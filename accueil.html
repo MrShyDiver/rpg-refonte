@@ -1,0 +1,1894 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Sécurité : mêmes règles que jeu.html. Si tu modifies le script en bas de page, son empreinte
+     sha256 change : regénère-la (sinon le navigateur refuse de l'exécuter). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'sha256-bq8QK2aeWTa004AQt+N7hFO/EVBhnKwy0ZNmtcp1LTs='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Stream RPG</title>
+<meta name="description" content="Le jeu de rôle de la chaîne MrShyDiver : gagne des lootbox en live, ouvre-les ici, équipe ton personnage et affronte le chat en duel.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Pixelify+Sans:wght@500;700&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sol: #0c0d12;
+  --sol-2: #121319;
+  --sol-3: #191b23;
+  --trait: rgba(255,255,255,.075);
+  --trait-fort: rgba(255,255,255,.14);
+  --encre: #f4f2ec;
+  --encre-2: #b3b2bd;
+  --encre-3: #8e8d9a;
+  --commun: #b9b9c3;
+  --normal: #4fd67d;
+  --rare: #3d9cff;
+  --epique: #b777ff;
+  --legendaire: #ffc53d;
+  --twitch: #9146ff;
+  --twitch-2: #a873ff;
+  --twitch-3: #7b35ee;
+  --titre: 'Unbounded', 'Onest', sans-serif;
+  --texte: 'Onest', system-ui, sans-serif;
+  --pixel: 'Pixelify Sans', 'Onest', sans-serif;
+  --panneau: 420px;
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scrollbar-color: #33343f var(--sol); }
+body { background: var(--sol); color: var(--encre); font-family: var(--texte); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; caret-color: var(--legendaire); }
+::selection { background: var(--legendaire); color: #16120a; }
+::-webkit-scrollbar { width: 10px; } ::-webkit-scrollbar-track { background: var(--sol); }
+::-webkit-scrollbar-thumb { background: #2c2d37; border-radius: 10px; border: 2px solid var(--sol); }
+img { display: block; max-width: 100%; }
+a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+:focus-visible { outline: 2px solid var(--legendaire); outline-offset: 3px; border-radius: 6px; }
+h1, h2, h3 { font-family: var(--titre); font-weight: 700; letter-spacing: -.02em; line-height: 1.08; text-wrap: balance; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ================= STRUCTURE : histoire à gauche, compte à droite ================= */
+body { overflow-x: clip; }
+.page { display: grid; grid-template-columns: minmax(0, 1fr) var(--panneau); min-height: 100vh; }
+.recit { min-width: 0; }
+.panneau {
+  position: sticky; top: 0; height: 100vh; overflow: hidden auto;
+  background: var(--sol-2); border-left: 1px solid var(--trait);
+  display: flex; flex-direction: column;
+}
+.colonne { max-width: 800px; margin: 0; padding: 0 clamp(20px, 4.5vw, 56px); }
+
+/* ================= EN-TÊTE ================= */
+.entete { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px clamp(20px, 4.5vw, 56px); }
+.marque { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; }
+.marque svg { width: 34px; height: 34px; flex: none; }
+.marque b { font-family: var(--titre); font-weight: 800; font-size: 17px; letter-spacing: -.01em; white-space: nowrap; }
+.liens-entete { display: flex; gap: 6px; }
+.liens-entete a { text-decoration: none; color: var(--encre-2); font-size: 14px; font-weight: 500; padding: 7px 12px; border-radius: 999px; transition: color .2s, background .2s; }
+.liens-entete a:hover { color: var(--encre); background: var(--sol-3); }
+
+/* ================= CARTE OBJET (composant partagé) =================
+   Tout l'intérieur est dimensionné en cqi : la carte garde ses proportions
+   à 64 comme à 200 px de large. */
+.carte {
+  --c: var(--commun);
+  container-type: inline-size;
+  position: relative; aspect-ratio: 5 / 7; border-radius: 14px;
+  background:
+    radial-gradient(120% 70% at 50% 18%, color-mix(in oklab, var(--c) 30%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in oklab, var(--c) 16%, #15161d) 0%, #121319 58%, #0f1015 100%);
+  border: 1px solid color-mix(in oklab, var(--c) 42%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 10px 24px -12px rgba(0,0,0,.8);
+  overflow: hidden; isolation: isolate;
+  display: flex; flex-direction: column;
+}
+.carte.normal { --c: var(--normal); } .carte.rare { --c: var(--rare); }
+.carte.epique { --c: var(--epique); } .carte.legendaire { --c: var(--legendaire); }
+.carte-haut { display: flex; justify-content: space-between; align-items: center; padding: 6cqi 7cqi 0; }
+.pastille-rarete {
+  font-family: var(--titre); font-weight: 800; font-size: 7.5cqi; line-height: 1;
+  color: #101116; background: var(--c); border-radius: 3cqi; padding: 2.2cqi 3cqi 2.4cqi; min-width: 11cqi; text-align: center;
+}
+.numero { font-family: var(--texte); font-weight: 600; font-size: 7cqi; font-variant-numeric: tabular-nums; color: color-mix(in oklab, var(--c) 60%, var(--encre-2)); }
+.carte-art { flex: 1; min-height: 0; position: relative; }
+.carte-art img { position: absolute; inset: 2cqi 10cqi; width: calc(100% - 20cqi); height: calc(100% - 4cqi); object-fit: contain; filter: drop-shadow(0 4cqi 5cqi rgba(0,0,0,.55)); }
+.carte-texte { padding: 0 7cqi 7cqi; }
+.carte-nom { font-weight: 600; font-size: 9.6cqi; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.3em; }
+.carte-sous { color: var(--encre-3); font-size: 7cqi; margin-top: 1.2cqi; }
+.carte-fait {
+  margin-top: 3.4cqi; padding-top: 3.2cqi; border-top: 1px solid var(--trait);
+  font-size: 7.4cqi; font-weight: 600; color: color-mix(in oklab, var(--c) 55%, var(--encre)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.niveau-tag {
+  position: absolute; top: 5cqi; right: 6cqi; z-index: 2;
+  font-family: var(--titre); font-weight: 800; font-size: 8cqi; line-height: 1;
+  color: #101116; background: var(--encre); border-radius: 3cqi; padding: 2cqi 3cqi 2.4cqi;
+}
+.niveau-tag.max { background: var(--c); }
+/* Reflet holographique des légendaires : une bande de lumière qui balaie la carte. */
+.carte.legendaire::after, .carte.brillante::after {
+  content: ""; position: absolute; inset: -40%; z-index: 3; pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255,236,170,.0) 42%, rgba(255,236,170,.32) 50%, rgba(255,255,255,.0) 58%, transparent 62%);
+  transform: translateX(-60%); animation: reflet 4.8s var(--ease) infinite;
+  mix-blend-mode: screen;
+}
+.carte.legendaire { box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 0 0 1px color-mix(in oklab, var(--legendaire) 30%, transparent), 0 12px 26px -12px rgba(0,0,0,.85); }
+@keyframes reflet { 0%, 55% { transform: translateX(-60%); } 100% { transform: translateX(60%); } }
+
+/* ================= HÉROS : carrousel d'objets ================= */
+.carrousel {
+  display: grid; gap: 14px; padding: 8px 0 4px; overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+.rangee { display: flex; gap: 14px; width: max-content; animation: defile var(--duree, 90s) linear infinite; }
+.rangee.inverse { animation-direction: reverse; }
+.carrousel:hover .rangee { animation-play-state: paused; }
+.rangee .carte { width: 148px; flex: none; transition: transform .45s var(--ease); }
+.rangee .carte:hover { transform: translateY(-6px) rotate(-1.5deg); }
+@keyframes defile { to { transform: translateX(calc(-50% - 7px)); } }
+
+.heros { padding: 44px 0 20px; }
+.heros h1 { font-size: clamp(34px, 4.6vw, 58px); font-weight: 800; letter-spacing: -.035em; max-width: 15ch; }
+.heros h1 em { font-style: normal; color: var(--legendaire); }
+.heros .definition { margin-top: 22px; font-size: clamp(16.5px, 1.5vw, 19px); color: var(--encre-2); max-width: 56ch; }
+.heros .definition b { color: var(--encre); font-weight: 600; }
+
+/* Boucle live -> site -> loadout -> duel -> live */
+.boucle { margin-top: 38px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; position: relative; }
+.etape { position: relative; padding: 18px 16px 0 0; }
+.etape + .etape { padding-left: 16px; }
+.etape::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--trait-fort); }
+.etape:first-child::before { background: linear-gradient(90deg, var(--twitch), var(--trait-fort)); }
+.etape svg { width: 26px; height: 26px; color: var(--encre); margin-bottom: 12px; }
+.etape:first-child svg { color: var(--twitch-2); }
+.etape .etape-titre { font-size: 15.5px; font-weight: 700; color: var(--encre); margin-bottom: 4px; }
+.etape p:not(.etape-titre) { font-size: 14px; color: var(--encre-2); line-height: 1.45; }
+.retour-live { margin-top: 18px; display: inline-flex; align-items: center; gap: 9px; font-size: 14px; color: var(--encre-2); }
+.retour-live svg { width: 18px; height: 18px; color: var(--twitch-2); flex: none; }
+
+/* ================= SECTIONS ================= */
+.section { padding: clamp(80px, 11vw, 132px) 0 0; }
+.section > .colonne > h2 { font-size: clamp(28px, 3.3vw, 40px); max-width: 18ch; }
+.chapeau { margin-top: 14px; color: var(--encre-2); font-size: 17px; max-width: 58ch; }
+.mention-demo { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--encre-3); }
+.mention-demo::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--encre-3); flex: none; }
+
+/* ---------- Lootbox : le coffre qui tremble, s'ouvre et libère les cartes ---------- */
+#lootbox .colonne { max-width: 960px; }
+.cf-o { fill: var(--contour, #160f0c); } .cf-b { fill: var(--bois, #7b4a2a); } .cf-bc { fill: var(--bois-clair, #a0643a); }
+.cf-bs { fill: var(--bois-sombre, #4b2c19); } .cf-m { fill: var(--metal, #9a9cae); } .cf-ms { fill: var(--metal-sombre, #5d5f70); } .cf-s { fill: var(--serrure, #ffc53d); }
+.version-legendaire { --bois: #3b2566; --bois-clair: #553692; --bois-sombre: #231543; --metal: #ffc53d; --metal-sombre: #b8841f; --serrure: #fff1c2; }
+
+.types-lootbox { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 30px; }
+.type-lootbox {
+  display: flex; gap: 14px; align-items: center; text-align: left; padding: 14px 16px; border-radius: 16px;
+  background: var(--sol-2); border: 1px solid var(--trait); transition: border-color .2s, background .2s, transform .2s var(--ease);
+}
+.type-lootbox:hover { border-color: var(--trait-fort); }
+.type-lootbox[aria-pressed="true"] { border-color: color-mix(in oklab, var(--c-type) 70%, transparent); background: color-mix(in oklab, var(--c-type) 9%, var(--sol-2)); }
+.type-lootbox[data-type="standard"] { --c-type: var(--encre-2); }
+.type-lootbox[data-type="legendaire"] { --c-type: var(--legendaire); }
+.type-lootbox svg { flex: none; width: 56px; height: auto; }
+.type-lootbox .titre-type { display: block; font-size: 15.5px; font-weight: 700; color: var(--encre); }
+.type-lootbox[data-type="legendaire"] .titre-type { color: var(--legendaire); }
+.type-lootbox .texte-type { display: block; font-size: 14px; color: var(--encre-2); margin-top: 2px; line-height: 1.45; }
+.type-lootbox:disabled { cursor: progress; }
+
+.table-jeu {
+  position: relative; margin-top: 14px; border-radius: 22px; overflow: hidden;
+  background: radial-gradient(55% 60% at 50% 100%, rgba(145,70,255,.13), transparent 70%), var(--sol-2);
+  border: 1px solid var(--trait); height: var(--h-table, 420px);
+}
+.table-jeu::before { /* feutrine discrète */
+  content: ""; position: absolute; inset: 0; opacity: .5; pointer-events: none;
+  background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px); background-size: 14px 14px;
+}
+.table-jeu.passable { cursor: pointer; }
+@keyframes flash-table { from { opacity: 1; } to { opacity: 0; } }
+
+.coffre { --lueur: #f4f2ec; --force: 1; position: absolute; left: 50%; top: 50%; width: min(230px, 46%); translate: -50% -46%; z-index: 2; transition: translate .7s var(--ease); }
+.coffre svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 16px 14px rgba(0,0,0,.65)); transition: opacity .5s var(--ease), scale .6s var(--ease); }
+.coffre:not(.tremble):not(.ouvert) svg { animation: flotte 3.4s ease-in-out infinite; }
+@keyframes flotte { 50% { transform: translateY(-5px); } }
+.coffre.tremble svg { animation: secousse .11s linear infinite; }
+@keyframes secousse {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  25% { transform: translate(calc(var(--force) * -1.6px), calc(var(--force) * .6px)) rotate(calc(var(--force) * -.9deg)); }
+  50% { transform: translate(calc(var(--force) * 1.4px), calc(var(--force) * -.8px)) rotate(calc(var(--force) * .7deg)); }
+  75% { transform: translate(calc(var(--force) * -.8px), calc(var(--force) * -.4px)) rotate(calc(var(--force) * -.4deg)); }
+}
+.couvercle { transform-box: fill-box; transform-origin: 8% 100%; transition: transform .45s cubic-bezier(.3, 1.7, .5, 1); }
+.coffre.tremble .couvercle { animation: sautille .2s steps(2) infinite; }
+@keyframes sautille { 50% { transform: translateY(calc(var(--force) * -.35px)); } }
+.coffre.ouvert .couvercle { animation: none; transform: translate(-1px, -6px) rotate(-24deg); }
+.fente { fill: var(--lueur); opacity: 0; transition: opacity .3s, fill .35s; }
+.coffre.tremble .fente { opacity: calc(.3 + var(--force) * .16); }
+.interieur { fill: var(--lueur); opacity: 0; transition: opacity .2s; }
+.coffre.ouvert .interieur { opacity: 1; }
+.halo {
+  position: absolute; left: 50%; top: 40%; width: 170%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; z-index: -1; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in oklab, var(--lueur) 60%, transparent), transparent 62%);
+  opacity: 0; scale: .5; transition: opacity .35s, scale .45s var(--ease);
+}
+.coffre.tremble .halo { opacity: calc(.1 + var(--force) * .09); scale: calc(.55 + var(--force) * .09); }
+.coffre.ouvert .halo { opacity: .9; scale: 1.2; }
+.faisceau {
+  position: absolute; left: 50%; bottom: 58%; width: 62%; height: 210%; translate: -50% 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(to top, color-mix(in oklab, var(--lueur) 80%, #fff), color-mix(in oklab, var(--lueur) 35%, transparent) 45%, transparent);
+  clip-path: polygon(28% 100%, 72% 100%, 100% 0, 0 0); filter: blur(5px);
+  opacity: 0; transform-origin: 50% 100%; scale: 1 0; transition: opacity .3s, scale .55s var(--ease);
+}
+.coffre.ouvert .faisceau { opacity: .85; scale: 1 1; }
+.rayons {
+  position: absolute; left: 50%; top: 38%; width: 360%; aspect-ratio: 1; translate: -50% -50%; z-index: -2; pointer-events: none;
+  background: repeating-conic-gradient(color-mix(in oklab, var(--lueur) 40%, transparent) 0 5deg, transparent 5deg 15deg);
+  -webkit-mask: radial-gradient(circle, #000 0 14%, transparent 60%); mask: radial-gradient(circle, #000 0 14%, transparent 60%);
+  opacity: 0; transition: opacity .6s; animation: rayons 16s linear infinite;
+}
+@keyframes rayons { to { rotate: 360deg; } }
+.coffre.rayonne .rayons { opacity: .75; }
+.onde { position: absolute; left: 50%; top: 40%; width: 40px; height: 40px; margin: -20px; border-radius: 50%; border: 3px solid var(--lueur); opacity: 0; pointer-events: none; }
+.coffre.ouvert .onde { animation: onde .8s var(--ease) forwards; }
+@keyframes onde { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(9); } }
+/* Une fois les cartes sorties, le coffre s'efface : il ne reste que sa lumière derrière elles. */
+.coffre.recule { translate: -50% -50%; }
+.coffre.recule svg { opacity: 0; scale: .7; }
+.coffre.recule .faisceau, .coffre.recule .fente { opacity: 0; }
+.coffre.recule .halo { opacity: .45; scale: 1.6; }
+
+.etincelle {
+  position: absolute; left: var(--x); top: var(--y); width: 6px; height: 6px; background: var(--c); z-index: 3; pointer-events: none;
+  animation: etincelle var(--d, .9s) cubic-bezier(.2, .7, .3, 1) forwards;
+}
+@keyframes etincelle { from { transform: translate(0, 0); opacity: 1; } to { transform: translate(var(--dx), calc(var(--dy) + 50px)) scale(.4) rotate(90deg); opacity: 0; } }
+
+.dcarte { position: absolute; left: 0; top: 0; width: var(--dw, 124px); transition: transform .75s var(--ease), opacity .35s, filter .4s; will-change: transform; perspective: 900px; z-index: 4; }
+.dcarte-in { position: relative; transform-style: preserve-3d; transition: transform .7s var(--ease); }
+.dcarte.retournee .dcarte-in { transform: rotateY(180deg); }
+.dos, .dcarte .face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.dcarte .face { position: absolute; inset: 0; transform: rotateY(180deg); }
+.dos {
+  aspect-ratio: 5 / 7; border-radius: 14px; position: relative; overflow: hidden;
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.035) 0 6px, transparent 6px 12px),
+    linear-gradient(160deg, #2a1d4a, #15121f 60%, #0f0e15);
+  border: 1px solid rgba(183,119,255,.35);
+  box-shadow: inset 0 0 0 5px #15121f, inset 0 0 0 6px rgba(183,119,255,.25), 0 12px 26px -12px rgba(0,0,0,.9);
+  display: grid; place-items: center;
+}
+.dos svg { width: 42%; opacity: .95; }
+/* Anticipation : le dos s'illumine de la couleur de rareté avant de se retourner. */
+.dcarte.charge .dos { animation: vibre var(--vib, .5s) linear; box-shadow: inset 0 0 0 5px #15121f, inset 0 0 0 6px var(--c), 0 0 38px -4px var(--c), 0 0 90px -20px var(--c); border-color: var(--c); transition: box-shadow .3s, border-color .3s; }
+@keyframes vibre { 0%,100% { transform: translate(0,0) } 20% { transform: translate(-1.5px,1px) rotate(-.6deg) } 40% { transform: translate(1.5px,-1px) rotate(.6deg) } 60% { transform: translate(-1px,-1px) } 80% { transform: translate(1px,1px) rotate(.4deg) } }
+.dcarte .libelle-rarete {
+  position: absolute; left: 50%; top: calc(100% + 10px); transform: translate(-50%, 6px); opacity: 0;
+  font-family: var(--titre); font-weight: 700; font-size: clamp(10px, calc(var(--dw, 124px) * .1), 12.5px); letter-spacing: .01em; color: var(--c); white-space: nowrap;
+  transition: opacity .4s, transform .4s var(--ease);
+}
+.dcarte.retournee .libelle-rarete { opacity: 1; transform: translate(-50%, 0); }
+.dcarte.haute.retournee .face { box-shadow: 0 0 0 1px var(--c), 0 22px 44px -18px color-mix(in oklab, var(--c) 70%, transparent); }
+.eclat { position: absolute; inset: -30%; border-radius: 50%; pointer-events: none; z-index: -1;
+  background: radial-gradient(circle, color-mix(in oklab, var(--c) 70%, transparent) 0%, transparent 62%); opacity: 0; transform: scale(.4); }
+.dcarte.eclate .eclat { animation: eclat 1.1s var(--ease) forwards; }
+@keyframes eclat { 0% { opacity: .95; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.6); } }
+.btn-passer {
+  position: absolute; right: 14px; bottom: 14px; z-index: 7; padding: 8px 13px; border-radius: 10px;
+  background: rgba(12,13,18,.75); border: 1px solid var(--trait-fort); font-size: 13px; font-weight: 600; color: var(--encre-2);
+}
+.btn-passer:hover { color: var(--encre); }
+
+.commandes-coffre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px; margin-top: 14px; }
+.boutons-ouvrir { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-ouvrir {
+  font-family: var(--titre); font-weight: 700; font-size: 14.5px; letter-spacing: -.005em;
+  padding: 13px 20px; border-radius: 12px; color: #16120a; background: var(--legendaire);
+  box-shadow: 0 10px 22px -12px rgba(0,0,0,.9), inset 0 -2px 0 rgba(0,0,0,.18);
+  transition: transform .2s var(--ease), filter .2s, opacity .2s;
+}
+.btn-ouvrir.second { background: transparent; color: var(--legendaire); box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--legendaire) 65%, transparent); }
+.btn-ouvrir:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.btn-ouvrir:active { transform: translateY(1px); }
+.btn-ouvrir:disabled { opacity: .4; cursor: progress; transform: none; }
+.btn-son { display: inline-flex; align-items: center; gap: 8px; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--trait-fort); font-size: 14px; font-weight: 600; color: var(--encre-2); }
+.btn-son svg { width: 18px; height: 18px; }
+.btn-son:hover { color: var(--encre); }
+.btn-son[aria-pressed="false"] .onde-son { display: none; }
+
+/* ---------- Jus de l'ouverture : échelle, secousse, éclairs, tampon, badges, pièces, bilan ---------- */
+.echelle { position: absolute; top: 14px; left: 50%; translate: -50% 0; z-index: 5; display: flex; gap: 6px; pointer-events: none; }
+.echelle[hidden] { display: none; }
+.echelle span {
+  font-family: var(--titre); font-weight: 700; font-size: 11px; letter-spacing: .02em; padding: 5px 9px 6px; border-radius: 999px;
+  color: var(--encre-3); background: rgba(12,13,18,.6); border: 1px solid var(--trait);
+  transition: color .2s, background .2s, border-color .2s, box-shadow .3s, scale .3s var(--ease);
+}
+.echelle span.atteint { color: #101116; background: var(--c); border-color: transparent; }
+.echelle span.actuel { scale: 1.16; box-shadow: 0 0 22px -2px var(--c); }
+.echelle span.exclu { opacity: .3; text-decoration: line-through; }
+.table-jeu.secoue { animation: camera var(--secousse, .5s) cubic-bezier(.36, .07, .19, .97); }
+@keyframes camera {
+  10%, 90% { transform: translate(-2px, 1px); } 20%, 80% { transform: translate(4px, -2px); }
+  30%, 50%, 70% { transform: translate(-7px, 3px) rotate(-.4deg); } 40%, 60% { transform: translate(7px, -3px) rotate(.4deg); }
+}
+.eclair { position: absolute; inset: 0; z-index: 6; pointer-events: none; background: radial-gradient(circle at 50% 45%, #fff, color-mix(in oklab, var(--flash) 55%, transparent) 30%, transparent 72%); animation: flash-table var(--df, .7s) ease-out forwards; }
+.coffre.inspire svg { scale: 1.14; transition: scale .14s ease-in; }
+.tampon {
+  position: absolute; left: 50%; top: 50%; z-index: 8; translate: -50% -50%; pointer-events: none; white-space: nowrap;
+  font-family: var(--titre); font-weight: 800; font-size: clamp(30px, 7vw, 64px); letter-spacing: -.02em; color: var(--c);
+  text-shadow: 0 0 30px var(--c), 0 4px 0 #000; animation: tampon 1.5s var(--ease) forwards;
+}
+@keyframes tampon { 0% { opacity: 0; scale: 2.4; filter: blur(8px); } 18% { opacity: 1; scale: .94; filter: none; } 28% { scale: 1.04; } 36% { scale: 1; } 75% { opacity: 1; } 100% { opacity: 0; scale: 1.08; } }
+.dcarte:not(.retournee) { cursor: pointer; }
+.dcarte.pop .dcarte-in { animation: pop .55s var(--ease); }
+@keyframes pop { 35% { scale: var(--pop, 1.1); } }
+.table-jeu.focus .dcarte:not(.vedette) { filter: brightness(.3) saturate(.5); }
+.dcarte.vedette { z-index: 5; }
+.badge-tirage {
+  position: absolute; left: 50%; top: -11px; translate: -50% 0; z-index: 6; pointer-events: none; white-space: nowrap;
+  font-family: var(--titre); font-weight: 800; font-size: clamp(9px, calc(var(--dw, 124px) * .085), 12px); line-height: 1;
+  padding: 5px 8px 6px; border-radius: 999px; animation: badge .55s cubic-bezier(.3, 1.7, .5, 1) both;
+}
+.badge-tirage.nouveau { background: var(--legendaire); color: #16120a; box-shadow: 0 0 18px -2px var(--legendaire); }
+.badge-tirage.niveau { background: var(--encre); color: #101116; }
+.badge-tirage.max { background: var(--c); color: #101116; box-shadow: 0 0 18px -2px var(--c); }
+@keyframes badge { from { opacity: 0; scale: .3; translate: -50% 8px; } }
+.piece {
+  position: absolute; top: -12px; left: var(--x); width: 8px; height: 8px; z-index: 7; pointer-events: none;
+  background: var(--legendaire); box-shadow: inset -2px -2px 0 #b8841f, inset 2px 2px 0 #fff1c2;
+  animation: piece var(--d) cubic-bezier(.4, 0, .8, .6) var(--r) forwards;
+}
+@keyframes piece { to { transform: translateY(var(--h)) rotate(540deg); opacity: .2; } }
+.recap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 12px; min-height: 32px; font-size: 14px; color: var(--encre-2); }
+.recap .puce {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 9px; border-radius: 999px; font-weight: 600; color: var(--encre);
+  background: var(--sol-2); border: 1px solid color-mix(in oklab, var(--c) 45%, transparent); font-variant-numeric: tabular-nums;
+  animation: puce .45s cubic-bezier(.3, 1.7, .5, 1) both;
+}
+.recap .puce::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+@keyframes puce { from { opacity: 0; scale: .6; } }
+.taux { margin-top: 10px; font-size: 13px; color: var(--encre-3); }
+@media (max-width: 720px) { .echelle { gap: 4px; } .echelle span { font-size: 9.5px; padding: 4px 6px 5px; } }
+
+/* ---------- Arsenal ---------- */
+.emplacements { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 38px; }
+.eventail { position: relative; height: 150px; margin-bottom: 14px; }
+.eventail .carte { position: absolute; bottom: 0; left: 50%; width: 84px; transform-origin: 50% 120%; transition: transform .5s var(--ease); }
+.eventail .carte:nth-child(1) { transform: translateX(-50%) translateX(-26px) rotate(-11deg); }
+.eventail .carte:nth-child(2) { transform: translateX(-50%) translateX(26px) rotate(11deg); }
+.eventail .carte:nth-child(3) { transform: translateX(-50%) translateY(-6px); z-index: 2; }
+.emplacement:hover .eventail .carte:nth-child(1) { transform: translateX(-50%) translateX(-36px) rotate(-15deg); }
+.emplacement:hover .eventail .carte:nth-child(2) { transform: translateX(-50%) translateX(36px) rotate(15deg); }
+.emplacement:hover .eventail .carte:nth-child(3) { transform: translateX(-50%) translateY(-14px); }
+.emplacement h3 { font-family: var(--texte); font-size: 16px; font-weight: 700; letter-spacing: 0; text-align: center; }
+.emplacement p { font-size: 13.5px; color: var(--encre-2); text-align: center; }
+
+.etiquettes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 40px; }
+.etiquette {
+  --c: var(--encre-2);
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 13px 8px 11px; border-radius: 999px;
+  background: var(--sol-2); border: 1px solid var(--trait-fort); font-size: 14px; font-weight: 600; color: var(--encre);
+  transition: background .2s, border-color .2s, color .2s, transform .2s var(--ease);
+}
+.etiquette::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px color-mix(in oklab, var(--c) 22%, transparent); }
+.etiquette .n { font-family: var(--texte); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--encre-3); font-size: 13px; }
+.etiquette:hover { border-color: color-mix(in oklab, var(--c) 60%, transparent); transform: translateY(-1px); }
+.etiquette[aria-pressed="true"] { background: color-mix(in oklab, var(--c) 18%, var(--sol-2)); border-color: var(--c); }
+.etiquette[aria-pressed="true"] .n { color: var(--encre); }
+.etiquette.sekiro { --c: #e2483d; } .etiquette.saignement { --c: #ff4d6d; } .etiquette.stun { --c: #ffd84d; }
+.etiquette.poison { --c: #7ee06d; } .etiquette.brulure { --c: #ff8a3d; } .etiquette.parade { --c: #9fd6ff; }
+.etiquette.soin { --c: #5ce0b8; } .etiquette.renvoi { --c: #d08bff; } .etiquette.bouclier { --c: #6ab8ff; }
+.etiquette.souffle { --c: #f5f1e0; } .etiquette.antisoin { --c: #c24dff; } .etiquette.differe { --c: #ffb03d; }
+.etiquette.vol { --c: #ff5e8a; } .etiquette.paralysie { --c: #fff07a; } .etiquette.stance { --c: #7aa7ff; }
+
+.collection { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 7px; margin-top: 22px; }
+.tuile {
+  --c: var(--commun); position: relative; aspect-ratio: 1; border-radius: 10px; background: radial-gradient(circle at 50% 40%, color-mix(in oklab, var(--c) 26%, transparent), transparent 72%), var(--sol-2);
+  border: 1px solid var(--trait); display: grid; place-items: center; padding: 12%;
+  transition: opacity .35s, transform .35s var(--ease), border-color .35s, filter .35s;
+}
+.tuile::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: 5px; height: 2px; border-radius: 2px; background: var(--c); opacity: .85; }
+.tuile.normal { --c: var(--normal); } .tuile.rare { --c: var(--rare); } .tuile.epique { --c: var(--epique); } .tuile.legendaire { --c: var(--legendaire); }
+.tuile img { width: 100%; height: 100%; object-fit: contain; }
+.collection.filtre .tuile { opacity: .16; filter: grayscale(1); }
+.collection.filtre .tuile.allume { opacity: 1; filter: none; border-color: color-mix(in oklab, var(--c) 60%, transparent); transform: translateY(-2px); }
+.tuile .bulle {
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px); z-index: 10; pointer-events: none; opacity: 0;
+  background: #22232d; border: 1px solid var(--trait-fort); border-radius: 8px; padding: 7px 10px; width: max-content; max-width: 220px;
+  font-size: 12.5px; line-height: 1.35; transition: opacity .15s, transform .15s;
+}
+.tuile .bulle b { display: block; font-size: 13px; }
+.tuile .bulle span { color: var(--encre-2); }
+.tuile:hover .bulle, .tuile:focus-visible .bulle { opacity: 1; transform: translate(-50%, 0); }
+/* Bulles des colonnes de bord : alignées sur le bord pour ne pas sortir de l'écran */
+.collection .tuile:nth-child(10n+1) .bulle { left: 0; transform: translate(0, 4px); }
+.collection .tuile:nth-child(10n) .bulle, .collection .tuile:nth-child(10n-1) .bulle { left: auto; right: 0; transform: translate(0, 4px); }
+.collection .tuile:nth-child(10n+1):is(:hover, :focus-visible) .bulle, .collection .tuile:nth-child(10n):is(:hover, :focus-visible) .bulle, .collection .tuile:nth-child(10n-1):is(:hover, :focus-visible) .bulle { transform: none; }
+.legende-collection { margin-top: 16px; font-size: 14px; color: var(--encre-2); min-height: 1.5em; }
+.legende-collection b { color: var(--encre); }
+
+/* ---------- Amélioration ---------- */
+.atelier { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: clamp(26px, 4vw, 48px); align-items: center; margin-top: 38px; }
+.atelier .carte { width: 100%; }
+.atelier .carte.monte { animation: monte .55s var(--ease); }
+@keyframes monte { 0% { transform: scale(1); } 35% { transform: scale(1.045) rotate(-1deg); box-shadow: 0 0 60px -10px var(--c); } 100% { transform: scale(1); } }
+.jauge-niveau { display: flex; gap: 5px; margin-bottom: 20px; }
+.jauge-niveau i { flex: 1; height: 8px; border-radius: 3px; background: var(--sol-3); border: 1px solid var(--trait); transition: background .35s, box-shadow .35s; }
+.jauge-niveau i.plein { background: var(--epique); border-color: transparent; }
+.entete-atelier { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.entete-atelier b { font-family: var(--titre); font-size: 22px; }
+.entete-atelier span { font-family: var(--titre); font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--epique); }
+.stats-atelier { display: grid; gap: 12px; }
+.ligne-stat { display: grid; grid-template-columns: 120px minmax(0, 1fr) 96px; align-items: center; gap: 14px; font-size: 14.5px; }
+.ligne-stat .nom-stat { color: var(--encre-2); }
+.ligne-stat .barre { height: 6px; border-radius: 6px; background: var(--sol-3); overflow: hidden; }
+.ligne-stat .barre i { display: block; height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, #7d4fd0, var(--epique)); transition: width .6s var(--ease); }
+.ligne-stat .val { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; position: relative; }
+.ligne-stat .val .gain { position: absolute; right: 0; top: -16px; font-family: var(--texte); font-weight: 700; font-size: 12.5px; color: var(--normal); opacity: 0; }
+.ligne-stat .val .gain.vu { animation: gain 1.2s var(--ease); }
+@keyframes gain { 0% { opacity: 0; transform: translateY(6px); } 25% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-6px); } }
+.actions-atelier { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+.btn-second { padding: 12px 18px; border-radius: 12px; border: 1px solid var(--trait-fort); font-weight: 600; font-size: 14.5px; color: var(--encre); transition: border-color .2s, background .2s; }
+.btn-second:hover { border-color: var(--encre-3); background: var(--sol-2); }
+.btn-doublon { background: var(--epique); color: #150b22; border-color: transparent; font-family: var(--titre); font-weight: 700; box-shadow: 0 10px 22px -12px rgba(0,0,0,.9); }
+.btn-doublon:hover { background: #c490ff; border-color: transparent; }
+.btn-doublon:disabled { opacity: .4; cursor: not-allowed; }
+.plafonds { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 44px; padding-top: 22px; border-top: 1px solid var(--trait); }
+.plafonds p { width: 100%; font-size: 14px; color: var(--encre-2); margin-bottom: 4px; }
+.plafond { display: inline-flex; align-items: baseline; gap: 8px; font-size: 14.5px; }
+.plafond i { width: 9px; height: 9px; border-radius: 2px; background: var(--c); align-self: center; }
+.plafond b { font-family: var(--titre); font-weight: 700; font-size: 13px; color: var(--c); }
+
+/* ---------- Duel ---------- */
+.arene {
+  position: relative; margin-top: 34px; border-radius: 22px; overflow: hidden; border: 1px solid var(--trait);
+  background: radial-gradient(70% 90% at 0% 50%, rgba(61,156,255,.10), transparent 60%), radial-gradient(70% 90% at 100% 50%, rgba(255,77,109,.10), transparent 60%), var(--sol-2);
+  padding: 26px 26px 20px;
+}
+.arene-grille { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 18px; align-items: start; }
+.combattant { display: grid; gap: 12px; position: relative; }
+.combattant.b { text-align: right; }
+.combattant .carte { width: min(150px, 100%); transition: transform .25s, filter .6s; }
+.combattant.b .carte { margin-left: auto; }
+.combattant.frappe .carte { animation: frappeA .35s ease-out; }
+.combattant.b.frappe .carte { animation-name: frappeB; }
+.combattant.touche .carte { animation: touche .35s ease-out; }
+@keyframes frappeA { 50% { transform: translateX(18px) rotate(3deg); } }
+@keyframes frappeB { 50% { transform: translateX(-18px) rotate(-3deg); } }
+@keyframes touche { 25% { transform: translateX(-6px); filter: brightness(1.8) saturate(.4); } 60% { transform: translateX(5px); } }
+.nom-combattant { font-family: var(--titre); font-size: 16px; font-weight: 700; }
+.pv { height: 10px; border-radius: 6px; background: #22131a; overflow: hidden; border: 1px solid var(--trait); display: flex; }
+.pv i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #36d27a, #7ef0a8); transition: width .55s var(--ease), background .3s; border-radius: 6px; }
+.combattant.b .pv { justify-content: flex-end; }
+.pv i.bas { background: linear-gradient(90deg, #ff4d4d, #ff8a6b); }
+.pv-texte { font-size: 13px; color: var(--encre-2); font-variant-numeric: tabular-nums; }
+.loadout-mini { display: flex; gap: 6px; }
+.combattant.b .loadout-mini { justify-content: flex-end; }
+.loadout-mini .tuile { width: 38px; border-radius: 8px; padding: 5px; }
+.loadout-mini .tuile::after { bottom: 3px; }
+.statut { min-height: 20px; font-family: var(--pixel); font-size: 13px; color: var(--legendaire); }
+.vs { font-family: var(--titre); font-weight: 800; font-size: 22px; color: var(--encre-3); align-self: center; padding-top: 10px; }
+.degat {
+  position: absolute; top: 30%; left: 50%; transform: translate(-50%, 0); pointer-events: none; z-index: 6;
+  font-family: var(--titre); font-weight: 800; font-size: 26px; color: #fff; text-shadow: 0 2px 0 #000, 0 3px 10px rgba(0,0,0,.7);
+  animation: degat 1s var(--ease) forwards;
+}
+.combattant.a .degat { left: min(75px, 50%); }
+.combattant.b .degat { left: auto; right: min(75px, 50%); transform: translate(50%, 0); }
+.degat.soin { color: #7ef0a8; }
+@keyframes degat { 0% { opacity: 0; translate: 0 10px; scale: .7; } 20% { opacity: 1; translate: 0 -6px; scale: 1.12; } 100% { opacity: 0; translate: 0 -40px; scale: 1; } }
+.journal { list-style: none; margin-top: 20px; display: grid; gap: 6px; min-height: 164px; align-content: end; }
+.journal li { font-size: 14px; color: var(--encre-2); padding: 7px 12px; border-radius: 9px; background: rgba(255,255,255,.028); animation: ligne .4s var(--ease); display: flex; gap: 10px; }
+.journal li b { color: var(--encre); font-weight: 600; }
+.journal li .qui { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; }
+.journal li:not(:last-child) { opacity: .55; }
+@keyframes ligne { from { opacity: 0; transform: translateY(8px); } }
+.bandeau-live {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--trait);
+  font-size: 14px; color: var(--encre-2);
+}
+.en-direct { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--encre); font-size: 13px; letter-spacing: .02em; transition: opacity .4s; }
+.en-direct.cache { opacity: 0; }
+.en-direct i { width: 8px; height: 8px; border-radius: 50%; background: #ff3b3b; }
+.bandeau-live .btn-second { padding: 9px 14px; font-size: 13.5px; }
+
+/* ---------- Classement ---------- */
+.podium { list-style: none; margin-top: 34px; display: grid; gap: 8px; }
+.rang-ligne {
+  display: grid; grid-template-columns: 44px 44px minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  padding: 12px 16px; border-radius: 14px; background: var(--sol-2); border: 1px solid var(--trait);
+}
+.rang-ligne:nth-child(1) { background: linear-gradient(90deg, rgba(255,197,61,.12), var(--sol-2) 55%); border-color: rgba(255,197,61,.35); }
+.rang-ligne:nth-child(2) { background: linear-gradient(90deg, rgba(210,215,230,.09), var(--sol-2) 55%); }
+.rang-ligne:nth-child(3) { background: linear-gradient(90deg, rgba(214,137,84,.1), var(--sol-2) 55%); }
+.rang-num { font-family: var(--titre); font-weight: 800; font-size: 20px; color: var(--encre-3); text-align: center; }
+.rang-ligne:nth-child(1) .rang-num { color: var(--legendaire); }
+.rang-ligne:nth-child(2) .rang-num { color: #d6d9e4; }
+.rang-ligne:nth-child(3) .rang-num { color: #e0925a; }
+.avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--sol-3); display: grid; place-items: center; font-weight: 700; color: var(--encre-2); overflow: hidden; border: 1px solid var(--trait-fort); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.rang-texte { min-width: 0; }
+.rang-nom { display: block; font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rang-bilan { display: block; font-size: 13px; color: var(--encre-2); font-variant-numeric: tabular-nums; }
+.rang-power { text-align: right; font-variant-numeric: tabular-nums; }
+.rang-power b { display: block; font-family: var(--titre); font-size: 18px; }
+.rang-power span { font-size: 12.5px; color: var(--encre-3); }
+.rang-ligne.fantome .rang-nom, .rang-ligne.fantome .rang-power b { color: var(--encre-3); }
+.pied-classement { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 16px; font-size: 14px; color: var(--encre-2); }
+.pied-classement a { font-weight: 600; color: var(--encre); }
+
+/* ---------- Clôture ---------- */
+.cloture { padding: clamp(90px, 12vw, 150px) 0 0; }
+.cloture h2 { font-size: clamp(30px, 4vw, 50px); font-weight: 800; letter-spacing: -.03em; max-width: 16ch; }
+.cloture p { margin-top: 16px; color: var(--encre-2); font-size: 17px; max-width: 52ch; }
+.cloture .btn-twitch { margin-top: 28px; max-width: 360px; }
+.pied { padding: 28px 0 40px; border-top: 1px solid var(--trait); margin-top: 90px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 13.5px; color: var(--encre-3); }
+.pied nav { display: flex; gap: 18px; }
+.pied a { color: var(--encre-2); text-decoration: none; }
+.pied a:hover { color: var(--encre); }
+
+/* ================= PANNEAU DE CONNEXION ================= */
+.panneau-corps { padding: 34px 38px 0; display: flex; flex-direction: column; flex: 1; }
+.panneau .marque svg { width: 40px; height: 40px; }
+.panneau .marque b { font-size: 20px; }
+.panneau h2 { font-size: 30px; font-weight: 800; letter-spacing: -.03em; margin-top: 44px; }
+.panneau .accroche { margin-top: 12px; color: var(--encre-2); font-size: 15.5px; }
+.btn-twitch {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%;
+  margin-top: 28px; padding: 16px 20px; border-radius: 14px;
+  background: var(--twitch); color: #fff; font-family: var(--titre); font-weight: 700; font-size: 15.5px; letter-spacing: -.005em;
+  box-shadow: 0 14px 28px -14px rgba(0,0,0,.95), inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 0 rgba(0,0,0,.2);
+  transition: transform .2s var(--ease), background .2s, box-shadow .2s;
+  overflow: hidden;
+}
+.btn-twitch svg { width: 20px; height: 20px; flex: none; }
+.btn-twitch:hover { background: var(--twitch-3); transform: translateY(-1px); box-shadow: 0 18px 32px -14px rgba(0,0,0,1), inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 0 rgba(0,0,0,.2); }
+.btn-twitch:active { transform: translateY(1px); }
+.btn-twitch[aria-busy="true"] { cursor: progress; opacity: .8; }
+.btn-twitch[aria-busy="true"] svg { animation: pulse-twitch 1s ease-in-out infinite; }
+@keyframes pulse-twitch { 50% { opacity: .35; } }
+.note-connexion { margin-top: 14px; font-size: 13.5px; color: var(--encre-3); display: flex; gap: 8px; align-items: flex-start; }
+.note-connexion svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.avantages { list-style: none; margin-top: 30px; display: grid; gap: 13px; }
+.avantages li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; font-size: 14.5px; color: var(--encre-2); }
+.avantages li svg { width: 18px; height: 18px; color: var(--legendaire); margin-top: 2px; }
+.avantages b { color: var(--encre); font-weight: 600; }
+.en-ce-moment { margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.en-ce-moment div { padding: 12px 14px; border-radius: 12px; background: var(--sol-3); border: 1px solid var(--trait); }
+.en-ce-moment b { display: block; font-family: var(--titre); font-size: 22px; font-variant-numeric: tabular-nums; }
+.en-ce-moment span { font-size: 12.5px; color: var(--encre-3); }
+.en-ce-moment[hidden] { display: none; }
+.main-legendaire { position: relative; height: 256px; margin-top: auto; flex: none; pointer-events: none; }
+.main-legendaire .carte { position: absolute; bottom: 44px; left: 50%; width: 128px; transform-origin: 50% 130%; }
+.main-legendaire .carte:nth-child(1) { transform: translateX(-50%) rotate(-16deg) translateX(-18px); }
+.main-legendaire .carte:nth-child(2) { transform: translateX(-50%) rotate(16deg) translateX(18px); }
+.main-legendaire .carte:nth-child(3) { transform: translateX(-50%) translateY(-18px); z-index: 2; }
+.panneau-pied { padding: 16px 38px 20px; border-top: 1px solid var(--trait); display: flex; gap: 18px; font-size: 13px; background: var(--sol-2); position: relative; z-index: 3; }
+.panneau-pied a { color: var(--encre-2); text-decoration: none; }
+.panneau-pied a:hover { color: var(--encre); }
+@media (max-height: 820px) and (min-width: 981px) { .main-legendaire { display: none; } .panneau h2 { margin-top: 30px; } }
+
+.message-erreur { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; background: #3a1418; border: 1px solid #7a2a31; color: #ffd9dc; padding: 12px 18px; border-radius: 12px; font-weight: 600; font-size: 14.5px; max-width: calc(100% - 32px); }
+.message-erreur[hidden] { display: none; }
+
+/* Barre d'action collante, mobile uniquement */
+.barre-mobile { display: none; }
+
+/* ================= ADAPTATIF ================= */
+@media (max-width: 1240px) { :root { --panneau: 380px; } .panneau-corps { padding: 30px 30px 0; } .panneau-pied { padding: 16px 30px 20px; } }
+@media (max-width: 980px) {
+  .page { display: flex; flex-direction: column; }
+  .recit { display: contents; }
+  .recit-haut { order: 0; min-width: 0; }
+  .panneau { order: 1; position: static; height: auto; overflow: visible; border-left: 0; border-top: 1px solid var(--trait); border-bottom: 1px solid var(--trait); }
+  .recit-bas { order: 2; min-width: 0; }
+  .panneau .marque, .main-legendaire, .panneau-pied { display: none; }
+  .panneau h2 { margin-top: 0; font-size: 26px; }
+  .panneau-corps { padding: 30px clamp(20px, 4.5vw, 56px) 32px; max-width: 780px; width: 100%; margin: 0 auto; }
+  .barre-mobile {
+    display: flex; position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 40;
+    transform: translateY(140%); transition: transform .45s var(--ease);
+  }
+  .barre-mobile.visible { transform: none; }
+  .barre-mobile .btn-twitch { margin: 0; box-shadow: 0 16px 40px -10px rgba(0,0,0,.9); }
+  .pied { margin-bottom: 70px; }
+}
+@media (max-width: 720px) {
+  .boucle { grid-template-columns: 1fr 1fr; row-gap: 26px; }
+  .etape:nth-child(3) { padding-left: 0; }
+  .emplacements { grid-template-columns: 1fr 1fr; row-gap: 34px; }
+  .collection { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .collection .tuile .bulle { left: 50% !important; right: auto !important; transform: translate(-50%, 4px) !important; }
+  .collection .tuile:is(:hover, :focus-visible) .bulle { transform: translate(-50%, 0) !important; }
+  .collection .tuile:nth-child(7n+1) .bulle { left: 0 !important; transform: none !important; }
+  .collection .tuile:is(:nth-child(7n), :nth-child(7n-1)) .bulle { left: auto !important; right: 0 !important; transform: none !important; }
+  .types-lootbox { grid-template-columns: 1fr; gap: 18px; }
+  .atelier { grid-template-columns: 1fr; }
+  .atelier .carte { max-width: 190px; margin: 0 auto; }
+  .ligne-stat { grid-template-columns: 84px minmax(0, 1fr) 92px; gap: 10px; font-size: 14px; }
+  .arene { padding: 18px 14px 16px; }
+  .arene-grille { gap: 8px; }
+  .combattant .carte { width: min(112px, 100%); }
+  .loadout-mini { gap: 4px; }
+  .loadout-mini .tuile { width: 26px; padding: 3px; border-radius: 6px; }
+  .vs { font-size: 16px; }
+  .rangee .carte { width: 120px; }
+  .rang-ligne { grid-template-columns: 26px 38px minmax(0, 1fr) auto; gap: 10px; padding: 10px 12px; }
+  .avatar { width: 38px; height: 38px; }
+  .btn-ouvrir { padding: 11px 14px; font-size: 13.5px; }
+  .type-lootbox svg { width: 44px; }
+  .liens-entete a:first-child { display: none; }
+  .heros { padding-bottom: 84px; }
+  .emplacements { overflow: clip; overflow-clip-margin: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .rangee { animation: none; }
+  .carrousel { overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-twitch" viewBox="0 0 24 24"><path fill="currentColor" d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></symbol>
+    <symbol id="i-live" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M8.2 15.8a5.4 5.4 0 0 1 0-7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.4 18.6a9.3 9.3 0 0 1 0-13.2M18.6 5.4a9.3 9.3 0 0 1 0 13.2"/></symbol>
+    <symbol id="i-boite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="11" rx="1.5"/><path d="M2.5 9h19V6.5A1.5 1.5 0 0 0 20 5H4a1.5 1.5 0 0 0-1.5 1.5zM12 5v15M12 5c-1.5-2.6-5-3-5-.6 0 1.2 1.6.9 5 .6zM12 5c1.5-2.6 5-3 5-.6 0 1.2-1.6.9-5 .6z"/></symbol>
+    <symbol id="i-bouclier" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.1 8 7.5 9.5 4.4-1.5 7.5-4.9 7.5-9.5V5.6z"/><path d="M12 7v10M8.2 11.2h7.6"/></symbol>
+    <symbol id="i-epees" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 6.5 13 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2"/></symbol>
+    <symbol id="i-retour" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/></symbol>
+    <symbol id="i-cle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-etoile" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.3 6.2 6.2 2.3-6.2 2.3L12 19.5l-2.3-6.2L3.5 11l6.2-2.3z"/></symbol>
+    <symbol id="i-marque" viewBox="0 0 40 40">
+      <rect x="9" y="4" width="22" height="31" rx="4.5" fill="#2a1d4a" stroke="#b777ff" stroke-opacity=".6" transform="rotate(-10 20 20)"/>
+      <rect x="10" y="5.5" width="22" height="31" rx="4.5" fill="#15121f" stroke="#ffc53d" stroke-width="1.5"/>
+      <g fill="#ffc53d" shape-rendering="crispEdges">
+        <rect x="24" y="10" width="3" height="3"/><rect x="21" y="13" width="3" height="3"/><rect x="18" y="16" width="3" height="3"/><rect x="15" y="19" width="3" height="3"/>
+        <rect x="13" y="22" width="3" height="3" fill="#b777ff"/><rect x="16" y="25" width="3" height="3" fill="#b777ff"/><rect x="11" y="20" width="3" height="3" fill="#b777ff"/>
+        <rect x="11" y="27" width="3" height="3" fill="#f4f2ec"/>
+      </g>
+    </symbol>
+    <symbol id="i-coffre" viewBox="0 0 32 26" shape-rendering="crispEdges">
+      <rect class="cf-o" x="3" y="10" width="26" height="15"/><rect class="cf-b" x="4" y="11" width="24" height="13"/><rect class="cf-bc" x="4" y="11" width="24" height="1"/>
+      <rect class="cf-bs" x="4" y="15" width="24" height="1"/><rect class="cf-bs" x="4" y="19" width="24" height="1"/><rect class="cf-bs" x="4" y="23" width="24" height="1"/>
+      <rect class="cf-m" x="7" y="11" width="3" height="13"/><rect class="cf-ms" x="9" y="11" width="1" height="13"/><rect class="cf-m" x="22" y="11" width="3" height="13"/><rect class="cf-ms" x="24" y="11" width="1" height="13"/>
+      <rect class="cf-o" x="4" y="2" width="24" height="1"/><rect class="cf-o" x="3" y="3" width="26" height="8"/><rect class="cf-b" x="4" y="3" width="24" height="7"/><rect class="cf-bc" x="4" y="3" width="24" height="2"/>
+      <rect class="cf-bs" x="4" y="8" width="24" height="1"/><rect class="cf-m" x="7" y="3" width="3" height="7"/><rect class="cf-ms" x="9" y="3" width="1" height="7"/><rect class="cf-m" x="22" y="3" width="3" height="7"/><rect class="cf-ms" x="24" y="3" width="1" height="7"/>
+      <rect class="cf-ms" x="3" y="10" width="26" height="1"/><rect class="cf-o" x="13" y="8" width="6" height="9"/><rect class="cf-s" x="14" y="9" width="4" height="1"/><rect class="cf-s" x="14" y="12" width="4" height="4"/><rect class="cf-o" x="15.5" y="13" width="1" height="2"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="page">
+
+  <main class="recit">
+    <div class="recit-haut">
+      <header class="entete">
+        <a class="marque" href="#" aria-label="Stream RPG, accueil"><svg aria-hidden="true"><use href="#i-marque"/></svg><b>Stream RPG</b></a>
+        <nav class="liens-entete" aria-label="Pages publiques">
+          <a href="/rpg/codex.html">Codex</a>
+          <a href="/rpg/ranking.html">Classement</a>
+        </nav>
+      </header>
+
+      <div class="carrousel" aria-label="Quelques objets à collectionner">
+        <div class="rangee" id="rangee-1" style="--duree: 110s"></div>
+        <div class="rangee inverse" id="rangee-2" style="--duree: 125s"></div>
+      </div>
+
+      <section class="heros">
+        <div class="colonne">
+          <h1>Tes points de chaîne deviennent <em>des armes.</em></h1>
+          <p class="definition"><b>Stream RPG</b>, c'est le jeu de rôle de la chaîne de MrShyDiver. Tu gagnes des lootbox en live avec tes points de chaîne, tu les ouvres ici, tu équipes ton personnage et tu défies les autres viewers en duel.</p>
+
+          <div class="boucle">
+            <div class="etape">
+              <svg aria-hidden="true"><use href="#i-live"/></svg>
+              <p class="etape-titre">En live</p>
+              <p>Tes points de chaîne se changent en lootbox et en tickets de duel.</p>
+            </div>
+            <div class="etape">
+              <svg aria-hidden="true"><use href="#i-boite"/></svg>
+              <p class="etape-titre">Sur le site</p>
+              <p>Tu ouvres tes lootbox et tu découvres ce qui tombe.</p>
+            </div>
+            <div class="etape">
+              <svg aria-hidden="true"><use href="#i-bouclier"/></svg>
+              <p class="etape-titre">Ton loadout</p>
+              <p>Une arme, une main gauche, une armure, un stratagème.</p>
+            </div>
+            <div class="etape">
+              <svg aria-hidden="true"><use href="#i-epees"/></svg>
+              <p class="etape-titre">En duel</p>
+              <p>Tu affrontes le chat, tour après tour.</p>
+            </div>
+          </div>
+          <p class="retour-live"><svg aria-hidden="true"><use href="#i-retour"/></svg>Et ton plus beau combat repasse en live, devant tout le monde.</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="recit-bas">
+      <!-- ============ LOOTBOX ============ -->
+      <section class="section" id="lootbox" aria-labelledby="t-lootbox">
+        <div class="colonne">
+          <h2 id="t-lootbox">Ouvre tes lootbox</h2>
+          <p class="chapeau">Une lootbox, un objet. Le coffre tremble, s'illumine… et plus il résiste, plus ce qu'il cache est rare. Touche une carte pour la retourner toi-même.</p>
+
+          <div class="types-lootbox" role="group" aria-label="Choisis ta lootbox">
+            <button type="button" class="type-lootbox" data-type="standard" aria-pressed="true">
+              <svg viewBox="0 0 32 26" aria-hidden="true"><use href="#i-coffre"/></svg>
+              <span><span class="titre-type">Lootbox</span><span class="texte-type">Gagnée en live avec tes points de chaîne.</span></span>
+            </button>
+            <button type="button" class="type-lootbox version-legendaire" data-type="legendaire" aria-pressed="false">
+              <svg viewBox="0 0 32 26" aria-hidden="true"><use href="#i-coffre"/></svg>
+              <span><span class="titre-type">Lootbox légendaire</span><span class="texte-type">Jamais de Commun. Elle se gagne en abattant le boss de la communauté.</span></span>
+            </button>
+          </div>
+
+          <div class="table-jeu" id="table-jeu">
+            <div class="coffre" id="coffre" aria-hidden="true">
+              <span class="rayons"></span>
+              <span class="halo"></span>
+              <span class="faisceau"></span>
+              <span class="onde"></span>
+              <svg viewBox="0 0 32 26" shape-rendering="crispEdges">
+                <g>
+                  <rect class="cf-o" x="3" y="10" width="26" height="15"/>
+                  <rect class="cf-b" x="4" y="11" width="24" height="13"/>
+                  <rect class="cf-bc" x="4" y="11" width="24" height="1"/>
+                  <rect class="cf-bs" x="4" y="15" width="24" height="1"/>
+                  <rect class="cf-bs" x="4" y="19" width="24" height="1"/>
+                  <rect class="cf-bs" x="4" y="23" width="24" height="1"/>
+                  <rect class="cf-m" x="7" y="11" width="3" height="13"/>
+                  <rect class="cf-ms" x="9" y="11" width="1" height="13"/>
+                  <rect class="cf-m" x="22" y="11" width="3" height="13"/>
+                  <rect class="cf-ms" x="24" y="11" width="1" height="13"/>
+                  <rect class="cf-o" x="13" y="11" width="6" height="6"/>
+                  <rect class="cf-s" x="14" y="12" width="4" height="4"/>
+                  <rect class="cf-o" x="15.5" y="13" width="1" height="2"/>
+                </g>
+                <rect class="interieur" x="4" y="9" width="24" height="2.5"/>
+                <g class="couvercle">
+                  <rect class="cf-o" x="4" y="2" width="24" height="1"/>
+                  <rect class="cf-o" x="3" y="3" width="26" height="8"/>
+                  <rect class="cf-b" x="4" y="3" width="24" height="7"/>
+                  <rect class="cf-bc" x="4" y="3" width="24" height="2"/>
+                  <rect class="cf-bs" x="4" y="8" width="24" height="1"/>
+                  <rect class="cf-m" x="7" y="3" width="3" height="7"/>
+                  <rect class="cf-ms" x="9" y="3" width="1" height="7"/>
+                  <rect class="cf-m" x="22" y="3" width="3" height="7"/>
+                  <rect class="cf-ms" x="24" y="3" width="1" height="7"/>
+                  <rect class="cf-ms" x="3" y="10" width="26" height="1"/>
+                  <rect class="cf-o" x="13" y="8" width="6" height="3"/>
+                  <rect class="cf-s" x="14" y="9" width="4" height="1"/>
+                </g>
+                <rect class="fente" x="3.5" y="10.6" width="25" height=".8"/>
+              </svg>
+            </div>
+            <div class="echelle" id="echelle" aria-hidden="true"></div>
+            <button type="button" class="btn-passer" id="btn-passer" hidden>Tout révéler</button>
+          </div>
+
+          <p class="recap" id="recap" aria-live="polite"></p>
+          <div class="commandes-coffre">
+            <div class="boutons-ouvrir">
+              <button class="btn-ouvrir" type="button" data-n="1">Ouvrir 1</button>
+              <button class="btn-ouvrir second" type="button" data-n="5">Ouvrir 5</button>
+              <button class="btn-ouvrir second" type="button" data-n="10">Ouvrir 10</button>
+            </div>
+            <button type="button" class="btn-son" id="btn-son" aria-pressed="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="onde-son" d="M15.5 9a4 4 0 0 1 0 6M18.2 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+              <span id="libelle-son">Son activé</span>
+            </button>
+          </div>
+          <p class="taux" id="taux"></p>
+          <p class="mention-demo" style="margin-top:8px">Tirage de démonstration aux taux actuels de chaque lootbox : rien n'est ajouté à un inventaire.</p>
+        </div>
+      </section>
+
+      <!-- ============ ARSENAL ============ -->
+      <section class="section" id="arsenal" aria-labelledby="t-arsenal">
+        <div class="colonne">
+          <h2 id="t-arsenal">Complète ton arsenal</h2>
+          <p class="chapeau" id="chapeau-arsenal">Des objets répartis sur quatre emplacements, des sets, des effets qui se combinent.</p>
+
+          <div class="emplacements" id="emplacements"></div>
+
+          <div class="etiquettes" id="etiquettes" role="group" aria-label="Filtrer la collection par effet"></div>
+          <div class="collection" id="collection"></div>
+          <p class="legende-collection" id="legende-collection" aria-live="polite">Touche un effet pour voir les objets qui le portent.</p>
+        </div>
+      </section>
+
+      <!-- ============ AMÉLIORATION ============ -->
+      <section class="section" id="amelioration" aria-labelledby="t-amelio">
+        <div class="colonne">
+          <h2 id="t-amelio">Fais monter tes objets</h2>
+          <p class="chapeau">Chaque doublon ajoute un niveau à ton objet : ses dégâts, ses stats et son effet principal grimpent avec lui.</p>
+
+          <div class="atelier">
+            <div id="carte-atelier"></div>
+            <div>
+              <div class="entete-atelier"><b id="atelier-nom"></b><span id="atelier-niveau"></span></div>
+              <div class="jauge-niveau" id="jauge-niveau" aria-hidden="true"></div>
+              <div class="stats-atelier" id="stats-atelier"></div>
+              <div class="actions-atelier">
+                <button type="button" class="btn-second btn-doublon" id="btn-doublon">Ajouter un doublon</button>
+                <button type="button" class="btn-second" id="btn-remise">Recommencer</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="plafonds" id="plafonds">
+            <p>Le niveau maximum dépend de la rareté :</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ DUELS ============ -->
+      <section class="section" id="duels" aria-labelledby="t-duels">
+        <div class="colonne">
+          <h2 id="t-duels">Tes duels passent en live</h2>
+          <p class="chapeau">Les combats se jouent au tour par tour, ici, avec ton loadout. Ton plus beau duel, tu peux l'envoyer sur le stream, un par jour, et tout le chat le regarde.</p>
+
+          <div class="arene" id="arene">
+            <div class="arene-grille">
+              <div class="combattant a" id="combattant-a"></div>
+              <div class="vs" aria-hidden="true">VS</div>
+              <div class="combattant b" id="combattant-b"></div>
+            </div>
+            <ol class="journal" id="journal" aria-live="off"></ol>
+            <div class="bandeau-live">
+              <span class="en-direct cache" id="en-direct"><i></i>Diffusé en direct sur la chaîne</span>
+              <button type="button" class="btn-second" id="btn-rejouer">Revoir le duel</button>
+            </div>
+          </div>
+          <p class="mention-demo" style="margin-top:12px">Duel de démonstration avec de vrais objets du jeu.</p>
+        </div>
+      </section>
+
+      <!-- ============ CLASSEMENT ============ -->
+      <section class="section" id="classement" aria-labelledby="t-classement">
+        <div class="colonne">
+          <h2 id="t-classement">Grimpe au classement</h2>
+          <p class="chapeau">Puissance, victoires, séries : chaque duel compte. Voici qui mène la chaîne en ce moment.</p>
+          <ol class="podium" id="podium"></ol>
+          <div class="pied-classement">
+            <span id="source-classement">Classement de la puissance, mis à jour toutes les 5 minutes.</span>
+            <a href="/rpg/ranking.html">Voir tous les classements</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CLÔTURE ============ -->
+      <section class="cloture">
+        <div class="colonne">
+          <h2>Ton arsenal t'attend déjà.</h2>
+          <p>Tu as déjà joué en live ? Tes objets, tes lootbox et tes médailles sont là, rattachés à ton compte Twitch. Sinon, c'est le moment de commencer.</p>
+          <button type="button" class="btn-twitch" data-connexion><svg aria-hidden="true"><use href="#i-twitch"/></svg>Se connecter avec Twitch</button>
+          <footer class="pied">
+            <span>Stream RPG, le jeu de la chaîne de MrShyDiver.</span>
+            <nav aria-label="Liens du pied de page">
+              <a href="/rpg/codex.html">Codex</a>
+              <a href="/rpg/ranking.html">Classement</a>
+              <a href="https://www.twitch.tv/mrshydiver" rel="noopener">La chaîne</a>
+            </nav>
+          </footer>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ============ PANNEAU DE CONNEXION ============ -->
+  <aside class="panneau" aria-labelledby="t-connexion">
+    <div class="panneau-corps">
+      <a class="marque" href="#" aria-hidden="true" tabindex="-1"><svg><use href="#i-marque"/></svg><b>Stream RPG</b></a>
+      <h2 id="t-connexion">Rejoins la partie</h2>
+      <p class="accroche">Ton compte, c'est ton Twitch. Un clic, et tu retrouves tout ce que tu as gagné en live.</p>
+      <button type="button" class="btn-twitch" id="btn-connexion" data-connexion><svg aria-hidden="true"><use href="#i-twitch"/></svg>Se connecter avec Twitch</button>
+      <p class="note-connexion"><svg aria-hidden="true"><use href="#i-cle"/></svg><span>Aucun mot de passe à créer : c'est Twitch qui s'occupe de la connexion.</span></p>
+
+      <ul class="avantages">
+        <li><svg aria-hidden="true"><use href="#i-etoile"/></svg><span><b>Tes lootbox</b> gagnées en live, prêtes à ouvrir.</span></li>
+        <li><svg aria-hidden="true"><use href="#i-etoile"/></svg><span><b>Ton loadout</b> à régler avant chaque duel.</span></li>
+        <li><svg aria-hidden="true"><use href="#i-etoile"/></svg><span><b>Tes duels</b>, et le meilleur envoyé sur le stream.</span></li>
+      </ul>
+
+      <div class="en-ce-moment" id="en-ce-moment" hidden>
+        <div><b class="num" id="nb-joueurs"></b><span>joueurs dans la partie</span></div>
+        <div><b class="num" id="nb-duels"></b><span>duels disputés</span></div>
+      </div>
+
+      <div class="main-legendaire" id="main-legendaire" aria-hidden="true"></div>
+    </div>
+    <div class="panneau-pied">
+      <a href="/rpg/codex.html">Codex</a><a href="/rpg/ranking.html">Classement</a><a href="https://www.twitch.tv/mrshydiver" rel="noopener">La chaîne</a>
+    </div>
+  </aside>
+</div>
+
+<div class="barre-mobile" id="barre-mobile">
+  <button type="button" class="btn-twitch" data-connexion><svg aria-hidden="true"><use href="#i-twitch"/></svg>Se connecter avec Twitch</button>
+</div>
+
+<div class="message-erreur" id="message-erreur" role="alert" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+// ============================================================
+// Données : les 50 objets du catalogue (catalog.cs). À garder synchronisé quand un objet
+// est ajouté : [numéro, image, nom, rareté, emplacement, mains, fait marquant, effets, contributeur]
+// ============================================================
+const OBJETS = [
+  [1, "machete-democratique", "Machete Démocratique", "commun", "arme", 1, "9–13 dégâts", []],
+  [2, "gallant", "Gallant", "commun", "arme", 1, "Rafale de 5 tirs", []],
+  [16, "gros_baton", "Gros Bâton (1h)", "commun", "arme", 1, "8–12 dégâts", []],
+  [6, "gros_baton", "Gros Bâton (2H)", "commun", "arme", 2, "16–23 dégâts", []],
+  [8, "bouclier-ballistique", "Bouclier Ballistique", "commun", "main", 0, "−50 % dégâts de tir", ["bouclier"]],
+  [32, "bouclier_tortue", "Grande Carapace de Tortue", "commun", "main", 0, "Blocage 15 %", ["bouclier"]],
+  [12, "slip-de-protection", "Slip de protection", "commun", "armure", 0, "Esquive +15 %", []],
+  [28, "armure-lourde", "Armure Lourde", "commun", "armure", 0, "+30 PV, +5 DEF", []],
+  [19, "frappe-precision", "Frappe de précision", "commun", "strat", 0, "15 dégâts, perce tout", []],
+  [20, "eagle_airstrike", "Frappe Aérienne", "commun", "strat", 0, "6 bombes de 4", []],
+  [27, "arbalete-explosive", "Arbalète Explosive", "normal", "arme", 1, "12–19 dégâts", []],
+  [29, "pistolet-bolster", "Pistolet Bolster", "normal", "arme", 1, "Pénétration 50 %", []],
+  [7, "deadeye", "Deadeye", "normal", "arme", 2, "30–32 dégâts", []],
+  [5, "marteau-democratique", "Marteau de la Liberté", "normal", "arme", 2, "Stun 25 %", ["stun"]],
+  [34, "tanto", "Tantô de Cérémonie", "normal", "arme", 1, "Recharge un stratagème", ["sekiro"]],
+  [10, "bouclier_epineux", "Bouclier épineux", "normal", "main", 0, "Renvoi 5 %", ["renvoi"]],
+  [11, "stim", "Stimulant", "normal", "main", 0, "Soin 50 PV × 4", ["soin"]],
+  [41, "plumes-de-corbeau", "Plumes de corbeau", "normal", "main", 0, "Esquive et parade +20 %", ["sekiro"]],
+  [43, "canon-flamboyant", "Canon Flamboyant", "normal", "main", 0, "Brûlure 10 × 2 tours", ["sekiro", "brulure"]],
+  [9, "armure-anti-crit", "Armure Anti-crit", "normal", "armure", 0, "−15 % de critiques subis", []],
+  [13, "armure_protection_democratique", "Protection Démocratique", "normal", "armure", 0, "Dernier souffle", ["souffle"]],
+  [17, "sac-generateur-bouclier", "Générateur de bouclier", "normal", "strat", 0, "Bouclier de 50", ["bouclier"]],
+  [18, "gas_orbital", "Gas Orbital", "normal", "strat", 0, "Poison 9 × 3 tours", ["poison"]],
+  [21, "eagle_500kg", "Frappe 500kg", "normal", "strat", 0, "50 dégâts", []],
+  [3, "lame-vampirique", "Lame vampirique", "rare", "arme", 1, "Vol de vie 15 %", ["vol"]],
+  [4, "dague_empoisonnee", "Dague empoisonnée", "rare", "arme", 1, "Poison 3 × 3 tours", ["poison"]],
+  [30, "croc-du-limier", "Croc du limier (1H)", "rare", "arme", 1, "Saignement", ["saignement"], "o_RiCO_o0"],
+  [25, "volto-hache-stance-1", "Volto-Hache", "rare", "arme", 2, "Change de forme tous les 3 tours", ["stance"], "Ayen57"],
+  [31, "croc-du-limier", "Croc du limier (2h)", "rare", "arme", 2, "Saignement renforcé", ["saignement"], "o_RiCO_o0"],
+  [26, "parapluie-charge", "Parapluie Chargé", "rare", "main", 0, "Parade 15 % + riposte", ["parade"]],
+  [14, "armure-regen", "Armure Med-Kit", "rare", "armure", 0, "Régénération 3 %", ["soin"]],
+  [15, "armure_renvoi", "Armure épineuse", "rare", "armure", 0, "Renvoi 5 %", ["renvoi"]],
+  [33, "rakshasa-armor", "Armure de Rakshasa", "rare", "armure", 0, "+12 ATK", [], "o_RiCO_o0"],
+  [24, "ecaille-dragon", "Écailles de Dragon", "rare", "armure", 0, "−50 % de brûlure subie", [], "Aurel_le_dragon"],
+  [22, "solo-silo", "Solo Silo", "rare", "strat", 0, "70 dégâts, 2 tours plus tard", ["differe"]],
+  [23, "souffle-draconique", "Souffle Draconique", "rare", "strat", 0, "Brûlure 15 × 3 tours", ["brulure"], "Aurel_le_dragon"],
+  [35, "kusabimaru", "Lame Kusabimaru", "epique", "arme", 1, "Frénésie + parade", ["sekiro", "parade"]],
+  [37, "lance-gyobou", "Lance Gyoubu", "epique", "arme", 2, "30–36 dégâts, saignement", ["sekiro", "saignement"]],
+  [39, "odachi-de-la-chouette", "Odachi de la Chouette", "epique", "arme", 2, "Anti-soin 30 % + parade", ["sekiro", "antisoin", "parade"]],
+  [40, "gourde-medicinale", "Gourde Médicinale", "epique", "main", 0, "Soin 60 PV, soins +25 %", ["sekiro", "soin"]],
+  [42, "petard-shinobi", "Pétards Shinobi", "epique", "main", 0, "−20 DEF adverse", ["sekiro"]],
+  [44, "sabimaru", "Sabimaru", "epique", "main", 0, "Poison + anti-soin", ["sekiro", "poison", "antisoin"]],
+  [45, "armure-robert", "Armure de Robert", "epique", "armure", 0, "Ténacité 50 %, riposte étourdissante", ["sekiro", "stun"]],
+  [47, "reste-demon-haine", "Restes du démon de la haine", "epique", "armure", 0, "Renvoie la brûlure", ["sekiro", "brulure", "renvoi"]],
+  [48, "hache-chargee", "Hache Chargée", "epique", "strat", 0, "60 dégâts, stun 2 tours", ["sekiro", "stun"]],
+  [49, "shuriken-shinobi", "Shurikens Shinobi", "epique", "strat", 0, "4 lancers, saignement", ["sekiro", "saignement", "stun"]],
+  [36, "lame-de-la-mort", "Lame de la mort", "legendaire", "arme", 1, "Ronge les PV max adverses", ["sekiro"]],
+  [38, "arc-genichiro", "Arc de Genichiro", "legendaire", "arme", 2, "3 modes de tir en alternance", ["sekiro", "saignement", "stun"]],
+  [46, "manteau-du-loup", "Manteau du Loup", "legendaire", "armure", 0, "Revient à 25 % PV", ["sekiro", "souffle"]],
+  [50, "eclair-tomoe", "Éclair de Tomoe", "legendaire", "strat", 0, "90 dégâts, paralysie", ["sekiro", "paralysie", "differe"]],
+].map(([numero, image, nom, rarete, slot, mains, fait, effets, contributeur]) =>
+  ({ numero, image, nom, rarete, slot, mains, fait, effets, contributeur }));
+const PAR_NUMERO = Object.fromEntries(OBJETS.map((o) => [o.numero, o]));
+
+const RARETES = {
+  commun: { nom: "Commun", lettre: "C", max: 25 },
+  normal: { nom: "Normal", lettre: "N", max: 20 },
+  rare: { nom: "Rare", lettre: "R", max: 15 },
+  epique: { nom: "Épique", lettre: "É", max: 10 },
+  legendaire: { nom: "Légendaire", lettre: "L", max: 5 },
+};
+const ORDRE_RARETE = ["commun", "normal", "rare", "epique", "legendaire"];
+const EMPLACEMENTS = {
+  arme: { nom: "armes", seul: "Arme", texte: "à une ou deux mains" },
+  main: { nom: "mains gauches", seul: "Main gauche", texte: "boucliers, soins, gadgets" },
+  armure: { nom: "armures", seul: "Armure", texte: "PV, défense, passifs" },
+  strat: { nom: "stratagèmes", seul: "Stratagème", texte: "frappes à recharge" },
+};
+const EFFETS = [
+  ["sekiro", "Set Sekiro"], ["saignement", "Saignement"], ["stun", "Stun"], ["poison", "Poison"],
+  ["brulure", "Brûlure"], ["parade", "Parade & riposte"], ["soin", "Soins"], ["renvoi", "Renvoi de dégâts"],
+  ["bouclier", "Bouclier & blocage"], ["souffle", "Dernier souffle"], ["antisoin", "Anti-soin"],
+  ["differe", "Frappe différée"], ["vol", "Vol de vie"], ["paralysie", "Paralysie"], ["stance", "Changement de forme"],
+];
+
+// Images : gear/<nom>.png à côté de cette page (même dossier que codex.html).
+const IMAGES_INTEGREES = {};
+const image = (nom) => IMAGES_INTEGREES[nom] || ("gear/" + nom + ".png");
+// Site publié ailleurs que dans /rpg/ (dépôt de test) : les images manquantes viennent de /rpg/gear/.
+document.addEventListener("error", (e) => {
+  const im = e.target;
+  if (!(im instanceof HTMLImageElement) || im.dataset.repli) return;
+  const src = im.getAttribute("src") || "";
+  if (/^gear\//.test(src) && !location.pathname.startsWith("/rpg/")) { im.dataset.repli = "1"; im.src = "/rpg/" + src; }
+}, true);
+
+const $ = (id) => document.getElementById(id);
+const reduit = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const attendre = (ms) => new Promise((r) => setTimeout(r, reduit ? Math.min(ms, 60) : ms));
+
+function sousTitre(o) {
+  if (o.slot === "arme") return "Arme · " + (o.mains === 2 ? "deux mains" : "une main");
+  return EMPLACEMENTS[o.slot].seul;
+}
+
+// Construit une carte d'objet. Le contenu vient uniquement des données ci-dessus.
+function carte(o, { niveau = null } = {}) {
+  const r = RARETES[o.rarete];
+  const el = document.createElement("div");
+  el.className = "carte " + o.rarete;
+  el.innerHTML =
+    '<div class="carte-haut"><span class="pastille-rarete">' + r.lettre + '</span><span class="numero">N°' + o.numero + '</span></div>' +
+    '<div class="carte-art"><img src="' + image(o.image) + '" alt="" loading="lazy" decoding="async"></div>' +
+    '<div class="carte-texte"><div class="carte-nom">' + o.nom + '</div><div class="carte-sous">' + sousTitre(o) + '</div><div class="carte-fait">' + o.fait + '</div></div>';
+  if (niveau !== null) {
+    const t = document.createElement("span");
+    t.className = "niveau-tag";
+    el.append(t);
+  }
+  el.setAttribute("role", "img");
+  el.setAttribute("aria-label", o.nom + ", " + r.nom + ", " + o.fait);
+  return el;
+}
+
+// ============================================================
+// Carrousel : deux rangées en sens inverse, chacune dupliquée pour boucler sans couture.
+// ============================================================
+(function carrousel() {
+  const melange = OBJETS.slice().sort((a, b) => ((a.numero * 37) % 50) - ((b.numero * 37) % 50));
+  const moitie = Math.ceil(melange.length / 2);
+  [[$("rangee-1"), melange.slice(0, moitie)], [$("rangee-2"), melange.slice(moitie)]].forEach(([rangee, liste]) => {
+    const frag = document.createDocumentFragment();
+    [...liste, ...liste].forEach((o, i) => {
+      const c = carte(o);
+      if (i >= liste.length) c.setAttribute("aria-hidden", "true");
+      frag.append(c);
+    });
+    rangee.append(frag);
+  });
+})();
+
+// Main de légendaires dans le panneau de connexion.
+[46, 36, 38].forEach((n) => $("main-legendaire").append(carte(PAR_NUMERO[n])));
+
+// ============================================================
+// Lootbox : le coffre tremble (plus longtemps quand le butin est rare), s'ouvre,
+// et libère une carte par lootbox ouverte. Chaque rareté a son son.
+// ============================================================
+const table = $("table-jeu");
+const coffre = $("coffre");
+const btnPasser = $("btn-passer");
+// Taux actuels (commande-lootbox.cs : table « avant boss », pas de Légendaire ;
+// commande-lootbox-legendaire.cs : jamais de Commun). Passer la standard à
+// 45/30/15/8/2 quand la table « après boss » sera activée.
+const TAUX = {
+  standard: { commun: 46, normal: 31, rare: 15, epique: 8, legendaire: 0 },
+  legendaire: { commun: 0, normal: 46, rare: 31, epique: 15, legendaire: 8 },
+};
+// Suspense du coffre selon la meilleure rareté du tirage, charge de chaque carte avant son
+// retournement, puis écart avant la suivante (les communes tombent en rafale).
+const SUSPENSE = [900, 1500, 2300, 3200, 4400];
+const CHARGE = [0, 110, 380, 720, 1150];
+const ECART = [150, 190, 420, 650, 950];
+// Sons : laisser vide pour les sons générés ; sinon un chemin (ex. "sons/jojo-rare.mp3").
+const SONS_FICHIERS = { commun: "", normal: "", rare: "", epique: "", legendaire: "" };
+// Vibrations sur mobile (ms), par rareté.
+const VIBRATIONS = [null, null, [25], [40, 40, 90], [70, 50, 70, 50, 260]];
+const PLURIEL = { commun: "Communs", normal: "Normaux", rare: "Rares", epique: "Épiques", legendaire: "Légendaires" };
+
+let typeCoffre = "standard", ouvertureEnCours = false, passer = false, reveils = [], dernierTirage = null;
+// Collection de démonstration (mémoire de la page) : « Nouveau ! » au premier exemplaire,
+// puis un niveau par doublon, exactement comme sur un vrai compte.
+const collectionDemo = {};
+const rangDe = (r) => ORDRE_RARETE.indexOf(r);
+const couleur = (r) => getComputedStyle(document.documentElement).getPropertyValue("--" + r).trim();
+
+// Pause que « Tout révéler » peut écourter.
+function pause(ms) {
+  return new Promise((fin) => {
+    if (passer) return fin();
+    const t = setTimeout(fin, reduit ? Math.min(ms, 60) : ms);
+    reveils.push(() => { clearTimeout(t); fin(); });
+  });
+}
+function toutReveler() {
+  if (!ouvertureEnCours || passer) return;
+  passer = true;
+  reveils.splice(0).forEach((f) => f());
+}
+
+function tirerRarete(taux) {
+  const total = ORDRE_RARETE.reduce((s, r) => s + taux[r], 0);
+  let x = Math.random() * total;
+  for (const r of ORDRE_RARETE) { if (!taux[r]) continue; x -= taux[r]; if (x <= 0) return r; }
+  return ORDRE_RARETE.find((r) => taux[r]);
+}
+function tirerObjet(rarete) {
+  const pool = OBJETS.filter((o) => o.rarete === rarete);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+// Même forme que ce que renvoie ouvrir_lootbox : { o, nouveau, niveau, max }.
+function tirageDemo(n) {
+  return Array.from({ length: n }, () => {
+    const o = tirerObjet(tirerRarete(TAUX[typeCoffre]));
+    const nouveau = !(o.numero in collectionDemo);
+    const niveau = nouveau ? 0 : collectionDemo[o.numero] + 1;
+    collectionDemo[o.numero] = niveau;
+    return { o, nouveau, niveau, max: RARETES[o.rarete].max };
+  });
+}
+
+// ---------- Sons (Web Audio, aucun fichier requis) ----------
+let actx = null, maitre = null, echo = null, sonActif = true;
+function demarrerAudio() {
+  if (!sonActif) return;
+  if (!actx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    actx = new AC();
+    const comp = actx.createDynamicsCompressor();
+    comp.connect(actx.destination);
+    maitre = actx.createGain();
+    maitre.gain.value = 0.5;
+    maitre.connect(comp);
+    // Réverbération générée (bruit qui s'éteint) : donne de l'ampleur aux grosses révélations.
+    const rev = actx.createConvolver(), n = Math.floor(actx.sampleRate * 1.8), ir = actx.createBuffer(2, n, actx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3); }
+    rev.buffer = ir;
+    echo = actx.createGain();
+    echo.gain.value = 0.3;
+    echo.connect(rev).connect(comp);
+  }
+  if (actx.state === "suspended") actx.resume();
+}
+const audible = () => sonActif && actx;
+function note(f, t0, duree, type = "triangle", vol = 0.16, reverb = 0) {
+  if (!audible()) return;
+  const t = actx.currentTime + t0, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+  o.connect(g).connect(maitre);
+  if (reverb) { const s = actx.createGain(); s.gain.value = reverb; g.connect(s).connect(echo); }
+  o.start(t); o.stop(t + duree + 0.05);
+}
+function bruit(duree) {
+  const b = actx.createBuffer(1, Math.floor(actx.sampleRate * duree), actx.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const s = actx.createBufferSource(); s.buffer = b; return s;
+}
+// Bruit filtré qui balaie une bande : souffle d'explosion, whoosh des cartes, claquement.
+function souffle(de, a, duree, vol, type = "bandpass", t0 = 0) {
+  if (!audible()) return;
+  const t = actx.currentTime + t0, s = bruit(duree), f = actx.createBiquadFilter(), g = actx.createGain();
+  f.type = type; f.Q.value = 1.2;
+  f.frequency.setValueAtTime(de, t); f.frequency.exponentialRampToValueAtTime(a, t + duree);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + duree * 0.3);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+  s.connect(f).connect(g).connect(maitre); s.start(t); s.stop(t + duree + 0.05);
+}
+// Sinus qui chute : battement de cœur, basse de l'explosion.
+function coup(f0, f1, t0, duree, vol) {
+  if (!audible()) return;
+  const t = actx.currentTime + t0, o = actx.createOscillator(), g = actx.createGain();
+  o.type = "sine"; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + duree);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+  o.connect(g).connect(maitre); o.start(t); o.stop(t + duree + 0.05);
+}
+// Grondement + montée qui grimpe pendant que le coffre tremble ; renvoie la fonction qui coupe tout.
+function tension(duree) {
+  if (!audible()) return () => {};
+  const t = actx.currentTime, s = bruit(2), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.loop = true; f.type = "lowpass"; f.frequency.value = 150;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.25);
+  s.connect(f).connect(g).connect(maitre); s.start(t);
+  const o = actx.createOscillator(), fo = actx.createBiquadFilter(), go = actx.createGain();
+  o.type = "sawtooth"; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(380, t + duree);
+  fo.type = "lowpass"; fo.frequency.setValueAtTime(300, t); fo.frequency.exponentialRampToValueAtTime(3400, t + duree);
+  go.gain.setValueAtTime(0.0001, t); go.gain.exponentialRampToValueAtTime(0.08, t + duree);
+  o.connect(fo).connect(go).connect(maitre); o.start(t);
+  return () => {
+    const t2 = actx.currentTime;
+    [g, go].forEach((x) => { x.gain.cancelScheduledValues(t2); x.gain.setValueAtTime(Math.max(x.gain.value, 0.0001), t2); x.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.08); });
+    s.stop(t2 + 0.1); o.stop(t2 + 0.1);
+  };
+}
+// Un « tic » qui monte d'un cran à chaque palier de rareté franchi pendant le suspense.
+function tic(palier) { note(196 * Math.pow(1.26, palier), 0, 0.12, "square", 0.06); note(98 * Math.pow(1.26, palier), 0, 0.22, "sine", 0.22); }
+const battement = () => { coup(75, 38, 0, 0.18, 0.7); coup(70, 36, 0.2, 0.18, 0.5); };
+function explosion(rang) {
+  souffle(2600, 260, 0.5 + rang * 0.12, 0.5);
+  coup(130, 38, 0, 0.45 + rang * 0.1, 0.6);
+  if (rang >= 3) coup(55, 26, 0.02, 1.2, 0.55);
+}
+const whoosh = (t0) => souffle(700, 3200, 0.2, 0.1, "bandpass", t0);
+const claque = () => souffle(5000, 2500, 0.05, 0.22, "highpass");
+// Chaque carte retournée sonne un cran plus haut que la précédente (gamme pentatonique).
+const PENTA = [0, 2, 4, 7, 9];
+const combo = (i) => note(523.25 * Math.pow(2, (PENTA[i % 5] + 12 * Math.floor(i / 5)) / 12), 0, 0.24, "triangle", 0.08, 0.2);
+const scintille = () => [1568, 1976, 2349, 2637, 3136].forEach((f, i) => note(f, i * 0.045, 0.32, "sine", 0.06, 0.5));
+function cloche(niveau) { const f = 660 * Math.pow(2, Math.min(niveau, 24) / 24); note(f, 0, 0.7, "sine", 0.11, 0.3); note(f * 2.76, 0, 0.25, "sine", 0.03, 0.3); }
+const accordMax = () => [784, 988, 1175, 1568].forEach((f, i) => note(f, i * 0.035, 1, "triangle", 0.07, 0.45));
+const tinte = () => note(2200 + Math.random() * 1400, 0, 0.12, "triangle", 0.035, 0.25);
+// Motif de chaque rareté : [fréquence, départ, durée, forme, volume]
+const MOTIFS = [
+  [[523, 0, 0.16, "square", 0.05]],
+  [[659, 0, 0.18], [880, 0.09, 0.28]],
+  [[784, 0, 0.16], [988, 0.08, 0.16], [1175, 0.16, 0.45], [2349, 0.16, 0.5, "sine", 0.05]],
+  [[523, 0, 0.14], [659, 0.07, 0.14], [784, 0.14, 0.14], [1047, 0.21, 0.7], [1568, 0.21, 0.8, "sine", 0.08], [2093, 0.36, 0.6, "sine", 0.05]],
+  [[392, 0, 0.16, "sawtooth", 0.06], [523, 0.1, 0.16, "sawtooth", 0.06], [659, 0.2, 0.16, "sawtooth", 0.06],
+   [784, 0.3, 1.4], [1047, 0.3, 1.4], [1319, 0.3, 1.4], [1568, 0.3, 1.5, "sine", 0.1],
+   [2637, 0.55, 0.5, "sine", 0.05], [3136, 0.75, 0.5, "sine", 0.05], [2093, 0.95, 0.7, "sine", 0.05]],
+];
+const REVERB = [0, 0.1, 0.3, 0.45, 0.6];
+function sonRarete(rang) {
+  if (!sonActif) return;
+  const fichier = SONS_FICHIERS[ORDRE_RARETE[rang]];
+  if (fichier) { const a = new Audio(fichier); a.volume = 0.8; a.play().catch(() => {}); return; }
+  MOTIFS[rang].forEach(([f, t, d, type, v]) => note(f, t, d, type || "triangle", v || 0.15, REVERB[rang]));
+}
+
+// ---------- Effets visuels ----------
+function eclat(c, duree) {
+  const e = document.createElement("span");
+  e.className = "eclair";
+  e.style.cssText = "--flash:" + c + ";--df:" + duree + "s";
+  table.append(e);
+  setTimeout(() => e.remove(), duree * 1000 + 60);
+}
+function secouer(duree) {
+  if (reduit) return;
+  table.style.setProperty("--secousse", duree + "s");
+  table.classList.remove("secoue"); void table.offsetWidth; table.classList.add("secoue");
+}
+function vibrer(rang) { if (!reduit && VIBRATIONS[rang] && navigator.vibrate) navigator.vibrate(VIBRATIONS[rang]); }
+function tampon(rarete) {
+  const t = document.createElement("span");
+  t.className = "tampon";
+  t.style.setProperty("--c", "var(--" + rarete + ")");
+  t.textContent = RARETES[rarete].nom + " !";
+  table.append(t);
+  setTimeout(() => t.remove(), 1600);
+}
+function pluieDePieces() {
+  if (reduit) return;
+  const h = table.clientHeight + 30;
+  for (let i = 0; i < 34; i++) {
+    const p = document.createElement("span");
+    p.className = "piece";
+    p.style.cssText = "--x:" + (Math.random() * 100).toFixed(1) + "%;--d:" + (0.9 + Math.random() * 0.9).toFixed(2) + "s;--r:" + (Math.random() * 0.7).toFixed(2) + "s;--h:" + h + "px";
+    table.append(p);
+    setTimeout(() => p.remove(), 2600);
+  }
+  for (let i = 0; i < 9; i++) setTimeout(tinte, 200 + i * 110);
+}
+function centreCoffre() {
+  const t = table.getBoundingClientRect(), s = coffre.querySelector("svg").getBoundingClientRect();
+  return [s.left - t.left + s.width / 2, s.top - t.top + s.height * 0.35];
+}
+function etincelles(x0, y0, rang, c) {
+  if (reduit) return;
+  for (let i = 0; i < 8 + rang * 12; i++) {
+    const e = document.createElement("span"), a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.3, v = 60 + Math.random() * (90 + rang * 55);
+    e.className = "etincelle";
+    e.style.cssText = "--x:" + x0 + "px;--y:" + y0 + "px;--dx:" + (Math.cos(a) * v).toFixed(1) + "px;--dy:" + (Math.sin(a) * v).toFixed(1) + "px;--d:" + (0.7 + Math.random() * 0.6).toFixed(2) + "s;--c:" + (Math.random() < 0.3 ? "#fff" : c);
+    table.append(e);
+    setTimeout(() => e.remove(), 1500);
+  }
+}
+
+// ---------- Échelle des raretés (elle ne monte que jusqu'à la vraie rareté du tirage) ----------
+function preparerEchelle() {
+  const ech = $("echelle");
+  ech.textContent = "";
+  ORDRE_RARETE.forEach((r) => {
+    const s = document.createElement("span");
+    s.textContent = RARETES[r].nom;
+    s.style.setProperty("--c", "var(--" + r + ")");
+    if (!TAUX[typeCoffre][r]) s.className = "exclu";
+    ech.append(s);
+  });
+  ech.hidden = false;
+}
+function monterEchelle(rang) {
+  [...$("echelle").children].forEach((s, i) => {
+    s.classList.toggle("atteint", i <= rang && !s.classList.contains("exclu"));
+    s.classList.toggle("actuel", i === rang);
+  });
+}
+function afficherTaux() {
+  const t = TAUX[typeCoffre];
+  $("taux").textContent = "Taux de cette lootbox : " + ORDRE_RARETE.filter((r) => t[r]).map((r) => RARETES[r].nom + " " + t[r] + " %").join(" · ") +
+    (t.legendaire ? "." : ". Le Légendaire s'ajoutera quand le boss tombera.");
+}
+
+// ---------- Mise en place ----------
+function disposition(n) {
+  const w = table.clientWidth, etroit = w < 560;
+  const cols = n === 1 ? 1 : etroit ? (n === 5 ? 3 : 4) : 5;
+  const rangs = Math.ceil(n / cols);
+  const dw = n === 1 ? Math.min(200, w * 0.5) : etroit ? Math.min(104, (w - 24 - (cols - 1) * 10) / cols) : Math.min(148, (w - 90) / 5);
+  const dh = dw * 1.4, gx = etroit ? 10 : Math.min(20, (w - dw * cols) / (cols + 1)), gy = 44;
+  const hauteur = Math.max(etroit ? 360 : 420, Math.round(rangs * (dh + gy) + 64));
+  const positions = [];
+  for (let i = 0; i < n; i++) {
+    const rg = Math.floor(i / cols), dansRang = Math.min(cols, n - rg * cols), k = i - rg * cols - (dansRang - 1) / 2;
+    const eventail = rangs === 1 && n > 1;
+    positions.push({ x: w / 2 - dw / 2 + k * (dw + gx), y: 28 + rg * (dh + gy) + (eventail ? Math.abs(k) * 8 : 0), r: eventail ? k * 3 : 0 });
+  }
+  if (n === 1) positions[0].y = Math.max(28, (hauteur - dh - 30) / 2);
+  return { dw, hauteur, positions };
+}
+function placer(el, p, rot, echelle = 1) { el.style.transform = "translate(" + p.x + "px," + p.y + "px) rotate(" + rot + "deg) scale(" + echelle + ")"; }
+function boucheCoffre(dw) {
+  const t = table.getBoundingClientRect(), s = coffre.querySelector("svg").getBoundingClientRect();
+  return { x: s.left - t.left + s.width / 2 - dw / 2, y: s.top - t.top + s.height * 0.3 - dw * 0.7 };
+}
+function creerCarteTable(o) {
+  const d = document.createElement("div");
+  d.className = "dcarte";
+  d.style.setProperty("--c", "var(--" + o.rarete + ")");
+  d.innerHTML = '<span class="eclat"></span><div class="dcarte-in"><div class="dos"><svg viewBox="0 0 40 40" aria-hidden="true"><use href="#i-marque"/></svg></div></div><span class="libelle-rarete">' + RARETES[o.rarete].nom + "</span>";
+  const face = carte(o);
+  face.classList.add("face");
+  d.querySelector(".dcarte-in").append(face);
+  return d;
+}
+function commandes(actives) {
+  document.querySelectorAll(".btn-ouvrir, .type-lootbox").forEach((b) => (b.disabled = !actives));
+  btnPasser.hidden = actives;
+  table.classList.toggle("passable", !actives);
+}
+function remettreCoffre() {
+  table.querySelectorAll(".dcarte, .etincelle, .eclair, .tampon, .piece").forEach((e) => e.remove());
+  table.classList.remove("focus", "secoue");
+  coffre.classList.remove("tremble", "ouvert", "rayonne", "recule", "inspire");
+  coffre.classList.toggle("version-legendaire", typeCoffre === "legendaire");
+  coffre.style.setProperty("--lueur", "#f4f2ec");
+  table.style.setProperty("--h-table", (table.clientWidth < 560 ? 360 : 420) + "px");
+  preparerEchelle();
+  afficherTaux();
+  $("recap").textContent = "";
+  dernierTirage = null;
+}
+
+// ---------- Révélation d'une carte (automatique, ou au clic du joueur) ----------
+function retourner(etat, i, silencieux) {
+  const d = etat.cartes[i], t = etat.tirage[i], rang = rangDe(t.o.rarete);
+  if (d.classList.contains("retournee")) return;
+  d.classList.remove("charge");
+  d.style.setProperty("--pop", String(1.06 + rang * 0.05));
+  d.classList.add("retournee", "pop");
+  if (rang >= 2) d.classList.add("eclate");
+  if (rang >= 3) d.classList.add("haute");
+  if (!silencieux) {
+    const p = etat.disp.positions[i], c = couleur(t.o.rarete);
+    claque();
+    combo(etat.combo++);
+    if (etat.tirage.length > 1 && rang >= 2) sonRarete(rang);
+    etincelles(p.x + etat.disp.dw / 2, p.y + etat.disp.dw * 0.7, Math.max(0, rang - 1), c);
+    vibrer(rang);
+    if (rang >= 3) { secouer(rang >= 4 ? 0.6 : 0.35); eclat(c, 0.6); tampon(t.o.rarete); }
+    if (rang >= 4) pluieDePieces();
+  }
+  setTimeout(() => poserBadge(d, t, silencieux), silencieux ? 0 : 360);
+}
+// Ce que la carte t'apporte : un nouvel objet, un niveau de plus, ou le niveau maximum.
+function poserBadge(d, t, silencieux) {
+  const b = document.createElement("span");
+  if (t.nouveau) { b.className = "badge-tirage nouveau"; b.textContent = "Nouveau !"; if (!silencieux) scintille(); }
+  else if (t.niveau > t.max) { b.className = "badge-tirage max"; b.textContent = "Max · doublon en plus"; }
+  else if (t.niveau === t.max) { b.className = "badge-tirage max"; b.textContent = "Niveau MAX !"; if (!silencieux) accordMax(); }
+  else { b.className = "badge-tirage niveau"; b.textContent = "+1 · niv. " + t.niveau; if (!silencieux) cloche(t.niveau); }
+  d.append(b);
+}
+function puce(texte, c) {
+  const s = document.createElement("span");
+  s.className = "puce";
+  s.style.setProperty("--c", c);
+  s.textContent = texte;
+  $("recap").append(s);
+}
+function recap(tirage) {
+  $("recap").textContent = "";
+  ORDRE_RARETE.forEach((r) => {
+    const nb = tirage.filter((t) => t.o.rarete === r).length;
+    if (nb) puce(nb + " " + (nb > 1 ? PLURIEL[r] : RARETES[r].nom), "var(--" + r + ")");
+  });
+  const nouveaux = tirage.filter((t) => t.nouveau).length, niveaux = tirage.filter((t) => !t.nouveau && t.niveau <= t.max).length;
+  if (nouveaux) puce(nouveaux + " nouveau" + (nouveaux > 1 ? "x" : ""), "var(--legendaire)");
+  if (niveaux) puce("+" + niveaux + " niveau" + (niveaux > 1 ? "x" : ""), "var(--encre)");
+  const m = document.createElement("span");
+  m.textContent = "Meilleur objet : " + tirage[tirage.length - 1].o.nom;
+  $("recap").append(m);
+}
+
+// ---------- L'ouverture ----------
+async function ouvrir(n) {
+  if (ouvertureEnCours) return;
+  ouvertureEnCours = true; passer = false; reveils = [];
+  demarrerAudio();
+  const dejaOuvert = coffre.classList.contains("recule");
+  remettreCoffre();
+  commandes(false);
+  if (dejaOuvert) await pause(450);
+  await jouerOuverture(tirageDemo(n));
+  commandes(true);
+  ouvertureEnCours = false;
+}
+
+// La mise en scène, séparée du tirage : lootbox.html lui passe le résultat de ouvrir_lootbox.
+async function jouerOuverture(tirage) {
+  // Les cartes se retournent de la moins rare à la plus rare : le meilleur arrive en dernier.
+  tirage.sort((a, b) => rangDe(a.o.rarete) - rangDe(b.o.rarete));
+  const n = tirage.length;
+  const rangMax = rangDe(tirage[n - 1].o.rarete);
+  const rangMin = ORDRE_RARETE.findIndex((r) => TAUX[typeCoffre][r] > 0);
+
+  // 1. Suspense : le coffre tremble de plus en plus fort, sa lueur et l'échelle montent d'une rareté à la suivante.
+  coffre.classList.add("tremble");
+  let couper = tension(SUSPENSE[rangMax] / 1000);
+  const paliers = rangMax - rangMin + 1;
+  for (let p = 0; p < paliers; p++) {
+    if (rangMax >= 3 && p === paliers - 1 && !passer) {
+      // Faux calme avant le dernier palier : silence, un battement de cœur, et ça repart.
+      couper();
+      coffre.classList.remove("tremble");
+      battement();
+      await pause(520);
+      coffre.classList.add("tremble");
+      couper = tension(SUSPENSE[rangMax] / paliers / 1000);
+    }
+    const r = rangMin + p;
+    coffre.style.setProperty("--lueur", couleur(ORDRE_RARETE[r]));
+    coffre.style.setProperty("--force", String(1 + p * 0.9));
+    monterEchelle(r);
+    if (!passer) { tic(p); if (r >= 3) battement(); }
+    await pause(SUSPENSE[rangMax] / paliers);
+  }
+  couper();
+  coffre.classList.remove("tremble");
+
+  // 2. Le coffre inspire… puis explose.
+  if (rangMax >= 2 && !passer) { coffre.classList.add("inspire"); await pause(rangMax >= 3 ? 240 : 130); }
+  coffre.classList.remove("inspire");
+  const cMax = couleur(ORDRE_RARETE[rangMax]);
+  coffre.style.setProperty("--lueur", cMax);
+  coffre.classList.add("ouvert");
+  if (rangMax >= 2) { coffre.classList.add("rayonne"); secouer(0.25 + rangMax * 0.1); }
+  eclat(cMax, 0.5 + rangMax * 0.15);
+  explosion(rangMax);
+  sonRarete(rangMax);
+  vibrer(rangMax);
+  etincelles(...centreCoffre(), rangMax, cMax);
+  await pause(rangMax >= 3 ? 950 : 620);
+
+  // 3. Les cartes jaillissent du coffre, face cachée.
+  $("echelle").hidden = true;
+  const disp = disposition(n);
+  table.style.setProperty("--dw", disp.dw + "px");
+  table.style.setProperty("--h-table", disp.hauteur + "px");
+  const bouche = boucheCoffre(disp.dw);
+  coffre.classList.add("recule");
+  const cartes = tirage.map((t) => {
+    const d = creerCarteTable(t.o);
+    d.style.transition = "none";
+    d.style.opacity = "0";
+    placer(d, bouche, 0, 0.25);
+    table.append(d);
+    return d;
+  });
+  const etat = { tirage, cartes, disp, combo: 0 };
+  // Toucher une carte la retourne tout de suite.
+  cartes.forEach((d, i) => d.addEventListener("click", (e) => { e.stopPropagation(); retourner(etat, i, false); }));
+  void table.offsetWidth;
+  cartes.forEach((d, i) => {
+    d.style.transition = "";
+    d.style.transitionDelay = (passer ? 0 : i * 70) + "ms";
+    d.style.opacity = "1";
+    placer(d, disp.positions[i], disp.positions[i].r);
+    if (!passer) whoosh(i * 0.07);
+  });
+  dernierTirage = { n, cartes };
+  await pause(760 + n * 70);
+  cartes.forEach((d) => (d.style.transitionDelay = "0ms"));
+
+  // 4. Retournement en cascade : les rares se chargent de leur couleur avant de se révéler,
+  //    les épiques et légendaires plongent le reste de la table dans l'ombre.
+  for (let i = 0; i < n; i++) {
+    const d = cartes[i], rang = rangDe(tirage[i].o.rarete);
+    if (d.classList.contains("retournee")) continue;
+    if (!passer && CHARGE[rang]) {
+      if (rang >= 3 && n > 1) { table.querySelectorAll(".tampon").forEach((e) => e.remove()); table.classList.add("focus"); d.classList.add("vedette"); }
+      d.style.setProperty("--vib", CHARGE[rang] + "ms");
+      d.classList.add("charge");
+      if (rang >= 3) battement();
+      await pause(CHARGE[rang]);
+    }
+    retourner(etat, i, passer);
+    await pause(ECART[rang]);
+    table.classList.remove("focus");
+    d.classList.remove("vedette");
+  }
+  if (passer) {
+    sonRarete(rangMax);
+    if (tirage.some((t) => t.nouveau)) scintille();
+    if (rangMax >= 3) tampon(ORDRE_RARETE[rangMax]);
+  }
+  recap(tirage);
+}
+
+document.querySelectorAll(".btn-ouvrir").forEach((b) => b.addEventListener("click", () => ouvrir(Number(b.dataset.n))));
+btnPasser.addEventListener("click", (e) => { e.stopPropagation(); toutReveler(); });
+table.addEventListener("click", toutReveler);
+document.querySelectorAll(".type-lootbox").forEach((b) => b.addEventListener("click", () => {
+  if (ouvertureEnCours) return;
+  typeCoffre = b.dataset.type;
+  document.querySelectorAll(".type-lootbox").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  remettreCoffre();
+}));
+$("btn-son").addEventListener("click", () => {
+  sonActif = !sonActif;
+  $("btn-son").setAttribute("aria-pressed", String(sonActif));
+  $("libelle-son").textContent = sonActif ? "Son activé" : "Son coupé";
+  if (sonActif) demarrerAudio();
+});
+
+// Repositionne les cartes posées quand la largeur change
+let minuterieRedim;
+addEventListener("resize", () => {
+  clearTimeout(minuterieRedim);
+  minuterieRedim = setTimeout(() => {
+    if (!dernierTirage || ouvertureEnCours) return;
+    const disp = disposition(dernierTirage.n);
+    table.style.setProperty("--dw", disp.dw + "px");
+    table.style.setProperty("--h-table", disp.hauteur + "px");
+    dernierTirage.cartes.forEach((d, i) => { d.style.transition = "none"; placer(d, disp.positions[i], disp.positions[i].r); });
+  }, 120);
+});
+remettreCoffre();
+
+// ============================================================
+// Arsenal : emplacements, effets filtrables, collection complète
+// ============================================================
+(function arsenal() {
+  const vitrine = { arme: [38, 37, 36], main: [40, 26, 11], armure: [46, 45, 24], strat: [50, 23, 22] };
+  Object.entries(EMPLACEMENTS).forEach(([cle, e]) => {
+    const nb = OBJETS.filter((o) => o.slot === cle).length;
+    const bloc = document.createElement("div");
+    bloc.className = "emplacement";
+    const ev = document.createElement("div");
+    ev.className = "eventail";
+    ev.setAttribute("aria-hidden", "true");
+    vitrine[cle].forEach((n) => ev.append(carte(PAR_NUMERO[n])));
+    const h = document.createElement("h3");
+    h.textContent = nb + " " + e.nom;
+    const p = document.createElement("p");
+    p.textContent = e.texte;
+    bloc.append(ev, h, p);
+    $("emplacements").append(bloc);
+  });
+
+  const contributeurs = [...new Set(OBJETS.map((o) => o.contributeur).filter(Boolean))];
+  $("chapeau-arsenal").textContent = OBJETS.length + " objets répartis sur quatre emplacements, des sets, des effets qui se combinent. Certains ont été imaginés par des viewers de la chaîne : " + contributeurs.join(", ") + ".";
+
+  const coll = $("collection");
+  const tuiles = OBJETS.slice()
+    .sort((a, b) => ORDRE_RARETE.indexOf(b.rarete) - ORDRE_RARETE.indexOf(a.rarete) || a.numero - b.numero)
+    .map((o) => {
+      const t = document.createElement("div");
+      t.className = "tuile " + o.rarete;
+      t.tabIndex = 0;
+      t.dataset.effets = o.effets.join(" ");
+      t.innerHTML = '<img src="' + image(o.image) + '" alt="" loading="lazy" decoding="async"><span class="bulle"><b>' + o.nom + "</b><span>" + RARETES[o.rarete].nom + " · " + o.fait + (o.contributeur ? " · imaginé par " + o.contributeur : "") + "</span></span>";
+      t.setAttribute("aria-label", o.nom + ", " + RARETES[o.rarete].nom + ", " + o.fait);
+      coll.append(t);
+      return t;
+    });
+
+  let actif = null;
+  EFFETS.forEach(([cle, nom]) => {
+    const nb = OBJETS.filter((o) => o.effets.includes(cle)).length;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "etiquette " + cle;
+    b.setAttribute("aria-pressed", "false");
+    b.innerHTML = nom + ' <span class="n">' + nb + "</span>";
+    b.addEventListener("click", () => {
+      actif = actif === cle ? null : cle;
+      document.querySelectorAll(".etiquette").forEach((x) => x.setAttribute("aria-pressed", String(x === b && actif === cle)));
+      coll.classList.toggle("filtre", !!actif);
+      tuiles.forEach((t) => t.classList.toggle("allume", !!actif && t.dataset.effets.split(" ").includes(actif)));
+      $("legende-collection").innerHTML = actif
+        ? "<b>" + nb + " objet" + (nb > 1 ? "s" : "") + "</b> avec « " + nom + " »" + (cle === "sekiro" ? ", la panoplie arrivée avec l'événement Sekiro." : ".")
+        : "Touche un effet pour voir les objets qui le portent.";
+    });
+    $("etiquettes").append(b);
+  });
+})();
+
+// ============================================================
+// Amélioration : Lame Kusabimaru (épique, niveau max 10). Valeurs de catalog.cs.
+// ============================================================
+(function atelier() {
+  const o = PAR_NUMERO[35];
+  const max = RARETES[o.rarete].max;
+  const STATS = [
+    { nom: "Dégâts", val: (n) => (12 + 2 * n) + "–" + (18 + 2 * n), jauge: (n) => (18 + 2 * n) / (18 + 2 * max), gain: "+2" },
+    { nom: "Vitesse", val: (n) => "+" + (5 + n), jauge: (n) => (5 + n) / (5 + max), gain: "+1" },
+    { nom: "Chance", val: (n) => "+" + (5 + 2 * n), jauge: (n) => (5 + 2 * n) / (5 + 2 * max), gain: "+2" },
+    { nom: "Frénésie", val: (n) => "+" + (8 + 0.5 * n).toLocaleString("fr-FR") + " VIT", jauge: (n) => (8 + 0.5 * n) / (8 + 0.5 * max), gain: "+0,5" },
+    { nom: "Parade", val: () => "10 %", jauge: () => 1, gain: "" },
+  ];
+  let niveau = 0;
+  const c = carte(o, { niveau: 0 });
+  $("carte-atelier").append(c);
+  $("atelier-nom").textContent = o.nom;
+  for (let i = 0; i < max; i++) $("jauge-niveau").append(document.createElement("i"));
+  $("stats-atelier").innerHTML = STATS.map((s, i) =>
+    '<div class="ligne-stat"><span class="nom-stat">' + s.nom + '</span><span class="barre"><i id="barre-' + i + '"></i></span><span class="val"><span id="val-' + i + '"></span><span class="gain" id="gain-' + i + '">' + s.gain + "</span></span></div>").join("");
+
+  function rendu(anime) {
+    const tag = c.querySelector(".niveau-tag");
+    tag.textContent = niveau >= max ? "MAX" : "+" + niveau;
+    tag.classList.toggle("max", niveau >= max);
+    tag.hidden = niveau === 0;
+    c.classList.toggle("brillante", niveau >= max);
+    $("atelier-niveau").textContent = "Niveau " + niveau + " / " + max;
+    [...$("jauge-niveau").children].forEach((p, i) => p.classList.toggle("plein", i < niveau));
+    STATS.forEach((s, i) => {
+      $("val-" + i).textContent = s.val(niveau);
+      $("barre-" + i).style.width = Math.round(s.jauge(niveau) * 100) + "%";
+      const g = $("gain-" + i);
+      g.classList.remove("vu");
+      if (anime && s.gain) { void g.offsetWidth; g.classList.add("vu"); }
+    });
+    $("btn-doublon").disabled = niveau >= max;
+    $("btn-doublon").textContent = niveau >= max ? "Niveau maximum atteint" : "Ajouter un doublon";
+  }
+  $("btn-doublon").addEventListener("click", () => {
+    if (niveau >= max) return;
+    niveau++;
+    c.classList.remove("monte"); void c.offsetWidth; c.classList.add("monte");
+    rendu(true);
+  });
+  $("btn-remise").addEventListener("click", () => { niveau = 0; rendu(false); });
+  rendu(false);
+
+  ORDRE_RARETE.forEach((r) => {
+    const s = document.createElement("span");
+    s.className = "plafond";
+    s.style.setProperty("--c", "var(--" + r + ")");
+    s.innerHTML = "<i></i>" + RARETES[r].nom + " <b>niv. " + RARETES[r].max + "</b>";
+    $("plafonds").append(s);
+  });
+})();
+
+// ============================================================
+// Duel de démonstration (scénario écrit à la main, mécaniques fidèles au moteur)
+// [qui agit, cible, dégâts (négatif = soin), texte, cible du statut, statut]
+// ============================================================
+const DUEL = {
+  a: { nom: "Toi", pv: 340, arme: 38, loadout: [38, 40, 46, 50] },
+  b: { nom: "Un viewer", pv: 300, arme: 37, loadout: [37, 26, 45, 48] },
+  tours: [
+    ["b", "a", 34, "<b>Lance Gyoubu</b> frappe : 34 dégâts, et la plaie saigne."],
+    ["a", "b", 41, "<b>Arc de Genichiro</b>, tir surpuissant : 41 dégâts, l'armure est ignorée."],
+    ["b", "a", 62, "<b>Hache Chargée</b> : 62 dégâts. Tu es étourdi 2 tours.", "a", "ÉTOURDI"],
+    ["a", null, 0, "Tu es étourdi, tu passes ton tour."],
+    ["a", "a", -75, "<b>Gourde Médicinale</b> : +75 PV (soin de 60, amplifié de 25 %).", "a", ""],
+    ["b", "a", 36, "<b>Lance Gyoubu</b> : 36 dégâts."],
+    ["a", "b", 48, "<b>Arc de Genichiro</b>, tir multiple : 4 flèches de 12."],
+    ["b", "a", 18, "<b>Parapluie Chargé</b> : parade, puis riposte à 18."],
+    ["a", null, 0, "<b>Éclair de Tomoe</b> est lancé. Il frappera au prochain tour."],
+    ["b", "a", 33, "<b>Lance Gyoubu</b> : 33 dégâts."],
+    ["a", "b", 96, "<b>Éclair de Tomoe</b> tombe : 96 dégâts. PARALYSÉ.", "b", "PARALYSÉ"],
+    ["a", "b", 44, "<b>Arc de Genichiro</b>, double coup saignant : 2 × 22."],
+    ["b", null, 0, "Ton adversaire est paralysé, il ne peut pas attaquer.", "b", ""],
+    ["a", "b", 44, "<b>Arc de Genichiro</b>, tir surpuissant : 44 dégâts."],
+    ["b", "a", 35, "<b>Lance Gyoubu</b> : 35 dégâts, dernier sursaut."],
+    ["a", "b", 48, "<b>Arc de Genichiro</b>, tir multiple : K.O. !"],
+  ],
+};
+const COULEUR_JOUEUR = { a: "var(--rare)", b: "#ff4d6d" };
+let duelJeton = 0;
+
+function montageCombattant(cote) {
+  const f = DUEL[cote], el = $("combattant-" + cote);
+  el.innerHTML = "";
+  el.append(carte(PAR_NUMERO[f.arme]));
+  const nom = document.createElement("div"); nom.className = "nom-combattant"; nom.textContent = f.nom;
+  const pv = document.createElement("div"); pv.className = "pv"; pv.innerHTML = "<i></i>";
+  const pvt = document.createElement("div"); pvt.className = "pv-texte"; pvt.textContent = f.pv + " / " + f.pv + " PV";
+  const mini = document.createElement("div"); mini.className = "loadout-mini";
+  f.loadout.forEach((n) => {
+    const o = PAR_NUMERO[n], t = document.createElement("div");
+    t.className = "tuile " + o.rarete; t.title = o.nom;
+    t.innerHTML = '<img src="' + image(o.image) + '" alt="' + o.nom + '">';
+    mini.append(t);
+  });
+  const st = document.createElement("div"); st.className = "statut";
+  el.append(nom, pv, pvt, mini, st);
+  return { el, barre: pv.firstChild, texte: pvt, statut: st, max: f.pv, pv: f.pv };
+}
+
+async function jouerDuel() {
+  const jeton = ++duelJeton;
+  const c = { a: montageCombattant("a"), b: montageCombattant("b") };
+  const maj = (k) => {
+    const x = c[k];
+    x.barre.style.width = Math.max(0, (x.pv / x.max) * 100) + "%";
+    x.barre.classList.toggle("bas", x.pv / x.max < 0.3);
+    x.texte.textContent = Math.max(0, x.pv) + " / " + x.max + " PV";
+  };
+  $("journal").innerHTML = "";
+  $("en-direct").classList.add("cache");
+  await attendre(700);
+  for (const [qui, cible, degats, texte, statutCible, statutTexte] of DUEL.tours) {
+    if (jeton !== duelJeton) return;
+    const li = document.createElement("li");
+    li.innerHTML = '<span class="qui" style="background:' + COULEUR_JOUEUR[qui] + '"></span><span>' + texte + "</span>";
+    $("journal").append(li);
+    while ($("journal").children.length > 4) $("journal").firstChild.remove();
+    if (cible && degats !== 0) {
+      if (degats > 0) {
+        c[qui].el.classList.remove("frappe"); void c[qui].el.offsetWidth; c[qui].el.classList.add("frappe");
+        await attendre(170);
+        c[cible].el.classList.remove("touche"); void c[cible].el.offsetWidth; c[cible].el.classList.add("touche");
+      }
+      c[cible].pv = Math.min(c[cible].max, c[cible].pv - degats);
+      maj(cible);
+      const f = document.createElement("span");
+      f.className = "degat" + (degats < 0 ? " soin" : "");
+      f.textContent = degats < 0 ? "+" + (-degats) : "−" + degats;
+      c[cible].el.append(f);
+      setTimeout(() => f.remove(), 1100);
+    }
+    if (statutCible !== undefined) c[statutCible].statut.textContent = statutTexte;
+    await attendre(1250);
+  }
+  if (jeton !== duelJeton) return;
+  c.b.el.querySelector(".carte").style.filter = "grayscale(1) brightness(.55)";
+  c.a.statut.textContent = "VICTOIRE";
+  $("en-direct").classList.remove("cache");
+}
+$("btn-rejouer").addEventListener("click", () => jouerDuel());
+montageCombattant("a"); montageCombattant("b");
+
+// Lance le duel quand il arrive à l'écran (une seule fois).
+const observe = new IntersectionObserver((entrees) => {
+  entrees.forEach((e) => {
+    if (!e.isIntersecting) return;
+    observe.unobserve(e.target);
+    if (e.target.id === "arene") jouerDuel();
+  });
+}, { threshold: 0.45 });
+observe.observe($("arene"));
+
+// ============================================================
+// Classement en direct (players.json, publié toutes les 5 minutes par Streamer.bot)
+// ============================================================
+const CLASSEMENT_APERCU = null;
+const fmt = (n) => Math.round(n).toLocaleString("fr-FR");
+
+function lignesFantomes(message) {
+  $("podium").innerHTML = "";
+  for (let i = 1; i <= 5; i++) {
+    const li = document.createElement("li");
+    li.className = "rang-ligne fantome";
+    li.innerHTML = '<span class="rang-num">' + i + '</span><span class="avatar">?</span><span class="rang-texte"><span class="rang-nom">Ta place ?</span></span><span class="rang-power"><b>—</b><span>puissance</span></span>';
+    $("podium").append(li);
+  }
+  $("source-classement").textContent = message;
+}
+
+function afficherClassement(joueurs, total) {
+  $("podium").innerHTML = "";
+  joueurs.forEach((j, i) => {
+    const li = document.createElement("li");
+    li.className = "rang-ligne";
+    const rang = document.createElement("span"); rang.className = "rang-num"; rang.textContent = i + 1;
+    const av = document.createElement("span"); av.className = "avatar"; av.textContent = (j.nom || "?").charAt(0).toUpperCase();
+    if (j.avatar && /^https:\/\/static-cdn\.jtvnw\.net\//.test(j.avatar)) {
+      const im = new Image(); im.alt = ""; im.referrerPolicy = "no-referrer";
+      im.onload = () => { av.textContent = ""; av.append(im); };
+      im.src = j.avatar;
+    }
+    const bloc = document.createElement("span"); bloc.className = "rang-texte";
+    const nom = document.createElement("span"); nom.className = "rang-nom"; nom.textContent = j.nom;
+    const bilan = document.createElement("span"); bilan.className = "rang-bilan";
+    bilan.textContent = j.v + " victoire" + (j.v > 1 ? "s" : "") + " · " + j.d + " défaite" + (j.d > 1 ? "s" : "");
+    bloc.append(nom, bilan);
+    const pw = document.createElement("span"); pw.className = "rang-power";
+    const b = document.createElement("b"); b.textContent = fmt(j.power);
+    const u = document.createElement("span"); u.textContent = "puissance";
+    pw.append(b, u);
+    li.append(rang, av, bloc, pw);
+    $("podium").append(li);
+  });
+  $("nb-joueurs").textContent = fmt(total.joueurs);
+  $("nb-duels").textContent = fmt(total.duels);
+  $("en-ce-moment").hidden = false;
+}
+
+function preparerClassement(data) {
+  let duels = 0;
+  const liste = Object.keys(data).map((k) => {
+    const j = data[k] || {}, s = j.stats || {}, cb = j.combat || {};
+    duels += (cb.victoires || 0) + (cb.defaites || 0) + (cb.egalites || 0);
+    return { nom: j.nomAffichage || k, avatar: j.avatar || "", power: s.powerLevel || 0, v: cb.victoires || 0, d: cb.defaites || 0 };
+  }).sort((a, b) => b.power - a.power);
+  // Chaque duel est compté une fois par participant.
+  return { top: liste.slice(0, 5), total: { joueurs: liste.length, duels: Math.round(duels / 2) } };
+}
+
+(async function classement() {
+  if (CLASSEMENT_APERCU) return afficherClassement(CLASSEMENT_APERCU.top, CLASSEMENT_APERCU.total);
+  lignesFantomes("Chargement du classement…");
+  try {
+    const r = await fetch("/rpg/players.json?v=" + Date.now());
+    if (!r.ok) throw new Error(r.status);
+    const p = preparerClassement(await r.json());
+    if (!p.top.length) return lignesFantomes("Personne au classement pour l'instant. La première place est libre.");
+    afficherClassement(p.top, p.total);
+    $("source-classement").textContent = "Classement de la puissance, mis à jour toutes les 5 minutes.";
+  } catch (e) {
+    lignesFantomes("Le classement n'a pas pu être chargé. Réessaie dans un instant.");
+  }
+})();
+
+// ============================================================
+// Connexion Twitch (Supabase, PKCE). Après Twitch, on arrive directement sur jeu.html.
+// ============================================================
+function erreur(msg) {
+  const m = $("message-erreur");
+  m.textContent = msg;
+  m.hidden = false;
+  clearTimeout(erreur.t);
+  erreur.t = setTimeout(() => (m.hidden = true), 6000);
+}
+
+const sb = window.supabase ? window.supabase.createClient(
+  "https://jpmrgxezdzkvbkctwqlh.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwbXJneGV6ZHprdmJrY3R3cWxoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MzkwMjksImV4cCI6MjEwNjExNTAyOX0.cLxYjrtd-vJgG-IMGa22JloSanUfIvfKOHAzEGRdeJo",
+  { auth: { flowType: "pkce" } }
+) : null;
+
+const PAGE_JEU = new URL("jeu.html", location.href).href;
+// Aperçu hors du site (page publiée pour relecture) : la connexion Twitch n'y est pas branchée.
+const APERCU = false;
+
+async function seConnecter() {
+  if (APERCU) return erreur("Aperçu : la connexion Twitch fonctionnera une fois la page en ligne sur ton site.");
+  if (!sb) return erreur("La connexion est indisponible pour le moment. Recharge la page et réessaie.");
+  const boutons = document.querySelectorAll("[data-connexion]");
+  boutons.forEach((b) => b.setAttribute("aria-busy", "true"));
+  const { error } = await sb.auth.signInWithOAuth({ provider: "twitch", options: { redirectTo: PAGE_JEU } });
+  if (error) {
+    boutons.forEach((b) => b.removeAttribute("aria-busy"));
+    erreur("Twitch n'a pas répondu : " + error.message);
+  }
+}
+document.querySelectorAll("[data-connexion]").forEach((b) => b.addEventListener("click", seConnecter));
+
+// Déjà connecté ? On file directement dans le jeu.
+if (sb && !APERCU) sb.auth.getSession().then(({ data }) => { if (data && data.session) location.replace(new URL("lootbox.html", location.href).href); }).catch(() => {});
+
+// Barre collante sur mobile tant que le bouton du panneau n'est pas à l'écran.
+new IntersectionObserver(([e]) => {
+  $("barre-mobile").classList.toggle("visible", !e.isIntersecting);
+}).observe($("btn-connexion"));
+</script>
+</body>
+</html>
