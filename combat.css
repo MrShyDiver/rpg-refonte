@@ -1,0 +1,392 @@
+/* Combat : écran versus + arène cinématique. Animations en transform/opacity, durées divisées par --vit. */
+:root { --pv: #5ce0b8; --defaite: #ff6b6b; --c-poison: #7ee06d; --c-feu: #ff8a3d; --c-sang: #ff4d6d; --c-elec: #fff07a; --c-bouclier: #6ab8ff; --c-acier: #cfe3ff; }
+.contenu.contenu-arene { max-width: none; padding: 14px clamp(10px, 1.6vw, 22px) 22px; }
+.arene-vide { max-width: 560px; margin: 40px auto; display: grid; justify-items: center; }
+.case-vide { aspect-ratio: 5 / 7; border-radius: 14px; border: 1px dashed var(--trait-fort); display: grid; place-content: center; text-align: center; padding: 6px; font-size: 11.5px; color: var(--encre-3); background: rgba(255,255,255,.015); }
+.case-vide small { font-size: 10.5px; }
+.lien-retour { display: inline-flex; align-items: center; gap: 6px; color: var(--encre-2); font-weight: 600; font-size: 14px; text-decoration: none; min-height: 44px; }
+.lien-retour:hover { color: var(--encre); }
+.lien-retour svg, .btn-second svg, .btn-principal svg { width: 17px; height: 17px; flex: none; }
+
+/* ---------- Visage (avatar Twitch ou initiale) ---------- */
+.visage { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden;
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,.03) 0 6px, transparent 6px 12px),
+    radial-gradient(90% 80% at 50% 28%, hsl(var(--teinte) 38% 30%), hsl(var(--teinte) 34% 12%) 72%); }
+.visage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.visage .initiale { font-family: var(--titre); font-weight: 800; font-size: 3em; line-height: 1; color: hsl(var(--teinte) 55% 88%); text-shadow: 0 6px 18px rgba(0,0,0,.55); }
+.visage.avec-image .initiale { display: none; }
+
+/* ---------- Versus ---------- */
+.versus { display: grid; gap: 22px; max-width: 1060px; margin: 0 auto; padding: 6px 0 24px; }
+.vs-entete { text-align: center; }
+.vs-sur { font-family: var(--pixel); font-size: 14px; color: var(--legendaire); }
+.vs-entete h1 { font-size: clamp(26px, 3.4vw, 40px); margin-top: 6px; }
+.vs-duo { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 18px; align-items: stretch; }
+.vs-joueur { display: grid; justify-items: center; align-content: start; gap: 12px; padding: 20px 18px; border-radius: 22px; background: radial-gradient(70% 50% at 50% 0%, rgba(255,255,255,.04), transparent 70%), var(--sol-2); border: 1px solid var(--trait); }
+.vs-joueur.moi { border-color: color-mix(in oklab, var(--legendaire) 32%, transparent); }
+.vs-portrait { position: relative; width: clamp(96px, 11vw, 144px); aspect-ratio: 1; border-radius: 26px; overflow: hidden; border: 2px solid var(--trait-fort); font-size: clamp(30px, 3.5vw, 46px); box-shadow: 0 18px 34px -18px rgba(0,0,0,.9); }
+.vs-joueur.moi .vs-portrait { border-color: color-mix(in oklab, var(--legendaire) 60%, transparent); }
+.vs-ident { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.vs-ident b { font-family: var(--titre); font-size: clamp(17px, 1.8vw, 22px); }
+.pilule.toi { --c: var(--legendaire); }
+.vs-chiffres { display: flex; gap: 26px; }
+.vs-chiffres > div { display: grid; justify-items: center; }
+.vs-chiffres b { font-family: var(--titre); font-size: 20px; }
+.vs-chiffres span { font-size: 12.5px; color: var(--encre-3); }
+.vs-build { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.vs-eclair { display: grid; place-items: center; }
+.vs-eclair span { font-family: var(--titre); font-weight: 800; font-size: clamp(30px, 4vw, 52px); color: var(--legendaire); text-shadow: 0 0 30px rgba(255,197,61,.25); }
+.vs-bas { display: grid; justify-items: center; gap: 12px; text-align: center; }
+.vs-modes button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.vs-modes svg { width: 15px; height: 15px; }
+.vs-cout { display: flex; align-items: center; gap: 8px; color: var(--encre-2); font-size: 14.5px; max-width: 60ch; }
+.vs-cout svg { width: 18px; height: 18px; flex: none; color: var(--legendaire); }
+.vs-cout b { color: var(--encre); }
+.vs-lancer { font-size: 16.5px; padding: 16px 32px; min-width: min(320px, 100%); min-height: 56px; }
+.vs-lancer svg { width: 20px; height: 20px; }
+.vs-lancer.occupe svg { animation: tourne 1s linear infinite; }
+@keyframes tourne { to { transform: rotate(360deg); } }
+.vs-raison { color: #ff9b9b; font-size: 14px; font-weight: 600; min-height: 1.3em; }
+.vs-note { max-width: 62ch; }
+
+/* ---------- Arène ---------- */
+.arene {
+  --vit: 1; --w-portrait: clamp(118px, min(15vw, 26vh), 236px); --w-carte: clamp(66px, min(8.2vw, 14vh), 128px);
+  position: relative; isolation: isolate; display: grid; grid-template-rows: minmax(0, 1fr) auto;
+  min-height: calc(100vh - 118px); min-height: calc(100dvh - 118px); border-radius: 22px; border: 1px solid var(--trait); overflow: hidden;
+  background:
+    radial-gradient(60% 45% at 50% 0%, rgba(255,255,255,.05), transparent 70%),
+    radial-gradient(34% 22% at 27% 80%, rgba(255,255,255,.035), transparent 70%),
+    radial-gradient(34% 22% at 73% 80%, rgba(255,255,255,.035), transparent 70%),
+    linear-gradient(180deg, #121319, #0c0d12 70%);
+}
+.arene::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0 2px, transparent 2px 5px); }
+.arene:fullscreen { border-radius: 0; border: 0; min-height: 100vh; --w-portrait: clamp(130px, 15vw, 250px); --w-carte: clamp(70px, 8.4vw, 136px); }
+.arene.fatigue { box-shadow: inset 0 0 0 2px rgba(255,138,61,.5), inset 0 0 80px -20px rgba(255,138,61,.45); }
+.scene-arene { display: grid; grid-template-columns: minmax(0, 1fr) clamp(92px, 10vw, 150px) minmax(0, 1fr); align-items: center; gap: clamp(8px, 1.4vw, 22px); padding: clamp(14px, 2.2vw, 30px); min-height: 0; }
+
+/* Combattant */
+.cbt { display: grid; gap: clamp(12px, 2vw, 22px); align-content: center; min-width: 0; container-type: inline-size; }
+/* Tailles bornées par la largeur de la colonne du combattant (cqi) : jamais de débordement. */
+.corps { --wp: min(var(--w-portrait), 41cqi); --wc: min(var(--w-carte), 23.5cqi); }
+.jauge { display: grid; gap: 7px; min-width: 0; }
+.jauge-tete { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.cbt.droite .jauge-tete { flex-direction: row-reverse; }
+.jauge-nom { font-family: var(--titre); font-weight: 700; font-size: clamp(15px, 1.5vw, 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.toi { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; color: var(--legendaire); border: 1px solid color-mix(in oklab, var(--legendaire) 40%, transparent); flex: none; }
+.jauge-puissance { margin-left: auto; font-size: 12.5px; color: var(--encre-3); white-space: nowrap; }
+.cbt.droite .jauge-puissance { margin-left: 0; margin-right: auto; }
+.barre { position: relative; height: 16px; border-radius: 5px; background: #07080b; border: 1px solid var(--trait-fort); overflow: hidden; box-shadow: inset 0 2px 6px rgba(0,0,0,.6); }
+.barre i { position: absolute; inset: 0; transform-origin: left; }
+.cbt.droite .barre i { transform-origin: right; }
+.barre .fantome { background: #f4f2ec; transition: transform calc(.7s / var(--vit)) calc(.45s / var(--vit)) cubic-bezier(.3,.6,.3,1); }
+.barre .plein { background: linear-gradient(180deg, color-mix(in oklab, var(--pv) 80%, #fff) 0 30%, var(--pv) 30%); transition: transform calc(.22s / var(--vit)) ease-out; }
+.barre[data-niveau="moyen"] .plein { --pv: #ffb03d; }
+.barre[data-niveau="bas"] .plein { --pv: #ff5a5a; }
+.barre .erosion { background: repeating-linear-gradient(135deg, #2a2b34 0 4px, #15161c 4px 8px); transform-origin: right; }
+.cbt.droite .barre .erosion { transform-origin: left; }
+.barre .bouclier { background: linear-gradient(180deg, rgba(160,210,255,.95), rgba(106,184,255,.75)); mix-blend-mode: screen; height: 45%; top: auto; transition: transform calc(.3s / var(--vit)); }
+.jauge-pied { display: flex; align-items: flex-start; gap: 10px; min-height: 24px; }
+.cbt.droite .jauge-pied { flex-direction: row-reverse; }
+.pv-txt { font-size: 13px; color: var(--encre-2); white-space: nowrap; padding-top: 2px; }
+.pv-txt b { font-family: var(--titre); font-size: 15px; color: var(--encre); }
+.pv-bouclier { color: var(--c-bouclier); font-weight: 700; }
+.statuts { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.cbt.droite .statuts { justify-content: flex-end; }
+.statut { font-family: var(--pixel); font-size: 12.5px; line-height: 1; padding: 4px 7px; border-radius: 6px; background: #15161d; border: 1px solid color-mix(in oklab, var(--c, var(--encre)) 35%, transparent); color: var(--c, var(--encre)); white-space: nowrap; }
+.statut.poison { --c: var(--c-poison); } .statut.brulure { --c: var(--c-feu); } .statut.saignement { --c: var(--c-sang); } .statut.paralysie, .statut.etourdi { --c: var(--c-elec); }
+.statut.marque { --c: #ff9b6b; } .statut.antisoin { --c: #e0a0ff; } .statut.brise { --c: #ffb03d; } .statut.frenesie, .statut.rage { --c: #ffd84d; } .statut.envol { --c: #9fd6ff; } .statut.souffle { --c: var(--legendaire); }
+
+.corps { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 1.8vw, 26px); }
+.cbt.gauche .corps { flex-direction: row-reverse; }
+.socle { flex: none; position: relative; width: var(--wp); font-size: calc(var(--wp) * .16); }
+.socle::after { content: ""; position: absolute; left: 8%; right: 8%; bottom: -16px; height: 18px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.7), transparent); z-index: -1; }
+.portrait { position: relative; aspect-ratio: 1; border-radius: 26px; overflow: hidden; border: 2px solid var(--trait-fort); background: var(--sol-3); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 22px 40px -22px rgba(0,0,0,.95); transition: border-color .4s, box-shadow .4s; }
+.cbt.moi .portrait { border-color: color-mix(in oklab, var(--legendaire) 55%, transparent); }
+.portrait > i { position: absolute; inset: 0; pointer-events: none; }
+.visage { transition: filter .6s; }
+.portrait[data-degats="2"] .visage { filter: saturate(.8); }
+.portrait[data-degats="3"] .visage { filter: saturate(.55) brightness(.92) contrast(1.05); }
+.portrait[data-degats="4"] .visage { filter: saturate(.3) brightness(.8) contrast(1.1); }
+.portrait[data-degats="5"] .visage { filter: grayscale(1) brightness(.5); }
+.fissures { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.fissures path, .fissures-armure path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.fissures .ombre, .fissures-armure .ombre { stroke: rgba(0,0,0,.6); }
+.fissures .lumiere { stroke: rgba(255,238,228,.85); }
+.fissures .sang { fill: #a3111f; opacity: .85; }
+.fissures g, .fissures-armure g { opacity: 0; transition: opacity calc(.3s / var(--vit)); }
+.portrait[data-degats="1"] [data-e="1"],
+.portrait[data-degats="2"] :is([data-e="1"], [data-e="2"]),
+.portrait[data-degats="3"] :is([data-e="1"], [data-e="2"], [data-e="3"]),
+.portrait:is([data-degats="4"], [data-degats="5"]) .fissures g { opacity: 1; }
+.vignette { background: radial-gradient(circle at 50% 50%, transparent 42%, rgba(150,8,22,.8) 100%); opacity: 0; transition: opacity .6s; }
+.portrait[data-degats="3"] .vignette { opacity: .5; }
+.portrait[data-degats="4"] .vignette { opacity: .9; animation: pouls calc(1.1s / var(--vit)) ease-in-out infinite; }
+@keyframes pouls { 50% { opacity: .55; } }
+.teinte { mix-blend-mode: color; opacity: 0; transition: opacity .5s, background .5s; }
+.portrait[data-dot="poison"] .teinte { background: #52d34a; opacity: .32; }
+.portrait[data-dot="brulure"] .teinte { background: #ff6a1a; opacity: .3; }
+.portrait[data-dot="saignement"] .teinte { background: #d4102c; opacity: .22; }
+.portrait[data-dot="paralysie"] .teinte { background: #ffe45a; opacity: .2; }
+.eclair-blanc { background: #fff; opacity: 0; mix-blend-mode: overlay; }
+.portrait.touche { animation: touche calc(.3s / var(--vit)) ease-out; }
+@keyframes touche { 30% { transform: scale(.95); } }
+.portrait:is([data-degats="3"], [data-degats="4"]) { animation: respire calc(2.2s / var(--vit)) ease-in-out infinite; }
+@keyframes respire { 50% { transform: translateY(2px) scale(.985); } }
+/* Lueurs d'événement : ponctuelles, elles s'éteignent d'elles-mêmes. */
+.portrait::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; box-shadow: inset 0 0 0 3px var(--c-lueur, #fff), inset 0 0 34px -4px var(--c-lueur, #fff); z-index: 2; }
+.portrait.pulse-poison { --c-lueur: var(--c-poison); } .portrait.pulse-brulure { --c-lueur: var(--c-feu); } .portrait.pulse-saignement { --c-lueur: var(--c-sang); }
+.portrait.pulse-fatigue { --c-lueur: var(--encre-2); } .portrait.soigne { --c-lueur: var(--pv); } .portrait.dome { --c-lueur: var(--c-bouclier); }
+.portrait:is(.pulse-poison, .pulse-brulure, .pulse-saignement, .pulse-fatigue, .soigne, .dome)::after { animation: lueur calc(.9s / var(--vit)) ease-out; }
+@keyframes lueur { 20% { opacity: 1; } 100% { opacity: 0; } }
+.portrait.renait { border-color: var(--legendaire); box-shadow: 0 0 0 3px var(--legendaire), 0 0 60px 0 rgba(255,197,61,.55); animation: renait calc(.9s / var(--vit)) ease-out; }
+@keyframes renait { 0% { transform: scale(.9); } 30% { transform: scale(1.08); } 100% { transform: none; } }
+.tampon-ko { position: absolute; left: 50%; top: 50%; translate: -50% -50%; rotate: -12deg; font-family: var(--titre); font-weight: 800; font-size: 1.5em; color: #ff5a5a; padding: .1em .35em; border: .12em solid #ff5a5a; border-radius: .25em; background: rgba(12,13,18,.55); animation: tampon calc(.45s / var(--vit)) cubic-bezier(.2,1.6,.4,1) both; z-index: 3; }
+@keyframes tampon { from { transform: scale(2.4); opacity: 0; } }
+.cbt.vaincu .socle { transition: transform 1s cubic-bezier(.3,.6,.4,1); transform: translateY(10px) rotate(-7deg); }
+.cbt.droite.vaincu .socle { transform: translateY(10px) rotate(7deg); }
+.cbt.vaincu .jauge, .cbt.vaincu .main-cartes { opacity: .6; transition: opacity .6s; }
+.cbt.vainqueur .portrait { border-color: var(--legendaire); box-shadow: 0 0 0 2px var(--legendaire), 0 0 60px -8px rgba(255,197,61,.8); }
+.cbt.vainqueur .socle { animation: triomphe calc(.8s / var(--vit)) var(--ease) both; }
+@keyframes triomphe { 40% { transform: translateY(-12px) scale(1.05); } 100% { transform: translateY(-4px); } }
+.cbt.nul .portrait { border-color: var(--encre-2); }
+
+/* Cartes du combattant */
+.main-cartes { display: grid; grid-template-columns: repeat(2, var(--wc)); gap: 10px; align-items: end; justify-items: center; flex: none; }
+.slot { position: relative; width: 100%; }
+.slot.slot-offhand, .slot.deck { width: 76%; }
+.slot::after { content: ""; position: absolute; inset: -3px; border-radius: 16px; pointer-events: none; opacity: 0; box-shadow: 0 0 0 2px var(--c-slot, var(--legendaire)), 0 0 30px -2px var(--c-slot, var(--legendaire)); }
+.slot:has(.carte.normal) { --c-slot: var(--normal); } .slot:has(.carte.rare) { --c-slot: var(--rare); } .slot:has(.carte.epique) { --c-slot: var(--epique); } .slot:has(.carte.commun) { --c-slot: var(--commun); }
+.slot.brille::after { animation: brille calc(.9s / var(--vit)) ease-out; }
+@keyframes brille { 15% { opacity: 1; } 100% { opacity: 0; } }
+.slot.brille > .carte { animation: souleve calc(.6s / var(--vit)) var(--ease); }
+@keyframes souleve { 30% { transform: translateY(-8px) scale(1.04); } }
+.slot-arme.forme-2 > .carte { box-shadow: 0 0 0 1px var(--c), 0 0 26px -6px var(--c); }
+.slot-armure { isolation: isolate; }
+.fissures-armure { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+.fissures-armure .lumiere { stroke: rgba(235,240,255,.9); }
+.slot-armure[data-etape="1"] [data-e="1"],
+.slot-armure[data-etape="2"] :is([data-e="1"], [data-e="2"]),
+.slot-armure[data-etape="3"] :is([data-e="1"], [data-e="2"], [data-e="3"]),
+.slot-armure:is([data-etape="4"], [data-etape="5"]) .fissures-armure g { opacity: 1; }
+.slot-armure > :first-child { transition: filter .5s; }
+.slot-armure[data-etape="3"] > :first-child { filter: saturate(.75) brightness(.92); }
+.slot-armure[data-etape="4"] > :first-child { filter: saturate(.5) brightness(.8); }
+.slot-armure[data-etape="5"] > :first-child { filter: grayscale(1) brightness(.4); }
+.slot-armure[data-etape="5"]::before { content: "Brisée"; position: absolute; left: 50%; top: 50%; translate: -50% -50%; rotate: -10deg; z-index: 4; font-family: var(--pixel); font-weight: 700; font-size: 13px; color: #ff9b9b; background: rgba(12,13,18,.8); border: 1px solid rgba(255,107,107,.5); padding: 3px 7px; border-radius: 6px; }
+.slot-armure.craque > :first-child { animation: craque calc(.32s / var(--vit)) linear; }
+@keyframes craque { 25% { transform: translate(-3px, 1px) rotate(-1.5deg); } 50% { transform: translate(3px, -1px) rotate(1.2deg); } 75% { transform: translate(-1px, 0); } }
+.slot-armure.protege::after { opacity: .9; --c-slot: var(--c-bouclier); box-shadow: 0 0 0 2px var(--c-bouclier), 0 0 22px -4px var(--c-bouclier); }
+.deck { display: grid; gap: 6px; }
+.pile { position: relative; aspect-ratio: 5 / 7; }
+.pile .dos { position: absolute; inset: 0; border-radius: 10px; transform: translate(calc(var(--i) * -3px), calc(var(--i) * -3px)); }
+.pile .dos svg { width: 44%; }
+.deck.epuise .pile { border: 1px dashed var(--trait-fort); border-radius: 10px; }
+.deck.epuise .pile::after { content: "Épuisé"; position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--pixel); font-size: 11px; color: var(--encre-3); }
+.deck.recharge .pile { filter: brightness(.45); }
+.deck .cd { position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 5 / 7; display: grid; place-items: center; font-family: var(--titre); font-weight: 800; font-size: calc(var(--wc) * .3); color: var(--encre); text-shadow: 0 2px 8px #000; pointer-events: none; }
+.pips { display: flex; justify-content: center; gap: 4px; min-height: 8px; }
+.pips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--trait-fort); }
+.pips i.plein { background: var(--legendaire); border-color: transparent; }
+.deck.sans { aspect-ratio: 5 / 7; border: 1px dashed var(--trait-fort); border-radius: 10px; place-items: center; text-align: center; padding: 4px; }
+.deck.sans small { font-size: 10px; color: var(--encre-3); }
+.deck.sans .pile, .deck.sans .pips { display: none; }
+
+/* Centre */
+.scene-arene { position: relative; }
+.centre { display: grid; justify-items: center; align-content: center; gap: 14px; min-width: 0; }
+.tour { display: grid; justify-items: center; line-height: 1; gap: 4px; }
+.tour span { font-family: var(--pixel); font-size: 13px; color: var(--encre-3); }
+.tour b { font-family: var(--titre); font-weight: 800; font-size: clamp(30px, 3.4vw, 48px); }
+.tour small { font-size: 12.5px; color: var(--encre-3); }
+.vs-centre { font-family: var(--titre); font-weight: 800; font-size: 15px; color: var(--encre-3); letter-spacing: .06em; }
+.annonce { position: absolute; left: 50%; top: clamp(10px, 7%, 70px); translate: -50% 0; width: max-content; max-width: min(60vw, 520px); z-index: 6; pointer-events: none; }
+.annonce-txt { font-family: var(--titre); font-weight: 800; font-size: clamp(15px, 1.6vw, 22px); padding: 8px 16px; border-radius: 12px; background: rgba(12,13,18,.9); border: 1px solid var(--trait-fort); text-align: center; box-shadow: 0 16px 30px -14px #000; }
+.annonce-txt.strat { color: var(--legendaire); border-color: color-mix(in oklab, var(--legendaire) 40%, transparent); }
+.annonce-txt.brule { color: var(--c-feu); border-color: color-mix(in oklab, var(--c-feu) 45%, transparent); }
+.annonce-txt.sang { color: var(--c-sang); } .annonce-txt.souffle { color: var(--legendaire); } .annonce-txt.etat { color: #ffb03d; }
+
+/* Calque d'effets */
+.fx { position: absolute; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
+.f { position: absolute; left: 0; top: 0; will-change: transform, opacity; }
+.nombre { font-family: var(--titre); font-weight: 800; font-size: clamp(20px, 2vw, 30px); line-height: 1; color: #fff; white-space: nowrap; text-align: center; text-shadow: 0 2px 0 rgba(0,0,0,.7), 0 0 16px rgba(0,0,0,.8); font-variant-numeric: tabular-nums; z-index: 3; }
+.nombre.crit { color: var(--legendaire); }
+.nombre.crit::before { content: "Critique"; display: block; font-family: var(--pixel); font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.nombre.soin { color: var(--pv); } .nombre.poison { color: var(--c-poison); } .nombre.brulure { color: var(--c-feu); }
+.nombre.saignement { color: var(--c-sang); } .nombre.saignement.gros { font-size: clamp(28px, 3vw, 42px); }
+.nombre.fatigue { color: var(--encre-2); } .nombre.renvoi { color: #e0a0ff; } .nombre.riposte { color: #9fd6ff; }
+.nombre.bouclier:not(.etat) { color: var(--c-bouclier); font-size: 18px; }
+.nombre.etat { font-family: var(--pixel); font-weight: 700; font-size: clamp(15px, 1.4vw, 19px); padding: 4px 10px; border-radius: 7px; background: rgba(12,13,18,.88); border: 1px solid var(--trait-fort); color: var(--legendaire); text-shadow: none; }
+.nombre.etat.rate { color: var(--encre); } .nombre.etat.parade { color: #9fd6ff; } .nombre.etat.stun, .nombre.etat.paralysie { color: var(--c-elec); }
+.nombre.etat.bloque, .nombre.etat.bouclier { color: var(--c-bouclier); } .nombre.etat.cible { color: var(--c-feu); }
+.particule { width: 6px; height: 6px; border-radius: 2px; background: #fff; }
+.etincelle { background: #fff3c4; box-shadow: 0 0 8px #ffd36b; width: 4px; height: 4px; }
+.etincelle.or { background: var(--legendaire); box-shadow: 0 0 10px var(--legendaire); }
+.etincelle.bleu { background: #d6f1ff; box-shadow: 0 0 10px #7fd2ff; }
+.poussiere { width: 10px; height: 10px; border-radius: 50%; background: rgba(190,180,160,.45); }
+.braise, .particule.braise { width: 5px; height: 5px; border-radius: 50%; background: #ffb03d; box-shadow: 0 0 8px #ff6a1a; }
+.debris { width: 7px; height: 7px; background: #3a3b45; border: 1px solid #55566a; }
+.bulle { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--c-poison); background: rgba(126,224,109,.2); }
+.goutte { width: 6px; height: 7px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: #c8102e; }
+.particule.soin { width: 6px; height: 6px; border-radius: 50%; background: var(--pv); box-shadow: 0 0 10px var(--pv); }
+.verre { width: 7px; height: 7px; background: #d4ecff; clip-path: polygon(50% 0, 100% 100%, 0 70%); }
+.onde { width: 80px; height: 80px; border-radius: 50%; border: 4px solid rgba(255,255,255,.85); }
+.onde.sol { height: 26px; border-width: 3px; }
+.onde.or { border-color: var(--legendaire); } .onde.feu { border-color: var(--c-feu); } .onde.electrique { border-color: #9ad8ff; }
+.onde.sang { border-color: var(--c-sang); } .onde.acier { border-color: var(--c-acier); } .onde.bouclier { border-color: var(--c-bouclier); border-width: 6px; }
+.entaille { background: radial-gradient(ellipse 50% 100% at 50% 100%, transparent 64%, rgba(255,255,255,.9) 67%, rgba(255,255,255,.35) 71%, transparent 75%); filter: drop-shadow(0 0 6px #fff); }
+.entaille.crit { background: radial-gradient(ellipse 50% 100% at 50% 100%, transparent 62%, #fff4cf 66%, rgba(255,197,61,.6) 71%, transparent 76%); filter: drop-shadow(0 0 10px var(--legendaire)); }
+.entaille.energie { background: radial-gradient(ellipse 50% 100% at 50% 100%, transparent 62%, #eafcff 66%, rgba(127,231,255,.6) 71%, transparent 76%); filter: drop-shadow(0 0 10px #7fe7ff); }
+.projectile.balle { width: 48px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, transparent, #fff5c8); box-shadow: 0 0 10px #ffd36b; }
+.projectile.balle.crit { height: 5px; background: linear-gradient(90deg, transparent, #fff, var(--legendaire)); box-shadow: 0 0 14px var(--legendaire); }
+.projectile.fleche { width: 46px; height: 2px; background: linear-gradient(90deg, #8a6a3a, #e4d2a8); }
+.projectile.fleche::after { content: ""; position: absolute; right: -6px; top: -4px; border: 5px solid transparent; border-left: 8px solid #e8ecf5; }
+.projectile.fleche.crit { box-shadow: 0 0 10px var(--legendaire); }
+.projectile.shuriken { width: 20px; height: 20px; background: #d6dcea; clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); filter: drop-shadow(0 0 4px #fff); }
+.projectile.obus { width: 13px; height: 13px; border-radius: 50%; background: #ffe2a0; box-shadow: 0 0 12px #ff8a3d, 0 0 26px #ff6a1a; }
+.bouche { width: 38px; height: 22px; background: radial-gradient(ellipse at 30% 50%, #fff 0 18%, #ffd36b 36%, rgba(255,138,61,.5) 55%, transparent 70%); }
+.bouche.gros { width: 64px; height: 36px; }
+.reticule { border-radius: 50%; border: 2px dashed #ff5a5a; box-shadow: 0 0 20px -2px rgba(255,90,90,.6); }
+.reticule::before, .reticule::after { content: ""; position: absolute; background: #ff5a5a; left: 50%; top: -10%; width: 2px; height: 120%; translate: -50% 0; opacity: .7; }
+.reticule::after { width: 120%; height: 2px; top: 50%; left: -10%; translate: 0 -50%; }
+.reticule.verrouille { border-style: solid; animation: verrou calc(.25s / var(--vit)) linear infinite; }
+@keyframes verrou { 50% { opacity: .4; } }
+.foudre { width: 70px; }
+.foudre svg { width: 100%; height: 100%; overflow: visible; }
+.foudre polyline, .arc-elec polyline { fill: none; stroke: #eef9ff; stroke-width: 3; stroke-linejoin: bevel; filter: drop-shadow(0 0 6px #7fd2ff) drop-shadow(0 0 16px #7fd2ff); }
+.arc-elec { width: 60px; height: 20px; }
+.arc-elec svg { width: 100%; height: 100%; }
+.arc-elec polyline { stroke: #fff9c4; stroke-width: 2.4; filter: drop-shadow(0 0 5px var(--c-elec)); }
+.nuage { width: 110px; height: 110px; border-radius: 50%; background: radial-gradient(circle, rgba(140,230,110,.7), rgba(90,190,70,.35) 45%, transparent 70%); }
+.flamme { width: 38px; height: 38px; border-radius: 50%; background: radial-gradient(circle, #fff6d0 0 15%, #ffc24d 35%, rgba(255,106,26,.7) 55%, transparent 72%); }
+.avion { width: 130px; height: 30px; background: #06070a; opacity: .75; clip-path: polygon(0 45%, 55% 40%, 70% 0, 78% 0, 74% 40%, 100% 44%, 100% 56%, 74% 60%, 78% 100%, 70% 100%, 55% 60%, 0 55%); }
+.ombre { width: 130px; height: 32px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.75), transparent); }
+.missile { width: 10px; height: 70px; border-radius: 6px; background: linear-gradient(180deg, transparent, rgba(255,211,107,.6) 45%, #fff 95%); box-shadow: 0 0 14px #ffd36b; }
+.boule-feu { width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, #fff 0 10%, #ffe08a 22%, #ff8a3d 42%, rgba(200,50,20,.65) 60%, transparent 70%); }
+.hache-vol { width: 54px; height: 54px; background: #dfe7f5; clip-path: polygon(45% 0, 55% 0, 55% 30%, 100% 18%, 100% 58%, 55% 46%, 55% 100%, 45% 100%, 45% 46%, 0 58%, 0 18%, 45% 30%); filter: drop-shadow(0 0 8px #7fe7ff); }
+.flash-arene { width: 100%; height: 100%; mix-blend-mode: screen; background: radial-gradient(70% 70% at 50% 45%, rgba(255,255,255,.75), rgba(200,225,255,.18) 50%, transparent 80%); }
+.flash-arene.or { background: radial-gradient(60% 60% at 50% 45%, rgba(255,197,61,.55), transparent 75%); } .flash-arene.feu { background: radial-gradient(60% 60% at 50% 45%, rgba(255,138,61,.6), transparent 75%); }
+.orbe-vie { width: 11px; height: 11px; border-radius: 50%; background: #ff5a6e; box-shadow: 0 0 12px #ff4d6d; }
+.etoile-stun { width: 16px; height: 16px; background: var(--c-elec); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); filter: drop-shadow(0 0 4px #fff07a); }
+.eclat-armure { width: 12px; height: 14px; background: color-mix(in oklab, var(--c, var(--commun)) 55%, #22232b); border: 1px solid color-mix(in oklab, var(--c, var(--commun)) 70%, #fff); clip-path: polygon(10% 0, 100% 20%, 80% 100%, 0 70%); }
+.eclat-armure.normal { --c: var(--normal); } .eclat-armure.rare { --c: var(--rare); } .eclat-armure.epique { --c: var(--epique); } .eclat-armure.legendaire { --c: var(--legendaire); }
+.eclat-visage { border-radius: 26px; overflow: hidden; }
+.moitie-armure .carte { width: 100%; }
+.carte.moitie.g { clip-path: polygon(0 0, 56% 0, 44% 38%, 52% 62%, 40% 100%, 0 100%); }
+.carte.moitie.d { clip-path: polygon(56% 0, 100% 0, 100% 100%, 40% 100%, 52% 62%, 44% 38%); }
+
+/* Carte de stratagème qui vole, se retourne et brûle */
+.carte-vol { aspect-ratio: 5 / 7; z-index: 4; }
+.carte-vol > .dos, .carte-vol > .cv-face { position: absolute; inset: 0; }
+.carte-vol > .dos svg { width: 44%; }
+.carte-vol .cv-face { opacity: 0; }
+.carte-vol.face .cv-face { opacity: 1; }
+.carte-vol.face > .dos { opacity: 0; }
+.carte-vol.active .cv-face .carte { box-shadow: 0 0 0 1px var(--c), 0 0 38px -4px var(--c), 0 0 90px -20px var(--c); }
+@property --b { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
+.carte-vol.brule .cv-face { animation: consume calc(1.25s / var(--vit)) linear forwards;
+  -webkit-mask-image: radial-gradient(circle at 65% 105%, transparent var(--b), #000 calc(var(--b) + 10%));
+  mask-image: radial-gradient(circle at 65% 105%, transparent var(--b), #000 calc(var(--b) + 10%)); }
+.carte-vol.brule .cv-face::after { content: ""; position: absolute; inset: 0; border-radius: 14px; z-index: 5;
+  background: radial-gradient(circle at 65% 105%, transparent calc(var(--b) - 1%), #fff2b0 calc(var(--b) + 1%), #ff8a3d calc(var(--b) + 4%), rgba(60,20,10,.85) calc(var(--b) + 9%), transparent calc(var(--b) + 22%)); }
+@keyframes consume { from { --b: 0%; } to { --b: 150%; } }
+
+/* Commandes */
+.commandes-arene { position: relative; z-index: 10; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 18px; padding: 12px 16px; border-top: 1px solid var(--trait); background: rgba(12,13,18,.7); }
+.cmd-lecture, .cmd-outils { display: flex; align-items: center; gap: 8px; }
+.commandes-arene .bouton-icone { width: 44px; height: 44px; }
+.commandes-arene .bouton-icone svg { width: 19px; height: 19px; }
+.vitesses { flex-wrap: nowrap; }
+.vitesses button { min-width: 44px; min-height: 40px; font-family: var(--titre); font-size: 13px; }
+.passer, .retour { min-height: 44px; padding: 9px 14px; }
+.arene-log { font-size: 14px; color: var(--encre-2); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.8em; }
+.bouton-icone.son[aria-pressed="false"] { color: var(--encre-3); }
+.bouton-icone.son[aria-pressed="false"]::after { content: ""; position: absolute; width: 22px; height: 2px; background: currentColor; rotate: -45deg; }
+.arene.en-pause::after { content: "Pause"; position: absolute; left: 50%; top: 42%; translate: -50% -50%; z-index: 8; font-family: var(--titre); font-weight: 800; font-size: 22px; padding: 10px 20px; border-radius: 14px; background: rgba(12,13,18,.88); border: 1px solid var(--trait-fort); }
+.arene.terminee .cmd-lecture { opacity: .45; }
+
+/* Intro */
+.intro { position: absolute; inset: 0; z-index: 8; display: grid; place-content: center; justify-items: center; gap: 22px; padding: 24px; text-align: center;
+  background: radial-gradient(60% 55% at 50% 45%, rgba(26,27,36,.9), rgba(8,9,12,.97)); }
+.intro-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: clamp(14px, 4vw, 64px); }
+.intro-cote { display: grid; justify-items: center; gap: 10px; min-width: 0; }
+.intro-visage { position: relative; width: clamp(92px, 12vw, 170px); aspect-ratio: 1; border-radius: 26px; overflow: hidden; border: 2px solid var(--trait-fort); font-size: clamp(30px, 4vw, 56px); box-shadow: 0 24px 50px -20px #000; }
+.intro-cote b { font-family: var(--titre); font-size: clamp(17px, 2.2vw, 30px); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.intro-cote span { color: var(--encre-2); font-size: 14px; }
+.intro-vs { font-family: var(--titre); font-weight: 800; font-size: clamp(40px, 6vw, 88px); color: var(--legendaire); text-shadow: 0 0 40px rgba(255,197,61,.35); }
+.intro-infos { color: var(--encre-2); font-size: 14.5px; }
+.intro-compte { font-family: var(--titre); font-weight: 800; font-size: clamp(42px, 6vw, 84px); line-height: 1; min-height: 1em; }
+.intro.porte .intro-compte { display: none; }
+.intro-go { font-size: 16px; padding: 15px 26px; min-height: 52px; }
+
+/* Fin */
+.outro { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; padding: 18px; background: rgba(8,9,12,.6); backdrop-filter: blur(3px); }
+.outro.victoire { --c: var(--legendaire); } .outro.defaite { --c: var(--defaite); } .outro.egalite, .outro.neutre { --c: var(--encre); }
+.outro-carte { width: min(540px, 100%); max-height: 100%; overflow: auto; display: grid; justify-items: center; gap: 14px; padding: 26px 24px; border-radius: 22px; text-align: center;
+  background: radial-gradient(80% 50% at 50% 0%, color-mix(in oklab, var(--c) 10%, transparent), transparent 70%), var(--sol-2);
+  border: 1px solid color-mix(in oklab, var(--c) 40%, transparent); box-shadow: 0 30px 60px -20px rgba(0,0,0,.95); }
+.outro-sur { font-family: var(--pixel); font-size: 13px; color: var(--encre-3); }
+.outro-titre { font-family: var(--titre); font-weight: 800; font-size: clamp(34px, 5vw, 56px); color: var(--c); line-height: 1.05; }
+.outro-titre:focus { outline: none; }
+.outro-sous { color: var(--encre-2); font-size: 15px; font-weight: 600; margin-top: -6px; }
+.outro-gains { display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: center; }
+.gain-medailles { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--sol-3); border: 1px solid var(--trait-fort); font-weight: 600; font-size: 14px; }
+.gain-medailles svg { width: 20px; height: 20px; }
+.gain-medailles b { font-family: var(--titre); font-size: 16px; color: var(--legendaire); }
+.gain-medailles.perte b { color: var(--defaite); }
+.gain-medailles small { color: var(--encre-3); font-size: 13px; }
+.outro-stats { width: 100%; border-collapse: collapse; font-size: 14px; }
+.outro-stats th, .outro-stats td { padding: 7px 8px; border-bottom: 1px solid var(--trait); }
+.outro-stats thead th { font-weight: 700; color: var(--encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.outro-stats tbody th { text-align: left; font-weight: 500; color: var(--encre-2); }
+.outro-stats td { font-family: var(--titre); font-weight: 700; }
+.outro-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.outro-actions > * { min-height: 46px; }
+
+/* ---------- Mobile : combattants empilés (défenseur en haut, attaquant en bas) ---------- */
+@media (max-width: 760px) {
+  .contenu.contenu-arene { padding: 8px 8px 96px; }
+  .arene { --w-portrait: clamp(88px, 26vw, 120px); --w-carte: clamp(48px, 14vw, 64px); min-height: calc(100dvh - 160px); border-radius: 18px; }
+  .scene-arene { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 10px; padding: 12px 12px 14px; align-content: space-evenly; }
+  .cbt.droite { order: 0; } .centre { order: 1; } .cbt.gauche { order: 2; }
+  .cbt { gap: 10px; }
+  .cbt.droite .jauge-tete, .cbt.droite .jauge-pied { flex-direction: row; }
+  .cbt.droite .jauge-puissance { margin-left: auto; margin-right: 0; }
+  .cbt.droite .statuts { justify-content: flex-start; }
+  .cbt.droite .barre i { transform-origin: left; }
+  .cbt.droite .barre .erosion { transform-origin: right; }
+  .corps, .cbt.gauche .corps { flex-direction: row; justify-content: flex-start; gap: 14px; }
+  .main-cartes { gap: 6px; }
+  .centre { grid-auto-flow: column; align-items: center; gap: 12px; min-height: 34px; }
+  .tour { grid-auto-flow: column; align-items: baseline; gap: 6px; }
+  .tour b { font-size: 24px; }
+  .vs-centre { display: none; }
+  .annonce { top: 50%; translate: -50% -50%; max-width: calc(100vw - 40px); }
+  .vitesses button { padding: 8px 10px; }
+  .jauge-puissance { display: none; }
+  .socle::after { bottom: -10px; }
+  .portrait { border-radius: 20px; }
+  .statut { font-size: 11.5px; padding: 3px 6px; }
+  .commandes-arene { grid-template-columns: minmax(0, 1fr) auto; padding: 10px; gap: 8px; }
+  .arene-log { grid-column: 1 / -1; order: -1; font-size: 13px; }
+  .cmd-lecture { gap: 6px; } .cmd-outils { gap: 6px; }
+  .passer { padding: 9px 10px; }
+  .retour span { display: none; }
+  .retour { width: 44px; padding: 0; }
+  .vitesses button { min-width: 38px; }
+  .vs-duo { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .vs-joueur { grid-template-columns: 76px minmax(0, 1fr); justify-items: start; align-items: center; column-gap: 14px; padding: 14px; }
+  .vs-portrait { width: 76px; border-radius: 18px; font-size: 26px; grid-row: span 2; }
+  .vs-ident { justify-content: flex-start; } .vs-ident b { font-size: 17px; }
+  .vs-chiffres { gap: 18px; } .vs-chiffres > div { justify-items: start; } .vs-chiffres b { font-size: 17px; }
+  .vs-build { grid-column: 1 / -1; margin-top: 4px; }
+  .vs-entete h1 { font-size: 24px; }
+  .vs-eclair span { font-size: 24px; line-height: 1; }
+  .intro-ligne { gap: 10px; }
+  .outro-carte { padding: 20px 16px; }
+}
+@media (max-width: 380px) { .passer { font-size: 0; gap: 0; width: 44px; padding: 0; } .passer svg { width: 18px; height: 18px; } }
+@media (prefers-reduced-motion: reduce) {
+  .portrait:is([data-degats="3"], [data-degats="4"]), .portrait[data-degats="4"] .vignette { animation: none; }
+}

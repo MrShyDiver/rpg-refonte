@@ -1,0 +1,143 @@
+/* Lootbox : le coffre et les cartes viennent d'app.css ; ici la mise en page et les résultats. */
+.lb-entete { margin-bottom: 22px; }
+.lb-grille { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; align-items: start; }
+.lb-principal { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.lb-scene { min-width: 0; }
+
+/* Sélecteurs de lootbox (base .type-lootbox d'app.css) + compteur */
+.lb-types { margin-top: 0; }
+.type-lootbox { min-height: 76px; }
+.lb-type-texte { flex: 1; min-width: 0; }
+.lb-compte { margin-left: auto; text-align: right; flex: none; }
+.lb-compte b { display: block; font-family: var(--titre); font-size: 26px; line-height: 1.05; color: var(--encre); }
+.type-lootbox[data-type="legendaire"] .lb-compte b { color: var(--legendaire); }
+.lb-compte small { font-size: 12px; color: var(--encre-3); white-space: nowrap; }
+.type-lootbox[data-vide] .lb-compte b { color: var(--encre-3); }
+.type-lootbox:disabled { opacity: .7; }
+
+/* Table de jeu */
+.lb-table { transition: height .6s var(--ease), border-color .3s; }
+.lb-table.leg {
+  background: radial-gradient(55% 60% at 50% 100%, rgba(255,197,61,.11), transparent 70%), var(--sol-2);
+  border-color: color-mix(in oklab, var(--legendaire) 26%, transparent);
+}
+.dcarte[role="button"] { cursor: pointer; }
+.dcarte[role="button"]:hover .face { filter: brightness(1.1); }
+.dcarte:focus-visible { outline: none; }
+.dcarte:focus-visible .face { outline: 2px solid var(--legendaire); outline-offset: 3px; }
+
+/* Résultat sous chaque carte : nouveau, montée de niveau, max, doublon en trop */
+.lb-badge {
+  position: absolute; left: 50%; top: calc(100% + 9px); width: calc(100% + 10px);
+  display: grid; justify-items: center; gap: 5px; text-align: center;
+  transform: translate(-50%, 6px); opacity: 0; transition: opacity .4s, transform .4s var(--ease); pointer-events: none;
+}
+.dcarte.retournee .lb-badge { opacity: 1; transform: translate(-50%, 0); }
+.lb-badge b { font-family: var(--titre); font-weight: 700; font-size: clamp(10px, calc(var(--dw, 124px) * .092), 12.5px); line-height: 1.2; color: color-mix(in oklab, var(--c) 55%, var(--encre)); }
+.lb-badge.nouveau b { background: var(--c); color: #101116; padding: 3px 9px 4px; border-radius: 999px; box-shadow: 0 0 22px -4px var(--c); }
+.lb-fleche { font-family: var(--texte); font-weight: 700; margin: 0 .2em; }
+.lb-badge.max b { color: var(--c); }
+.lb-badge.trop b { color: var(--encre-2); }
+.lb-badge small { font-size: 11px; color: var(--encre-3); line-height: 1.2; }
+.lb-badge .jauge-niv { width: 70%; height: 4px; --c: var(--epique); }
+.table-jeu.etroite .lb-badge { gap: 4px; }
+
+/* Commandes */
+.lb-actions { margin-top: 14px; display: grid; gap: 10px; }
+.lb-actions .boutons-ouvrir { display: flex; gap: 8px; flex-wrap: wrap; }
+.lb-x { display: none; }
+.btn-ouvrir[data-manque]:disabled { cursor: not-allowed; }
+.btn-ouvrir[hidden] { display: none; }
+.lb-sous-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lb-aide { font-size: 14px; color: var(--encre-2); }
+.lb-sous-actions .btn-son { flex: none; min-height: 44px; }
+.lb-lien { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; font-weight: 600; color: var(--legendaire); text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+.lb-lien svg { width: 15px; height: 15px; }
+
+.lb-bilan { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14.5px; color: var(--encre-2); }
+.lb-bilan:empty { display: none; }
+.lb-bilan > * + *::before { content: "·"; margin-right: 14px; color: var(--encre-3); }
+.lb-bilan > b { color: var(--encre); }
+.lb-bilan-nouveau { color: var(--encre); font-weight: 600; }
+
+/* État vide */
+.lb-vide { text-align: left; padding: 22px 24px; border-style: solid; border-color: color-mix(in oklab, var(--legendaire) 35%, transparent); background: color-mix(in oklab, var(--legendaire) 5%, var(--sol-2)); }
+.lb-vide b { font-family: var(--titre); font-size: 19px; margin-bottom: 8px; }
+.lb-vide p { max-width: 62ch; }
+.lb-vide-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; align-items: center; }
+.lb-vide .btn-twitch { margin-top: 0; width: auto; max-width: none; }
+.lb-vide .btn-second { min-height: 50px; }
+
+/* Colonne latérale */
+.lb-cote { display: grid; gap: 14px; min-width: 0; }
+.lb-bloc h2 { font-size: 16px; }
+.lb-bloc-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.lb-barre { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: var(--sol-3); margin: 16px 0 10px; gap: 2px; }
+.lb-barre i { background: var(--c); min-width: 3px; }
+.lb-taux, .lb-raretes, .lb-notes { list-style: none; }
+.lb-taux li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 0; font-size: 14.5px; }
+.lb-taux li + li { border-top: 1px solid var(--trait); }
+.lb-taux small { color: var(--encre-3); font-size: 12.5px; margin-left: 8px; }
+.lb-taux b { font-family: var(--titre); font-size: 14px; }
+.lb-taux li.absent { color: var(--encre-3); }
+.lb-taux li.absent .lb-carre { opacity: .35; }
+.lb-carre { width: 9px; height: 9px; border-radius: 2px; background: var(--c); }
+.lb-notes { margin-top: 12px; display: grid; gap: 6px; font-size: 13px; color: var(--encre-3); }
+.lb-notes li { padding-left: 14px; position: relative; }
+.lb-notes li::before { content: ""; position: absolute; left: 2px; top: .6em; width: 5px; height: 5px; border-radius: 50%; background: var(--encre-3); }
+
+.lb-chiffres { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lb-chiffres .chiffre:last-child { grid-column: 1 / -1; }
+.lb-chiffres small a { color: var(--legendaire); }
+
+.lb-total { margin: 12px 0 10px; color: var(--encre-2); font-size: 14px; }
+.lb-total b { font-family: var(--titre); font-size: 24px; color: var(--encre); }
+.lb-raretes li { display: grid; grid-template-columns: 84px minmax(0, 1fr) 56px; align-items: center; gap: 10px; padding: 5px 0; font-size: 14px; }
+.lb-raretes li > span:first-child { color: color-mix(in oklab, var(--c) 60%, var(--encre)); font-weight: 600; }
+.lb-raretes b { text-align: right; font-size: 13.5px; font-weight: 600; color: var(--encre-2); }
+
+/* Historique de la session */
+.lb-histo { margin-top: 26px; }
+.lb-histo-rang { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; scroll-snap-type: x proximity; }
+.lb-histo-rang .zone { position: relative; flex: none; width: 92px; border-radius: 14px; scroll-snap-align: start; transition: transform .25s var(--ease); }
+.lb-histo-rang .zone:hover { transform: translateY(-3px); }
+.lb-mini-nouveau { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); z-index: 4; font-family: var(--titre); font-size: 9.5px; font-weight: 700; padding: 2px 7px 3px; border-radius: 999px; background: var(--encre); color: #101116; white-space: nowrap; }
+
+/* Mobile */
+@media (max-width: 1100px) and (min-width: 901px) {
+  .lb-grille { grid-template-columns: minmax(0, 1fr) 280px; gap: 22px; }
+}
+@media (max-width: 900px) {
+  .lb-entete { margin-bottom: 16px; }
+  .lb-entete p { font-size: 15px; }
+  .lb-grille { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  .lb-types { gap: 8px; }
+  .type-lootbox { padding: 10px 12px; gap: 10px; min-height: 64px; }
+  .type-lootbox svg { width: 38px; }
+  .type-lootbox .titre-type { font-size: 14px; line-height: 1.25; }
+  .type-lootbox .texte-type { display: none; }
+  .lb-compte b { font-size: 22px; }
+  .lb-compte small { display: none; }
+  .lb-table { margin-top: 10px; }
+
+  /* Zone d'action collante au-dessus de la barre d'onglets */
+  .lb-actions:not(.inactif) {
+    position: sticky; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+    margin: 10px -16px 0; padding: 10px 16px 8px; gap: 6px;
+    background: color-mix(in oklab, var(--sol) 90%, transparent); backdrop-filter: blur(10px);
+    border-top: 1px solid var(--trait);
+  }
+  .lb-actions .boutons-ouvrir { flex-wrap: nowrap; gap: 6px; }
+  .lb-actions .btn-ouvrir { flex: 1 1 0; min-width: 0; min-height: 48px; padding: 10px 4px; font-size: 13.5px; white-space: nowrap; }
+  .lb-actions .btn-ouvrir:first-child { flex-grow: 1.6; }
+  .lb-actions .btn-ouvrir:not(:first-child) .lb-verbe { display: none; }
+  .lb-actions .btn-ouvrir:not(:first-child) .lb-x { display: inline; }
+  .lb-aide { font-size: 13px; line-height: 1.35; }
+  .lb-sous-actions .btn-son { padding: 8px 10px; min-height: 40px; min-width: 44px; justify-content: center; }
+  .lb-son-libelle { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .lb-vide { padding: 18px; }
+  .lb-vide-actions > * { flex: 1 1 100%; }
+  .lb-histo { margin-top: 12px; }
+  .lb-histo-rang { margin: 0 -16px; padding: 4px 16px 10px; }
+  .lb-histo-rang .zone { width: 80px; }
+}

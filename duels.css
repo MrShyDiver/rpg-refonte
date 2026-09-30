@@ -1,0 +1,174 @@
+/* Duels : héros, adversaires, historique, lecteur de replay. */
+:root { --victoire: #5ce0b8; --defaite: #ff6b6b; --pv: #5ce0b8; }
+
+/* ---------- Annonce « défier depuis le site » ---------- */
+.annonce-defi { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; }
+.annonce-defi > div { flex: 1 1 360px; }
+.annonce-defi h2 { font-size: 19px; margin-top: 10px; }
+.annonce-defi p { margin-top: 6px; color: var(--encre-2); font-size: 14.5px; max-width: 62ch; }
+.annonce-defi p b { color: var(--encre); }
+.pilule.nouveau { --c: var(--legendaire); }
+.manque-ticket { display: flex; align-items: center; gap: 8px; color: #ff9b9b !important; font-weight: 600; }
+.manque-ticket svg { width: 18px; height: 18px; flex: none; }
+code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1px 6px; border-radius: 6px; background: var(--sol-3); border: 1px solid var(--trait-fort); color: var(--encre); }
+.lien-live svg { color: var(--twitch-2); }
+.lien { color: var(--encre); text-decoration: underline; text-underline-offset: 3px; }
+.recherche { flex: 1 1 200px; max-width: 280px; }
+.barre-filtres .mention { margin-left: auto; }
+.btn-second.plus { display: flex; margin: 14px auto 0; }
+
+/* ---------- Adversaires ---------- */
+.liste-adversaires, .liste-duels { list-style: none; display: grid; gap: 8px; }
+.adversaire {
+  display: grid; grid-template-columns: 44px minmax(0, 1.4fr) 100px minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  padding: 12px 16px; border-radius: 14px; background: var(--sol-2); border: 1px solid var(--trait);
+}
+.adversaire .ident { min-width: 0; display: grid; }
+.adversaire .ident a { font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adversaire .ident a:hover { text-decoration: underline; }
+.puissance b { display: block; font-family: var(--titre); font-size: 18px; line-height: 1.1; }
+.puissance span { font-size: 12px; color: var(--encre-3); }
+.estimation { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; }
+.estimation[data-niveau="5"], .estimation[data-niveau="4"] { --c: var(--victoire); }
+.estimation[data-niveau="3"] { --c: var(--encre); }
+.estimation[data-niveau="2"] { --c: #ffb03d; }
+.estimation[data-niveau="1"] { --c: var(--defaite); }
+.estimation > span:last-child { color: var(--c); }
+.jauge-est { display: inline-flex; gap: 3px; }
+.jauge-est i { width: 6px; height: 14px; border-radius: 2px; background: var(--sol-3); border: 1px solid var(--trait-fort); }
+.jauge-est i.plein { background: var(--c); border-color: transparent; }
+.adversaire .actions { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-second.petit { white-space: nowrap; padding: 8px 12px; font-size: 13.5px; min-height: 40px; }
+.btn-principal.btn-defier { min-height: 40px; padding: 8px 14px; font-size: 13.5px; }
+.btn-defier svg, .verrouille svg { width: 16px; height: 16px; }
+.btn-defier[aria-disabled="true"] { opacity: .4; cursor: not-allowed; transform: none; filter: none; }
+.btn-second.verrouille { color: var(--encre-3); border-style: dashed; cursor: not-allowed; }
+
+/* ---------- Historique ---------- */
+.face-a-face { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.face-a-face b { display: block; }
+.fa-duo { display: flex; align-items: center; gap: 8px; }
+.vs { font-family: var(--titre); font-weight: 800; font-size: 13px; color: var(--encre-3); }
+.fa-score { margin-left: auto; display: flex; gap: 14px; font-family: var(--titre); font-weight: 700; font-size: 20px; }
+.fa-score .v { color: var(--victoire); } .fa-score .d { color: var(--defaite); } .fa-score .e { color: var(--encre-2); }
+.duel {
+  width: 100%; text-align: left; display: grid; grid-template-columns: 88px minmax(0, 1fr) 130px 70px 92px 172px; align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: 14px; background: var(--sol-2); border: 1px solid var(--trait); font-size: 14.5px; transition: border-color .15s, background .15s;
+}
+.duel:hover { border-color: var(--trait-fort); }
+.resultat { display: inline-flex; align-items: center; gap: 8px; font-family: var(--titre); font-weight: 700; font-size: 13px; padding: 4px 0; color: var(--c); }
+.resultat::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c, transparent); flex: none; }
+.resultat.victoire { --c: var(--victoire); } .resultat.defaite { --c: var(--defaite); } .resultat.egalite { --c: var(--encre-2); }
+.centre { display: grid; gap: 4px; min-width: 0; }
+.participants { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.participants > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.participants .avatar { flex: none; font-size: 12px; }
+.details { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.type-duel { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--trait-fort); color: var(--encre-2); }
+.type-duel[data-type="duel"] { color: var(--legendaire); border-color: color-mix(in oklab, var(--legendaire) 40%, transparent); }
+.puissances { font-weight: 600; white-space: nowrap; }
+.revoir { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; font-weight: 600; font-size: 13.5px; }
+.revoir a, .revoir button { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--trait-fort); text-decoration: none; color: var(--encre); }
+.revoir .regarder { color: var(--legendaire); border-color: color-mix(in oklab, var(--legendaire) 40%, transparent); }
+.revoir a:hover, .revoir button:hover { background: var(--sol-3); }
+.revoir svg { width: 16px; height: 16px; }
+
+/* ---------- Lecteur de replay (tiroir élargi) ---------- */
+.tiroir.tiroir-replay { width: min(940px, 100%); }
+.tiroir-replay [hidden] { display: none !important; }
+.replay { display: grid; gap: 16px; }
+.scene { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 14px; align-items: start; padding: 16px; border-radius: 22px; border: 1px solid var(--trait);
+  background: radial-gradient(60% 80% at 50% 0%, rgba(255,255,255,.04), transparent 70%), var(--sol); }
+.scene > .vs { align-self: center; font-size: 15px; }
+.combattant { position: relative; display: grid; gap: 10px; padding: 12px; border-radius: 14px; border: 1px solid transparent; transition: border-color .3s, opacity .3s; }
+.combattant.moi .ident b::after { content: " (toi)"; font-weight: 500; color: var(--encre-3); }
+.combattant.gagnant { border-color: color-mix(in oklab, var(--legendaire) 55%, transparent); background: color-mix(in oklab, var(--legendaire) 6%, transparent); }
+.combattant.vaincu { opacity: .55; }
+.fiche-combattant { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.fiche-combattant .ident { display: grid; min-width: 0; }
+.fiche-combattant .ident b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fiche-combattant .avatar { flex: none; }
+.pv { display: grid; gap: 4px; }
+.pv > span { font-size: 13px; color: var(--encre-2); }
+.barre-pv { height: 12px; border-radius: 6px; background: var(--sol-3); border: 1px solid var(--trait); overflow: hidden; }
+.barre-pv i { display: block; height: 100%; width: 100%; transform-origin: left; background: var(--pv); transition: transform .45s var(--ease), background .3s; }
+.barre-pv i.moyen { background: #ffb03d; } .barre-pv i.bas { background: var(--defaite); }
+.statuts { display: flex; flex-wrap: wrap; gap: 5px; min-height: 22px; }
+.statut { font-family: var(--pixel); font-size: 13px; line-height: 1; padding: 4px 7px; border-radius: 6px; background: var(--sol-3); border: 1px solid var(--trait-fort); color: var(--c, var(--encre)); }
+.statut.poison { --c: #7ee06d; } .statut.brulure { --c: #ff8a3d; } .statut.paralysie { --c: #fff07a; } .statut.saignement { --c: #ff4d6d; }
+.statut.bouclier { --c: #6ab8ff; } .statut.antisoin { --c: #d08bff; } .statut.frenesie { --c: #ffd84d; }
+.pop { position: absolute; right: 14px; top: 8px; font-family: var(--titre); font-weight: 800; font-size: 22px; color: var(--defaite); pointer-events: none; animation: pop 1s var(--ease) forwards; text-shadow: 0 2px 8px rgba(0,0,0,.8); }
+.pop.crit { color: var(--legendaire); font-size: 27px; } .pop.soin { color: var(--victoire); }
+@keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.8); } 20% { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-22px); } }
+.combattant.secoue { animation: secoue .35s linear; }
+@keyframes secoue { 25% { transform: translateX(-4px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+
+.direct { min-height: 3.1em; padding: 12px 14px; border-radius: 12px; background: var(--sol-3); border: 1px solid var(--trait); font-size: 15px; font-weight: 600; }
+.bandeau-fin { display: flex; align-items: center; justify-content: space-between; gap: 14px 24px; flex-wrap: wrap; padding: 16px 18px; border-radius: 14px; border: 1px solid color-mix(in oklab, var(--c, var(--encre-2)) 45%, transparent); background: color-mix(in oklab, var(--c, var(--encre-2)) 9%, var(--sol-2)); }
+.bandeau-fin.victoire { --c: var(--victoire); } .bandeau-fin.defaite { --c: var(--defaite); } .bandeau-fin.neutre { --c: var(--legendaire); }
+.titre-fin { display: block; font-family: var(--titre); font-size: 20px; color: var(--c); }
+.bandeau-fin > div:first-child span { font-size: 14.5px; color: var(--encre-2); }
+.stats-fin { display: flex; gap: 18px; flex-wrap: wrap; }
+.stats-fin > div { display: grid; }
+.stats-fin b { font-family: var(--titre); font-size: 15px; }
+
+.journal { list-style: none; max-height: min(42vh, 420px); overflow-y: auto; border-radius: 14px; border: 1px solid var(--trait); background: var(--sol); overscroll-behavior: contain; }
+.journal li + li { border-top: 1px solid var(--trait); }
+.journal button { width: 100%; text-align: left; display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 10px; padding: 9px 12px; font-size: 14px; }
+.journal button:hover { background: var(--sol-2); }
+.journal li[aria-current="step"] button { background: color-mix(in oklab, var(--legendaire) 7%, var(--sol-2)); }
+.no-tour { font-family: var(--titre); font-weight: 700; font-size: 12px; color: var(--encre-3); padding-top: 2px; }
+.lignes-tour { display: grid; gap: 2px; }
+.evt { color: var(--encre-2); }
+.evt.coup { color: var(--encre); } .evt.crit { color: var(--legendaire); font-weight: 600; } .evt.soin { color: var(--victoire); }
+.evt.parade { color: #9fd6ff; } .evt.rate { color: var(--encre-3); font-style: italic; } .evt.poison { color: #7ee06d; }
+.evt.brulure { color: #ff8a3d; } .evt.saignement { color: #ff4d6d; font-weight: 600; } .evt.strat { color: #ffb03d; }
+
+.builds h3 { font-family: var(--texte); font-size: 12.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--encre-3); margin-bottom: 10px; font-weight: 700; }
+.builds-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.build h4 { font-size: 14px; margin-bottom: 8px; }
+.build-cartes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.case-vide { aspect-ratio: 5 / 7; border-radius: 14px; border: 1px dashed var(--trait-fort); display: grid; place-content: center; text-align: center; padding: 6px; font-size: 11.5px; color: var(--encre-3); }
+.case-vide small { font-size: 10.5px; }
+.infos-duel { padding-bottom: 4px; }
+.vide .ic-vide { width: 36px; height: 36px; margin: 0 auto 10px; color: var(--encre-3); display: block; }
+.vide strong { color: var(--encre); }
+
+.commandes { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; width: 100%; }
+.transport { display: flex; align-items: center; gap: 6px; }
+.transport .bouton-icone { width: 44px; height: 44px; }
+.transport svg { width: 18px; height: 18px; }
+.btn-lecture { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--legendaire); color: #16120a; box-shadow: 0 10px 22px -12px rgba(0,0,0,.9), inset 0 -2px 0 rgba(0,0,0,.18); transition: filter .2s; }
+.btn-lecture:hover { filter: brightness(1.07); }
+.btn-lecture svg { width: 22px; height: 22px; }
+.piste { flex: 1 1 200px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.piste input { flex: 1; min-width: 0; accent-color: var(--legendaire); height: 44px; }
+.piste output { font-size: 13px; font-weight: 600; color: var(--encre-2); min-width: 78px; text-align: right; }
+.vitesses button { min-width: 44px; min-height: 40px; }
+
+@media (max-width: 900px) {
+  .adversaire { grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "av id pu" "es es es" "ac ac ac"; row-gap: 10px; }
+  .adversaire > .avatar { grid-area: av; } .adversaire .ident { grid-area: id; } .adversaire .puissance { grid-area: pu; text-align: right; }
+  .adversaire .estimation { grid-area: es; } .adversaire .actions { grid-area: ac; justify-content: stretch; }
+  .adversaire .actions > * { flex: 1; justify-content: center; min-height: 44px; }
+  .recherche { max-width: none; }
+  .barre-filtres .mention { margin-left: 0; }
+  .duel { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "re ti" "ce ce" "pu to" ; gap: 8px 12px; }
+  .duel .resultat { grid-area: re; } .duel time { grid-area: ti; text-align: right; } .duel .centre { grid-area: ce; }
+  .duel .puissances { grid-area: pu; } .duel .tours { display: none; } .duel .revoir { grid-area: to; }
+  .duel .resultat.neutre { display: none; }
+  .duel:has(.resultat.neutre) { grid-template-areas: "ce ti" "pu to"; }
+  .contenu > .grille-chiffres > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .scene { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 8px; gap: 6px; }
+  .scene > .vs { display: none; }
+  .combattant { padding: 8px; gap: 8px; }
+  .fiche-combattant { gap: 8px; }
+  .fiche-combattant .avatar { width: 34px !important; height: 34px !important; }
+  .fiche-combattant .ident .mention { font-size: 12px; }
+  .pv > span { font-size: 12px; }
+  .pop { right: 6px; font-size: 18px; } .pop.crit { font-size: 22px; }
+  .builds-duo { grid-template-columns: 1fr; }
+  .journal { max-height: 34vh; }
+  .commandes { justify-content: center; }
+  .piste { order: -1; flex-basis: 100%; }
+}
