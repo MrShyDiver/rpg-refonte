@@ -111,6 +111,15 @@ const couleur = (r) => getComputedStyle(document.documentElement).getPropertyVal
 const App = {};
 App.IMAGES = {};
 App.image = (chemin) => App.IMAGES[chemin] || chemin || "";
+// Dépôt de test (ou futur domaine) sans dossier gear/ : on retombe sur les images de l'ancien site.
+// ponytail: dépend de /rpg/ sur le même domaine ; copier gear/ lors de la migration Cloudflare.
+const ANCIEN_SITE = "/rpg/";
+document.addEventListener("error", (e) => {
+  const im = e.target;
+  if (!(im instanceof HTMLImageElement) || im.dataset.repli) return;
+  const src = im.getAttribute("src") || "";
+  if (/^gear\//.test(src) && !location.pathname.startsWith(ANCIEN_SITE)) { im.dataset.repli = "1"; im.src = ANCIEN_SITE + src; }
+}, true);
 
 // ---------------------------------------------------------------------
 // Accès aux données (remplaçable par demo.js pour l'aperçu)
@@ -149,7 +158,13 @@ App.api = {
   lootboxRaretes: () => q(client().from("lootbox_raretes").select("*")),
   lootboxSets: () => q(client().from("lootbox_sets").select("*")),
   // Replays des duels : fichiers statiques duels/<id>.json publiés par le snapshot GitHub.
-  replay: async (fichier) => { if (!/^duels\/[\w-]+\.json$/.test(fichier || "")) throw new Error("Replay introuvable"); const r = await fetch(fichier); if (!r.ok) throw new Error("Replay indisponible (" + r.status + ")"); return r.json(); },
+  replay: async (fichier) => {
+    if (!/^duels\/[\w-]+\.json$/.test(fichier || "")) throw new Error("Replay introuvable");
+    let r = await fetch(fichier);
+    if (!r.ok && !location.pathname.startsWith(ANCIEN_SITE)) r = await fetch(ANCIEN_SITE + fichier); // site de test : replays restés sur /rpg/
+    if (!r.ok) throw new Error("Replay indisponible (" + r.status + ")");
+    return r.json();
+  },
   // Replay d'un duel, quelle que soit sa source : fichier statique (live) ou table duel_replays (site).
   async replayDuel(duel) {
     const f = duel && duel.replay && duel.replay.fichier;
