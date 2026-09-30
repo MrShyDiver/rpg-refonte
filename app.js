@@ -102,28 +102,24 @@ function ilYa(d) {
   if (s < 86400 * 30) return "il y a " + Math.floor(s / 86400) + " j";
   return date(d);
 }
-const reduit = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const attendre = (ms) => new Promise((r) => setTimeout(r, reduit ? Math.min(ms, 60) : ms));
+let reduit = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const attendre = (ms) => new Promise((r) => setTimeout(r, App.reduit ? Math.min(ms, 60) : ms));
 const rangRarete = (r) => ORDRE_RARETE.indexOf(r);
 const couleur = (r) => getComputedStyle(document.documentElement).getPropertyValue("--" + r).trim();
 
 // Images : "gear/x.png" dans le catalogue, à côté des pages. L'aperçu peut les remplacer.
 const App = {};
 App.IMAGES = {};
-App.image = (chemin) => App.IMAGES[chemin] || chemin || "";
-// Dépôt de test (ou futur domaine) sans dossier gear/ : on retombe sur les images de l'ancien site.
-// ponytail: dépend de /rpg/ sur le même domaine ; copier gear/ lors de la migration Cloudflare.
+// Dépôt de test (ou futur domaine) sans dossier gear/ : les images viennent de l'ancien site /rpg/.
+// ponytail: dépend de /rpg/ sur le même domaine ; copier gear/ lors de la migration Cloudflare et vider ANCIEN_SITE.
 const ANCIEN_SITE = "/rpg/";
-document.addEventListener("error", (e) => {
-  const im = e.target;
-  if (!(im instanceof HTMLImageElement) || im.dataset.repli) return;
-  const src = im.getAttribute("src") || "";
-  if (/^gear\//.test(src) && !location.pathname.startsWith(ANCIEN_SITE)) { im.dataset.repli = "1"; im.src = ANCIEN_SITE + src; }
-}, true);
+const HORS_ANCIEN_SITE = !location.pathname.startsWith(ANCIEN_SITE);
+App.image = (chemin) => App.IMAGES[chemin] || (chemin && HORS_ANCIEN_SITE && /^gear\//.test(chemin) ? ANCIEN_SITE + chemin : chemin) || "";
 
 // ---------------------------------------------------------------------
 // Accès aux données (remplaçable par demo.js pour l'aperçu)
 // ---------------------------------------------------------------------
+const COLONNES_JOUEUR = "id,twitch_user_id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks,lootbox,lootbox_legendaire,tickets,tickets_reset,credits_reset,medailles,medailles_duel,medailles_revente,points,victoires,defaites,egalites,serie_actuelle,serie_record,degats_infliges,degats_subis,plus_gros_coup,combat_details,cree_le,premiere_connexion,lootbox_ouvertes,lootbox_leg_ouvertes,achats_boutique,abonne_jusqu_au,abonne_tier,admin";
 let sb = null;
 function client() {
   if (!sb && window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { flowType: "pkce" } });
@@ -137,8 +133,10 @@ async function q(promesse) {
 App.api = {
   async session() { const c = client(); if (!c) return null; const { data } = await c.auth.getSession(); return data.session; },
   async deconnexion() { await client().auth.signOut(); },
-  moi: (uid) => q(client().from("players").select("*").eq("auth_user_id", uid).maybeSingle()),
-  joueur: (login) => q(client().from("players").select("*").eq("twitch_login", String(login).toLowerCase()).maybeSingle()),
+  // Ma ligne via RPC : auth_user_id et donnees_import ne sont plus lisibles publiquement.
+  moi: () => q(client().rpc("moi_joueur")).then((r) => (Array.isArray(r) ? r[0] : r) || null),
+  joueur: (login) => q(client().from("players").select(COLONNES_JOUEUR).eq("twitch_login", String(login).toLowerCase()).maybeSingle()),
+  exporterMesDonnees: () => App.rpc("exporter_mes_donnees"),
   joueurs: () => q(client().from("players").select("id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks,victoires,defaites,egalites,serie_actuelle,serie_record,degats_infliges,degats_subis,plus_gros_coup,points,medailles,combat_details,premiere_connexion,lootbox_ouvertes,lootbox_leg_ouvertes,cree_le").limit(2000)),
   objets: () => q(client().from("items").select("numero,nom,slot,rarete,set_nom,actif,data").order("numero")),
   inventaire: (pid) => q(client().from("inventory").select("item_numero,niveau,obtenu_le").eq("player_id", pid)),
@@ -194,6 +192,13 @@ App.lancerDuel = async ({ adversaire, mode = "classe" }) => {
   return json;
 };
 App.DISCORD = DISCORD;
+// Miroir de enregistrer_duel (SQL) : ces comptes ne comptent ni au bilan ni aux stats.
+App.HORS_CLASSEMENT = ["mrshydiver", "mikumosana"];
+App.horsClassement = (j) => !!j && App.HORS_CLASSEMENT.includes(String(j.twitch_login || "").toLowerCase());
+// Joueurs importés du stream le 28/09/2026 : cree_le est la date d'import, pas leur arrivée.
+App.DATE_IMPORT = "2026-09-28";
+App.estImporte = (j) => !!j && String(j.cree_le || "").slice(0, 10) <= App.DATE_IMPORT;
+App.peutEntrainer = (j) => !!j && (j.admin === true || (j.abonne_jusqu_au && new Date(j.abonne_jusqu_au) > new Date()));
 App.TWITCH_CHAINE = TWITCH_CHAINE;
 
 // ---------------------------------------------------------------------
@@ -597,7 +602,7 @@ function avatar(j, taille = 40) {
 App.avatar = avatar;
 
 function ressources(j) {
-  const r = (href, ic, val, lib, aFaire) => el("a", { class: "ressource" + (aFaire ? " a-faire" : ""), href, title: lib }, icone(ic), el("div", {}, el("b", { texte: fmt(val) }), el("span", { texte: lib })));
+  const r = (href, ic, val, lib, aFaire) => el("a", { class: "ressource" + (aFaire ? " a-faire" : ""), href, title: lib, "aria-label": fmt(val) + " " + lib }, icone(ic), el("div", { "aria-hidden": "true" }, el("b", { texte: fmt(val) }), el("span", { texte: lib })));
   return [
     r("lootbox.html", "i-coffre-ligne", j.lootbox, "Lootbox", j.lootbox > 0),
     r("lootbox.html?type=legendaire", "i-etoile", j.lootbox_legendaire || 0, "Légendaires", (j.lootbox_legendaire || 0) > 0),
@@ -612,7 +617,7 @@ App.majRessources = () => {
   if (b) { const n = (j.lootbox || 0) + (j.lootbox_legendaire || 0); b.textContent = n; b.hidden = n === 0; }
 };
 App.rafraichirJoueur = async () => {
-  const j = await App.api.moi(App.ctx.session.user.id);
+  const j = await App.api.moi();
   if (j) { App.ctx.joueur = j; App.majRessources(); }
   return App.ctx.joueur;
 };
@@ -624,6 +629,28 @@ App.rafraichirCollection = async () => {
 };
 App.niveaux = () => new Map([...App.ctx.inventaire].map(([n, l]) => [n, l.niveau]));
 
+// Pied de page commun (pages connectées et pages publiques comme l'aide).
+function piedApp() {
+  return el("footer", { class: "pied-app" },
+    el("nav", { "aria-label": "Informations" },
+      el("a", { href: "aide.html", texte: "Comment jouer" }), el("a", { href: "reglement.html", texte: "Règlement" }),
+      el("a", { href: "confidentialite.html", texte: "Confidentialité" }), el("a", { href: "mentions-legales.html", texte: "Mentions légales" }),
+      el("a", { href: DISCORD, rel: "noopener", texte: "Discord" })),
+    el("p", { texte: "Stream RPG, projet de fan de la chaîne de MrShyDiver. Non affilié à Twitch, FromSoftware, Activision ni Arrowhead." }));
+}
+// Coque minimale pour un visiteur non connecté (page marquée publique, ex. l'aide).
+function coquePublique() {
+  document.body.replaceChildren();
+  document.body.append(el("div", { html: `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${SYMBOLES}${ICONES}</defs></svg>` }).firstChild);
+  const main = el("main", { class: "contenu", id: "contenu", tabindex: "-1" });
+  document.body.append(el("a", { class: "lien-evitement", href: "#contenu", texte: "Aller au contenu" }),
+    el("header", { class: "barre-haute barre-publique" },
+      el("a", { class: "marque", href: "jeu.html" }, icone("i-marque"), el("b", { texte: "Stream RPG" })),
+      el("a", { class: "btn-principal", href: "jeu.html", texte: "Se connecter avec Twitch" })),
+    main, piedApp());
+  return main;
+}
+
 function coque(page) {
   const j = App.ctx.joueur;
   const lien = (p) => el("a", { href: p.href, "aria-current": p.id === page ? "page" : null }, icone(p.icone), p.titre,
@@ -634,10 +661,11 @@ function coque(page) {
     el("div", { class: "ressources", "data-ressources": "" }),
     el("div", { class: "nav-principale" }, PAGES.map(lien)),
     el("div", { class: "nav-bas" },
+      el("a", { href: "aide.html", "aria-current": page === "aide" ? "page" : null }, icone("i-livre"), "Comment jouer"),
       el("a", { href: "parametres.html", "aria-current": page === "parametres" ? "page" : null }, icone("i-reglages"), "Paramètres"),
       el("button", { type: "button", onclick: App.seDeconnecter }, icone("i-sortie"), "Se déconnecter")));
 
-  const titrePage = (PAGES.find((p) => p.id === page) || { titre: "Paramètres" }).titre;
+  const titrePage = (PAGES.find((p) => p.id === page) || { titre: page === "aide" ? "Comment jouer" : "Paramètres" }).titre;
   const cloche = el("button", { class: "bouton-icone", type: "button", "aria-label": "Notifications", "aria-expanded": "false", onclick: () => basculerNotifs(cloche) }, icone("i-cloche"));
   const haute = el("header", { class: "barre-haute" },
     el("a", { class: "marque marque-mobile", href: "lootbox.html", "aria-label": "Stream RPG" }, icone("i-marque"), el("b", { texte: "Stream RPG" })),
@@ -645,10 +673,13 @@ function coque(page) {
     el("div", { class: "ressources-mobile", "data-ressources": "" }),
     el("div", { class: "outils" }, cloche));
 
-  const main = el("main", { class: "contenu", id: "contenu" }, el("div", { class: "chargement", texte: "Chargement…" }));
+  const main = el("main", { class: "contenu", id: "contenu", tabindex: "-1" }, el("div", { class: "chargement", texte: "Chargement…" }));
   const plus = el("div", { class: "feuille-plus", id: "feuille-plus" },
     PAGES.filter((p) => !p.mobile).map((p) => el("a", { href: p.href, "aria-current": p.id === page ? "page" : null }, icone(p.icone), p.titre)),
-    el("a", { href: "parametres.html", "aria-current": page === "parametres" ? "page" : null }, icone("i-reglages"), "Paramètres"));
+    el("a", { href: "aide.html", "aria-current": page === "aide" ? "page" : null }, icone("i-livre"), "Comment jouer"),
+    el("a", { href: "parametres.html", "aria-current": page === "parametres" ? "page" : null }, icone("i-reglages"), "Paramètres"),
+    el("div", { class: "legende-ressources" }, el("b", { texte: "Tes ressources" }), el("div", { "data-ressources": "" }),
+      el("a", { href: "aide.html#lexique", texte: "À quoi servent-elles ?" })));
   const onglets = el("nav", { class: "barre-onglets", "aria-label": "Navigation principale" },
     PAGES.filter((p) => p.mobile).map((p) => el("a", { href: p.href, "aria-current": p.id === page ? "page" : null }, icone(p.icone), p.titre)),
     el("button", { type: "button", "aria-expanded": "false", onclick: (e) => { const o = plus.classList.toggle("ouverte"); e.currentTarget.setAttribute("aria-expanded", String(o)); } }, icone("i-plus"), "Plus"));
@@ -657,7 +688,9 @@ function coque(page) {
   document.body.replaceChildren();
   document.body.append(el("div", { html: `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${SYMBOLES}${ICONES}</defs></svg>` }).firstChild);
   if (bandeau) document.body.append(bandeau);
-  document.body.append(el("div", { class: "coque" }, lateral, el("div", { class: "principal" }, haute, main)), plus, onglets);
+  const pied = piedApp();
+  document.body.append(el("a", { class: "lien-evitement", href: "#contenu", texte: "Aller au contenu" }));
+  document.body.append(el("div", { class: "coque" }, lateral, el("div", { class: "principal" }, haute, main, pied)), plus, onglets);
   App.majRessources();
   chargerNotifs(cloche);
   return main;
@@ -709,11 +742,19 @@ App.seDeconnecter = async () => {
 // Démarrage d'une page : App.demarrer("collection", async (main, ctx) => { ... })
 // ---------------------------------------------------------------------
 App.ctx = {};
-App.demarrer = async (page, rendu) => {
+App.demarrer = async (page, rendu, options = {}) => {
+  // Anti-clickjacking : GitHub Pages ne permet pas l'en-tête frame-ancestors.
+  if (window.top !== window.self) { document.body.textContent = "Stream RPG ne s'affiche pas dans une autre page. Ouvre-le directement dans ton navigateur."; return; }
   try {
     const session = await App.api.session();
-    if (!session) { location.replace("jeu.html"); return; }
-    const [joueur, objets] = await Promise.all([App.api.moi(session.user.id), App.api.objets()]);
+    if (!session) {
+      if (!options.public) { location.replace("jeu.html"); return; }
+      preparerObjets(await App.api.objets());
+      App.ctx = { session: null, joueur: null, inventaire: new Map(), loadout: {}, prefs: {} };
+      await rendu(coquePublique(), App.ctx);
+      return;
+    }
+    const [joueur, objets] = await Promise.all([App.api.moi(), App.api.objets()]);
     if (!joueur) {
       document.body.innerHTML = '<div class="vide" style="margin:40px auto;max-width:520px"><b>Ton compte Twitch n\'est pas encore rattaché.</b>Déconnecte-toi puis reconnecte-toi. Si le problème persiste, préviens MrShyDiver sur Discord.</div>';
       return;
@@ -722,6 +763,8 @@ App.demarrer = async (page, rendu) => {
     const [inv, loadout, prefs] = await Promise.all([App.api.inventaire(joueur.id), App.api.loadout(joueur.id), App.api.preferences(joueur.id)]);
     App.ctx = { session, joueur, inventaire: new Map(inv.map((l) => [l.item_numero, l])), loadout: loadout || {}, prefs: prefs || { sons: true, notif_lootbox: true, notif_succes: true, notif_duels: true, notif_annonces: true } };
     App.sons.actif = App.ctx.prefs.sons !== false;
+    if (App.ctx.prefs.effets_reduits) { reduit = true; App.reduit = true; }
+    document.documentElement.classList.toggle("effets-reduits", reduit);
     const main = coque(page);
     main.replaceChildren();
     await rendu(main, App.ctx);

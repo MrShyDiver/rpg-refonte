@@ -1,7 +1,7 @@
 "use strict";
 /* Boutique : étal de l'heure, lootbox et tickets, revente, troc, journal. Monnaie : les médailles. */
 (function () {
-const { $, $$, el, icone, fmt, ilYa, date, attendre, reduit, RARETES, ORDRE_RARETE, rangRarete } = App;
+const { $, $$, el, icone, fmt, ilYa, date, attendre, RARETES, ORDRE_RARETE, rangRarete } = App;
 
 const ONGLETS = [
   { id: "etal", titre: "Étal", icone: "i-boutique" },
@@ -76,7 +76,7 @@ App.demarrer("boutique", async (main, ctx) => {
   function majSolde() {
     const cible = solde(), depart = soldeAffiche;
     soldeAffiche = cible;
-    if (reduit || depart === cible) { soldeChiffre.textContent = fmt(cible); return; }
+    if (App.reduit || depart === cible) { soldeChiffre.textContent = fmt(cible); return; }
     const t0 = performance.now(), duree = 650;
     const pas = (t) => {
       const k = Math.min(1, (t - t0) / duree), e = 1 - Math.pow(1 - k, 3);
@@ -90,7 +90,7 @@ App.demarrer("boutique", async (main, ctx) => {
   }
   const bourse = el("div", { class: "bourse" },
     icone("i-medaille", "bourse-ic"),
-    el("div", {}, el("span", { class: "bourse-lib", texte: "Ta bourse" }), el("div", { class: "bourse-chiffre", "aria-live": "polite" }, soldeChiffre, el("span", { texte: " médailles" }))));
+    el("div", {}, el("span", { class: "bourse-lib" }, "Ta bourse", el("a", { class: "lien-aide", href: "aide.html#medailles", "aria-label": "Aide : les médailles", title: "Aide : les médailles", texte: "?" })), el("div", { class: "bourse-chiffre", "aria-live": "polite" }, soldeChiffre, el("span", { texte: " médailles" }))));
   const cumulDuel = el("b", { class: "num" }), cumulRevente = el("b", { class: "num" });
   function majCumuls() { cumulDuel.textContent = fmt(ctx.joueur.medailles_duel || 0); cumulRevente.textContent = fmt(ctx.joueur.medailles_revente || 0); }
   majCumuls();
@@ -131,7 +131,7 @@ App.demarrer("boutique", async (main, ctx) => {
     if (memoriser && location.hash !== "#" + id) history.replaceState(null, "", "#" + id);
     if (id === "journal" && journalSale) chargerJournal();
   }
-  window.addEventListener("hashchange", () => { ouvrir(location.hash.slice(1)); liste.scrollIntoView({ block: "nearest", behavior: reduit ? "auto" : "smooth" }); });
+  window.addEventListener("hashchange", () => { ouvrir(location.hash.slice(1)); liste.scrollIntoView({ block: "nearest", behavior: App.reduit ? "auto" : "smooth" }); });
 
   main.append(entete, sources, liste, ...Object.values(panneaux));
 

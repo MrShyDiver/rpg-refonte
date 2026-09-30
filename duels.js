@@ -35,26 +35,30 @@ App.demarrer("duels", async (main, ctx) => {
   // ------------------------------------------------------------------ Héros
   const joues = (moi.victoires || 0) + (moi.defaites || 0) + (moi.egalites || 0);
   const tickets = moi.tickets || 0;
-  const abonne = !!(moi.abonne_jusqu_au && new Date(moi.abonne_jusqu_au).getTime() > Date.now());
+  const abonne = App.peutEntrainer(moi);
+  const horsClassement = App.horsClassement(moi);
   const versCombat = (l, mode) => `combat.html?adversaire=${encodeURIComponent(l)}&mode=${mode}`;
-  const chiffre = (valeur, libelle, detail) => el("div", { class: "chiffre" }, el("b", { class: "num", texte: valeur }), el("span", { texte: libelle }), detail ? el("small", { texte: detail }) : null);
+  const chiffre = (valeur, libelle, detail) => el("div", { class: "chiffre" }, el("b", { class: "num", texte: valeur }), el("span", {}, libelle), detail ? el("small", { texte: detail }) : null);
+  const lienAide = (ancre, sujet) => el("a", { class: "lien-aide", href: "aide.html#" + ancre, "aria-label": "Aide : " + sujet, title: "Aide : " + sujet, texte: "?" });
   main.append(
     el("header", { class: "entete-page" }, el("div", {},
       el("h1", { texte: "Duels" }),
       el("p", { texte: "Ton bilan, les adversaires à ta mesure et tous les combats du stream, rejouables tour par tour." }))),
+    ...(horsClassement ? [el("p", { class: "hors-classement" }, el("span", { class: "pilule", texte: "Compte hors classement" }),
+      el("span", { texte: "Le streamer et les comptes de test jouent sans bilan ni stats : tes victoires s'affichent dans l'historique mais ne comptent pas." }))] : []),
     el("div", { class: "grille-chiffres" },
       chiffre(fmt(moi.victoires || 0), "Victoires", `${fmt(moi.defaites || 0)} défaite${moi.defaites > 1 ? "s" : ""} · ${fmt(moi.egalites || 0)} égalité${moi.egalites > 1 ? "s" : ""}`),
       chiffre(joues ? fmt((100 * (moi.victoires || 0)) / joues) + " %" : "—", "Taux de victoire", joues ? fmt(joues) + " combats" : "Aucun combat pour l'instant"),
       chiffre(fmt(moi.serie_actuelle || 0), "Série en cours", "Record : " + fmt(moi.serie_record || 0)),
       chiffre(maPuissance ? fmt(maPuissance) : "—", "Ta puissance", "Calculée sur ton équipement"),
-      chiffre(fmt(moi.tickets || 0), "Tickets de duel", "1 ticket par duel classé")),
+      chiffre(fmt(moi.tickets || 0), ["Tickets de duel", lienAide("tickets", "les tickets de duel")], "1 ticket par duel classé")),
     el("section", { class: "annonce-defi panneau-b", "aria-labelledby": "titre-defi" },
       el("div", {},
         el("span", { class: "pilule nouveau", texte: "Nouveau" }),
         el("h2", { id: "titre-defi", texte: "Défie qui tu veux, ici et maintenant" }),
         el("p", {}, "Choisis un adversaire ci-dessous : ton build contre le sien, combat immédiat, même s'il n'est pas connecté. Un ",
           el("b", { texte: "duel classé" }), " coûte 1 ticket et rapporte médailles et bilan, comme en live. ",
-          abonne ? el("span", {}, "L'", el("b", { texte: "entraînement" }), " est gratuit pour toi, abonné de la chaîne : aucune récompense, aucun risque.")
+          abonne ? el("span", {}, "L'", el("b", { texte: "entraînement" }), " est gratuit pour toi : aucune récompense, aucun risque.")
             : el("span", {}, "L'", el("b", { texte: "entraînement" }), " gratuit est réservé aux abonnés de la chaîne.")),
         tickets < 1 ? el("p", { class: "manque-ticket" }, icone("i-ticket"), "Plus de ticket de duel — gagne-en en live avec tes points de chaîne.") : null),
       el("a", { class: "btn-second lien-live", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener" }, icone("i-twitch"), "Aller sur le live")));
@@ -173,7 +177,7 @@ App.demarrer("duels", async (main, ctx) => {
       App.avatar(j, 44),
       el("div", { class: "ident" },
         el("a", { href: "profil.html?joueur=" + encodeURIComponent(j.twitch_login), texte: j.display_name || j.twitch_login }),
-        el("span", { class: "mention num", texte: bilan(j.victoires || 0, j.defaites || 0, j.egalites || 0) })),
+        App.horsClassement(j) ? el("span", { class: "mention", texte: "Hors classement" }) : el("span", { class: "mention num", texte: bilan(j.victoires || 0, j.defaites || 0, j.egalites || 0) })),
       el("div", { class: "puissance" }, el("b", { class: "num", texte: puissance ? fmt(puissance) : "—" }), el("span", { texte: "puissance" })),
       est ? el("div", { class: "estimation", "data-niveau": est[1] },
         el("span", { class: "jauge-est", "aria-hidden": "true" }, [1, 2, 3, 4, 5].map((k) => el("i", { class: k <= est[1] ? "plein" : null }))),

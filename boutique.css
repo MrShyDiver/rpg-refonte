@@ -242,3 +242,8 @@
   .entree-ic { width: 36px; height: 36px; }
   .scene-revelation { --dw: 168px; }
 }
+
+/* Aide contextuelle (audit 30/09) */
+.lien-aide { position: relative; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 6px; border-radius: 50%; border: 1px solid var(--trait-fort); color: var(--encre-2); font: 700 12px/1 var(--texte); letter-spacing: 0; text-transform: none; text-decoration: none; vertical-align: 1px; }
+.lien-aide::before { content: ""; position: absolute; inset: -12px; }
+.lien-aide:hover { color: var(--encre); border-color: var(--encre-3); }

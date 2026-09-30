@@ -47,12 +47,18 @@ App.demarrer("arsenal", async (main, ctx) => {
 
   // ---------- En-tête ----------
   const parRarete = (l) => ORDRE_RARETE.map((r) => [r, l.filter((o) => o.rarete === r).length]).filter(([, n]) => n);
+  const stats = el("div", { class: "stats-objets", id: "stats-objets" });
+  const resume = el("button", { type: "button", class: "resume-objets", "aria-expanded": "false", "aria-controls": "stats-objets",
+    onclick: () => resume.setAttribute("aria-expanded", String(stats.classList.toggle("ouvert"))) },
+    el("span", {}, el("b", { class: "num", texte: String(tous.length) }), " objets · ", el("b", { class: "num", texte: String(tous.filter(possede).length) }), " possédés · plafonds par rareté"), icone("i-fleche"));
   main.append(
-    el("header", { class: "entete-page" },
+    el("header", { class: "entete-page entete-objets" },
       el("div", {},
         el("h1", { texte: "Arsenal" }),
         el("p", { texte: `Les ${tous.length} objets de Stream RPG avec toutes leurs valeurs, où les trouver et qui les porte. Ce que tu possèdes est marqué.` })),
       el("div", { class: "actions" }, el("a", { class: "btn-second", href: "collection.html" }, icone("i-cartes"), "Ma collection"))),
+    resume, stats);
+  stats.append(
     el("div", { class: "grille-chiffres" }, Object.entries(SLOTS).map(([k, s]) => {
       const l = tous.filter((o) => o.slot === k);
       return el("div", { class: "chiffre" }, el("b", { class: "num", texte: l.length }), el("span", { texte: s.pluriel }),
@@ -75,20 +81,23 @@ App.demarrer("arsenal", async (main, ctx) => {
   const tri = el("select", { "aria-label": "Trier", onchange: (e) => { f.tri = e.target.value; rendre(); } }, TRIS.map(([v, n]) => el("option", { value: v, texte: n, selected: v === f.tri })));
   const compte = el("p", { class: "compte-resultats", "aria-live": "polite" });
   const zone = el("div");
-
-  main.append(el("section", { class: "section-page" },
-    el("div", { class: "outils-objets" },
-      el("div", { class: "rangee" },
-        el("div", { class: "onglets-b", role: "group", "aria-label": "Affichage" }, btnVue),
-        el("div", { class: "onglets-b", role: "group", "aria-label": "Niveau d'aperçu des valeurs" }, btnNiv)),
-      el("div", { class: "onglets-b defile", role: "group", "aria-label": "Emplacement" }, btnSlots),
-      el("div", { class: "puces", role: "group", "aria-label": "Rareté" }, btnRar),
-      el("div", { class: "puces", role: "group", "aria-label": "Effets et set" }, btnEff),
-      el("div", { class: "rangee" },
-        el("label", { class: "champ recherche" }, icone("i-recherche"), recherche),
-        el("label", { class: "champ tri" }, el("span", { texte: "Trier par" }), tri),
-        compte)),
-    zone));
+  const nFiltres = el("span", { class: "n-filtres num" });
+  const outils = el("div", { class: "outils-objets", id: "outils-arsenal" });
+  const btnFiltres = el("button", { type: "button", class: "btn-second btn-filtres", "aria-expanded": "false", "aria-controls": "outils-arsenal",
+    onclick: () => btnFiltres.setAttribute("aria-expanded", String(outils.classList.toggle("filtres-ouverts"))) }, "Filtres", nFiltres);
+  outils.append(
+    el("div", { class: "rangee repliable" },
+      el("div", { class: "onglets-b", role: "group", "aria-label": "Affichage" }, btnVue),
+      el("div", { class: "onglets-b", role: "group", "aria-label": "Niveau d'aperçu des valeurs" }, btnNiv)),
+    el("div", { class: "onglets-b defile repliable", role: "group", "aria-label": "Emplacement" }, btnSlots),
+    el("div", { class: "puces repliable", role: "group", "aria-label": "Rareté" }, btnRar),
+    el("div", { class: "puces repliable", role: "group", "aria-label": "Effets et set" }, btnEff),
+    el("div", { class: "rangee rangee-recherche" },
+      el("label", { class: "champ recherche" }, icone("i-recherche"), recherche),
+      btnFiltres,
+      el("label", { class: "champ tri" }, el("span", { texte: "Trier par" }), tri),
+      compte));
+  main.append(el("section", { class: "section-page section-objets" }, outils, zone));
 
   // ---------- Filtres, tri, rendu ----------
   const passe = (o, sauf) =>
@@ -129,6 +138,9 @@ App.demarrer("arsenal", async (main, ctx) => {
     btnSlots.forEach((x) => { const k = x.dataset.v; x.setAttribute("aria-pressed", String(f.slot === k)); x.lastChild.textContent = tous.filter((o) => (k === "tout" || o.slot === k) && passe(o, "slot")).length; });
     btnRar.forEach((x) => { x.setAttribute("aria-pressed", String(f.raretes.has(x.dataset.v))); x.lastChild.textContent = tous.filter((o) => o.rarete === x.dataset.v && passe(o, "rarete")).length; });
     btnEff.forEach((x) => { x.setAttribute("aria-pressed", String(f.effets.has(x.dataset.v))); x.lastChild.textContent = tous.filter((o) => effetsDe.get(o.numero).includes(x.dataset.v) && passe(o, "effet")).length; });
+    const nf = (f.slot !== "tout") + f.raretes.size + f.effets.size + (f.niv === "max") + (f.vue === "tableau");
+    nFiltres.textContent = nf || "";
+    btnFiltres.setAttribute("aria-label", nf ? `Filtres et affichage, ${nf} actif${nf > 1 ? "s" : ""}` : "Filtres et affichage");
     majUrl();
 
     const vis = tous.filter((o) => passe(o)).sort(cle[f.tri]);

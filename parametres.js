@@ -6,6 +6,7 @@
   App.demarrer("parametres", async (main, ctx) => {
     const j = ctx.joueur, user = ctx.session.user || {};
     const prefs = Object.fromEntries(CLES.map((k) => [k, ctx.prefs[k] !== false]));
+    prefs.effets_reduits = ctx.prefs.effets_reduits === true; // désactivé par défaut, contrairement aux autres
 
     // ---------- Interrupteurs (enregistrés à chaque bascule) ----------
     function bloc(id, titre, sous, ...contenu) {
@@ -59,6 +60,13 @@
       }),
       el("div", { class: "tests-sons" }, aideTest, boutonsTest));
 
+    // ---------- Affichage : effets réduits ----------
+    const affichage = bloc("affichage", "Affichage", "Pour jouer confortablement, surtout si les flashs ou les mouvements rapides te gênent.",
+      interrupteur("effets_reduits", "Réduire les effets", "Retire les flashs, les secousses d'écran et les grosses animations (ouverture de lootbox, combats). Les résultats restent les mêmes, ils s'affichent juste plus sobrement.", (v) => {
+        App.reduit = v || matchMedia("(prefers-reduced-motion: reduce)").matches;
+        document.documentElement.classList.toggle("effets-reduits", App.reduit);
+      }));
+
     // ---------- Notifications ----------
     const btnLu = el("button", { class: "btn-second", type: "button" }, icone("i-coche"), "Tout marquer comme lu");
     btnLu.addEventListener("click", async () => {
@@ -77,6 +85,20 @@
       interrupteur("notif_annonces", "Annonces", "Les nouveautés du jeu : patch notes, saisons, événements du stream. Arrive avec les annonces sur le site."),
       el("div", { class: "actions-bloc" }, btnLu, el("span", { class: "mention", texte: "Retire la pastille rouge de la cloche sans rien supprimer." })));
 
+    // ---------- Export des données (portabilité) ----------
+    const btnExport = el("button", { class: "btn-second", type: "button" }, "Télécharger (.json)");
+    btnExport.addEventListener("click", async () => {
+      btnExport.disabled = true;
+      try {
+        const donnees = await App.api.exporterMesDonnees();
+        const url = URL.createObjectURL(new Blob([JSON.stringify(donnees, null, 2)], { type: "application/json" }));
+        const a = el("a", { href: url, download: `stream-rpg-${j.twitch_login}-${new Date().toLocaleDateString("sv-SE")}.json` });
+        document.body.append(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        App.toast("Ton fichier est téléchargé.", { titre: "Export prêt" });
+      } catch (e) { App.erreur(e); } finally { btnExport.disabled = false; }
+    });
+
     // ---------- Compte Twitch ----------
     const meta = user.user_metadata || {};
     const identite = (user.identities || []).find((i) => i.provider === "twitch") || (user.identities || [])[0] || {};
@@ -91,8 +113,12 @@
         info("Compte lié le", date(identite.created_at || user.created_at)),
         info("Première connexion au site", date(j.premiere_connexion)),
         info("Dernière connexion", date(user.last_sign_in_at, true)),
-        info("Joueur depuis", date(j.cree_le), "Sur le stream, avant l'ouverture du site")),
-      el("a", { class: "btn-twitch-lien", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener noreferrer" }, icone("i-twitch"), "Retrouver le live sur Twitch"));
+        App.estImporte(j) ? info("Joueur depuis", "Sur le stream avant l'ouverture du site") : info("Joueur depuis", date(j.cree_le))),
+      el("a", { class: "btn-twitch-lien", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener noreferrer" }, icone("i-twitch"), "Retrouver le live sur Twitch"),
+      el("div", { class: "export-donnees" },
+        el("div", {}, el("b", { texte: "Exporter mes données" }),
+          el("p", { texte: "Télécharge tout ce que Stream RPG sait de toi (profil, collection, équipement, duels, succès, boutique) dans un fichier JSON. C'est ton droit à la portabilité des données (RGPD, article 20)." })),
+        btnExport));
 
     // ---------- Discord ----------
     const discord = el("section", { class: "panneau-b bloc-reglages carte-discord", id: "discord", "aria-labelledby": "t-discord" },
@@ -162,14 +188,14 @@
     }
 
     // ---------- Mise en page ----------
-    const SOMMAIRE = [["sons", "Sons"], ["notifications", "Notifications"], ["compte", "Compte Twitch"], ["discord", "Discord"], ["session", "Session"], ["suppression", "Zone dangereuse"]];
+    const SOMMAIRE = [["sons", "Sons"], ["affichage", "Affichage"], ["notifications", "Notifications"], ["compte", "Compte Twitch"], ["discord", "Discord"], ["session", "Session"], ["suppression", "Zone dangereuse"]];
     main.append(
       el("header", { class: "entete-page" }, el("div", {}, el("h1", { texte: "Paramètres" }),
-        el("p", { texte: "Tes sons, tes notifications et ton compte. Tout s'enregistre dès que tu bascules un réglage." }))),
+        el("p", { texte: "Tes sons, l'affichage, tes notifications et ton compte. Tout s'enregistre dès que tu bascules un réglage." }))),
       el("div", { class: "parametres-grille" },
         el("nav", { class: "sommaire", "aria-label": "Sections des paramètres" },
           SOMMAIRE.map(([id, t]) => el("a", { href: "#" + id, class: id === "suppression" ? "danger" : null, texte: t }))),
-        el("div", { class: "blocs-reglages" }, sons, notifications, compte, discord, session, danger)));
+        el("div", { class: "blocs-reglages" }, sons, affichage, notifications, compte, discord, session, danger)));
 
     // La page est rendue après coup : on rejoue l'ancre de l'URL (ex. parametres.html#notifications depuis la cloche).
     if (location.hash) { const cible = $(location.hash.replace(/[^#\w-]/g, "")); if (cible) cible.scrollIntoView(); }

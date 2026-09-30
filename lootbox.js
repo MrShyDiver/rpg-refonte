@@ -3,13 +3,14 @@
 // s'ouvre et libère une carte par lootbox. Le tirage est fait AVANT l'animation par
 // ouvrir_lootbox : l'animation ne fait que révéler le résultat du serveur.
 (function () {
-const { $, $$, el, icone, fmt, nombre, RARETES, ORDRE_RARETE, rangRarete, couleur } = App;
+const { $, $$, el, icone, fmt, nombre, RARETES, ORDRE_RARETE, SLOTS, rangRarete, couleur } = App;
 
 // Suspense du coffre selon la meilleure rareté du tirage, puis charge de chaque carte (même réglage que l'accueil).
 const SUSPENSE = [900, 1500, 2200, 3000, 4000];
 const CHARGE = [110, 190, 360, 620, 950];
 const MAX_PAR_OUVERTURE = 10; // limite de ouvrir_lootbox
 const CLE_HISTO = "lootbox-session";
+const CLE_PREMIERS_PAS = "premiers-pas-masques";
 
 const COFFRE = `<div class="coffre" aria-hidden="true">
   <span class="rayons"></span><span class="halo"></span><span class="faisceau"></span><span class="onde"></span>
@@ -39,6 +40,9 @@ const SVG_SON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 
 const pluriel = (n, mot, motP) => fmt(n) + " " + (n > 1 ? (motP || mot + "s") : mot);
 function lireHisto() { try { return JSON.parse(sessionStorage.getItem(CLE_HISTO)) || []; } catch (e) { return []; } }
+function premiersPasMasques() { try { return localStorage.getItem(CLE_PREMIERS_PAS) === "1"; } catch (e) { return false; } }
+function masquerPremiersPas() { try { localStorage.setItem(CLE_PREMIERS_PAS, "1"); } catch (e) { /* navigation privée */ } }
+const lienAide = (ancre, sujet) => el("a", { class: "lien-aide", href: "aide.html#" + ancre, "aria-label": "Aide : " + sujet, title: "Aide : " + sujet, texte: "?" });
 function ecrireHisto(h) { try { sessionStorage.setItem(CLE_HISTO, JSON.stringify(h)); } catch (e) { /* navigation privée */ } }
 
 App.demarrer("lootbox", async (main, ctx) => {
@@ -87,6 +91,9 @@ App.demarrer("lootbox", async (main, ctx) => {
 
   const scene = el("div", { class: "lb-scene" }, types, table, actions);
   const bilan = el("p", { class: "lb-bilan", "aria-live": "polite" });
+  const suite = el("div", { class: "lb-suite", hidden: true });
+  const premiersPas = el("section", { class: "panneau-b lb-premiers-pas", "aria-labelledby": "t-premiers-pas", hidden: true });
+  let aDejaCombattu = null; // null = pas encore vérifié dans l'historique des duels
 
   const vide = el("div", { class: "vide lb-vide", hidden: true },
     el("b", { texte: "Plus aucune lootbox à ouvrir" }),
@@ -108,7 +115,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     el("div", { class: "lb-bloc-tete" }, el("h2", { texte: "Ta collection" }), el("a", { href: "collection.html", class: "lb-lien" }, "Tout voir", icone("i-fleche"))), zoneCollection);
   const cote = el("aside", { class: "lb-cote", "aria-label": "Taux et progression" }, blocTaux, zoneChiffres, blocCollection);
 
-  main.append(entete, el("div", { class: "lb-grille" }, el("div", { class: "lb-principal" }, vide, scene, bilan, sectionHisto), cote));
+  main.append(entete, el("div", { class: "lb-grille" }, el("div", { class: "lb-principal" }, premiersPas, vide, scene, bilan, suite, sectionHisto), cote));
 
   // ---------- États ----------
   function majTypes() {
@@ -186,11 +193,11 @@ App.demarrer("lootbox", async (main, ctx) => {
     const j = ctx.joueur;
     let enTrop = 0;
     ctx.inventaire.forEach((l, n) => { const o = App.objet(n); if (o) enTrop += Math.max(0, l.niveau - App.niveauMax(o.rarete)); });
-    const chiffre = (val, lib, extra) => el("div", { class: "chiffre" }, el("b", { class: "num", texte: fmt(val) }), el("span", { texte: lib }), extra || null);
+    const chiffre = (val, lib, extra) => el("div", { class: "chiffre" }, el("b", { class: "num", texte: fmt(val) }), el("span", {}, lib), extra || null);
     zoneChiffres.replaceChildren(
       chiffre(j.lootbox_ouvertes || 0, "Lootbox ouvertes"),
       chiffre(j.lootbox_leg_ouvertes || 0, "Légendaires ouvertes"),
-      chiffre(enTrop, enTrop > 1 ? "Doublons en trop" : "Doublon en trop", enTrop ? el("small", {}, el("a", { href: "boutique.html", texte: "À revendre à la boutique" })) : el("small", { texte: "Rien à revendre" })));
+      chiffre(enTrop, [enTrop > 1 ? "Doublons en trop" : "Doublon en trop", lienAide("doublons", "les doublons en trop")], enTrop ? el("small", {}, el("a", { href: "boutique.html", texte: "À revendre à la boutique" })) : el("small", { texte: "Rien à revendre" })));
 
     const actifs = App.objets.filter((o) => o.actif);
     const a = actifs.filter((o) => ctx.inventaire.has(o.numero)).length;
@@ -218,7 +225,53 @@ App.demarrer("lootbox", async (main, ctx) => {
     }).filter(Boolean));
   }
 
-  function majTout() { majTypes(); majBoutons(); rendreTaux(); rendreProgression(); rendreHisto(); }
+  function majTout() { majTypes(); majBoutons(); rendreTaux(); rendreProgression(); rendreHisto(); rendrePremiersPas(); }
+
+  // ---------- Premiers pas : 3 étapes tirées des vraies données, masquables ----------
+  function rendrePremiersPas() {
+    const j = ctx.joueur;
+    const joues = (j.victoires || 0) + (j.defaites || 0) + (j.egalites || 0) > 0 || aDejaCombattu === true;
+    const etapes = [
+      { fait: (j.lootbox_ouvertes || 0) + (j.lootbox_leg_ouvertes || 0) > 0, titre: "Ouvre une lootbox", texte: "Chaque lootbox te donne un objet.",
+        action: stock("standard") + stock("legendaire") > 0
+          ? el("button", { type: "button", class: "btn-second", onclick: () => { const b = boutons.find((x) => !x.disabled); if (b) { b.scrollIntoView({ block: "center", behavior: App.reduit ? "auto" : "smooth" }); b.focus({ preventScroll: true }); } } }, "Ouvrir")
+          : el("a", { class: "btn-second", href: "aide.html#live" }, "En gagner") },
+      { fait: ctx.loadout.arme != null, titre: "Équipe une arme", texte: "Sans arme, tu te bats à mains nues.",
+        action: el("a", { class: "btn-second", href: "collection.html?slot=weapon" }, "Choisir") },
+      { fait: joues, titre: "Joue un duel", texte: "Défie un joueur, même hors ligne.",
+        action: el("a", { class: "btn-second", href: "duels.html" }, "Défier") },
+    ];
+    const reste = etapes.filter((e) => !e.fait).length;
+    premiersPas.hidden = !reste || premiersPasMasques();
+    if (premiersPas.hidden) return;
+    premiersPas.replaceChildren(
+      el("div", { class: "lb-pp-tete" },
+        el("h2", { id: "t-premiers-pas", texte: "Tes premiers pas" }),
+        el("span", { class: "mention num", texte: `${3 - reste} / 3` }),
+        el("button", { type: "button", class: "bouton-icone", "aria-label": "Masquer tes premiers pas", onclick: () => { masquerPremiersPas(); premiersPas.hidden = true; } }, icone("i-fermer"))),
+      el("ol", { class: "lb-pp-etapes" }, etapes.map((e, i) => el("li", { class: e.fait ? "fait" : null },
+        el("span", { class: "lb-pp-puce", "aria-hidden": "true" }, e.fait ? icone("i-coche") : String(i + 1)),
+        el("span", { class: "lb-pp-texte" }, el("b", { texte: e.titre }), el("span", { class: "sr", texte: e.fait ? " (fait)" : " (à faire)" }), el("small", { texte: e.fait ? "C'est fait." : e.texte })),
+        e.fait ? null : e.action))),
+      el("a", { class: "lb-lien", href: "aide.html" }, "Comment jouer", icone("i-fleche")));
+    if (!joues && aDejaCombattu === null && !premiersPasMasques()) {
+      aDejaCombattu = false;
+      App.api.duels().then((l) => {
+        const moi = j.twitch_login;
+        if (l.some((d) => d.attaquant_login === moi || d.defenseur_login === moi)) { aDejaCombattu = true; rendrePremiersPas(); }
+      }).catch((e) => console.warn(e));
+    }
+  }
+
+  // Après une ouverture : l'étape suivante la plus utile.
+  function rendreSuite(tirages) {
+    const o = tirages.map((t) => App.objet(t.numero)).find((x) => x && (x.slot === "weapon" || x.slot === "torso") && ctx.loadout[SLOTS[x.slot].col] == null);
+    suite.replaceChildren(...[el("span", { class: "lb-suite-lib", texte: "Prochaine étape" }),
+      o ? el("a", { class: "btn-principal", href: "collection.html?objet=" + o.numero }, icone("i-bouclier"), "Équipe ton nouvel objet")
+        : el("a", { class: "btn-principal", href: "duels.html" }, icone("i-epees"), "Défie un joueur"),
+      o ? el("span", { class: "mention", texte: o.nom + " : ton emplacement " + SLOTS[o.slot].nom.toLowerCase() + " est vide." }) : null].filter(Boolean));
+    suite.hidden = false;
+  }
 
   function ficheObjet(numero) {
     const o = App.objet(numero);
@@ -236,6 +289,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     try { history.replaceState(null, "", t === "legendaire" ? "?type=legendaire" : location.pathname); } catch (e) { /* ignore */ }
     remettreCoffre();
     bilan.replaceChildren();
+    suite.hidden = true;
     majTout();
   }
 
@@ -343,6 +397,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     const dejaOuvert = coffre.classList.contains("recule");
     remettreCoffre();
     bilan.replaceChildren();
+    suite.hidden = true;
     commandes(false);
     if (dejaOuvert) await pause(450);
 
@@ -456,6 +511,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     enCours = false;
     commandes(true);
     majTout();
+    rendreSuite(tirages);
     App.verifierSucces();
   }
 

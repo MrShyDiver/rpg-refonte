@@ -6,6 +6,7 @@ const COLS = ["arme", "offhand", "armure", "strategeme"];
 const TRIS = [["rarete", "Rareté"], ["niveau", "Niveau"], ["numero", "Numéro"], ["recent", "Récemment obtenu"]];
 const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const basculer = (set, v) => (set.has(v) ? set.delete(v) : set.add(v));
+const lienAide = (ancre, sujet) => el("a", { class: "lien-aide", href: "aide.html#" + ancre, "aria-label": "Aide : " + sujet, title: "Aide : " + sujet, texte: "?" });
 
 App.demarrer("collection", async (main, ctx) => {
   const p = new URLSearchParams(location.search);
@@ -37,12 +38,20 @@ App.demarrer("collection", async (main, ctx) => {
   const trop = possedes.reduce((s, o) => s + enTrop(o), 0);
   const pct = actifs.length ? Math.round((nbActifs / actifs.length) * 100) : 0;
 
+  // Mobile : une ligne de résumé qui déplie les chiffres (objets.css).
+  const stats = el("div", { class: "stats-objets", id: "stats-objets" });
+  const resume = el("button", { type: "button", class: "resume-objets", "aria-expanded": "false", "aria-controls": "stats-objets",
+    onclick: () => resume.setAttribute("aria-expanded", String(stats.classList.toggle("ouvert"))) },
+    el("span", {}, el("b", { class: "num", texte: `${nbActifs} / ${actifs.length}` }), " objets · ", el("b", { class: "num", texte: fmt(auMax) }), " au max",
+      trop ? [" · ", el("b", { class: "num", texte: fmt(trop) }), " en trop"] : null), icone("i-fleche"));
   main.append(
-    el("header", { class: "entete-page" },
+    el("header", { class: "entete-page entete-objets" },
       el("div", {},
         el("h1", { texte: "Ma collection" }),
-        el("p", { texte: `${nbActifs} objets différents sur ${actifs.length}. Chaque doublon fait monter un objet d'un niveau, jusqu'à son plafond.` })),
+        el("p", {}, `${nbActifs} objets différents sur ${actifs.length}. Chaque doublon fait monter un objet d'un niveau, jusqu'à son plafond.`, lienAide("doublons", "doublons et niveaux"))),
       el("div", { class: "actions" }, el("a", { class: "btn-second", href: "arsenal.html" }, icone("i-livre"), "Tout l'arsenal"))),
+    resume, stats);
+  stats.append(
     el("div", { class: "grille-chiffres" },
       el("div", { class: "chiffre" }, el("b", { class: "num", texte: `${nbActifs} / ${actifs.length}` }), el("span", { texte: "Objets différents" }), el("small", { texte: `${pct} % du jeu` })),
       el("div", { class: "chiffre" }, el("b", { class: "num", texte: fmt(auMax) }), el("span", { texte: "Au niveau max" })),
@@ -72,19 +81,22 @@ App.demarrer("collection", async (main, ctx) => {
   const inter = el("button", { type: "button", class: "interrupteur", role: "switch", id: "voir-manquants", onclick: () => { f.manquants = !f.manquants; rendre(); } });
   const compte = el("p", { class: "compte-resultats", "aria-live": "polite" });
   const grille = el("div", { class: "grille-cartes" });
-
-  main.append(el("section", { class: "section-page" },
-    el("div", { class: "outils-objets" },
-      el("div", { class: "rangee entre" },
+  const nFiltres = el("span", { class: "n-filtres num" });
+  const outils = el("div", { class: "outils-objets", id: "outils-collection" });
+  const btnFiltres = el("button", { type: "button", class: "btn-second btn-filtres", "aria-expanded": "false", "aria-controls": "outils-collection",
+    onclick: () => btnFiltres.setAttribute("aria-expanded", String(outils.classList.toggle("filtres-ouverts"))) }, "Filtres", nFiltres);
+  outils.append(
+      el("div", { class: "rangee entre repliable" },
         el("div", { class: "onglets-b defile", role: "group", "aria-label": "Emplacement" }, btnSlots),
         el("div", { class: "bascule" }, inter, el("label", { for: "voir-manquants", texte: "Afficher ce qui me manque" }))),
-      el("div", { class: "puces", role: "group", "aria-label": "Rareté" }, btnRar),
-      el("div", { class: "puces", role: "group", "aria-label": "Effets" }, btnEff),
-      el("div", { class: "rangee" },
+      el("div", { class: "puces repliable", role: "group", "aria-label": "Rareté" }, btnRar),
+      el("div", { class: "puces repliable", role: "group", "aria-label": "Effets" }, btnEff),
+      el("div", { class: "rangee rangee-recherche" },
         el("label", { class: "champ recherche" }, icone("i-recherche"), recherche),
+        btnFiltres,
         el("label", { class: "champ tri" }, el("span", { texte: "Trier par" }), tri),
-        compte)),
-    grille));
+        compte));
+  main.append(el("section", { class: "section-page section-objets" }, outils, grille));
 
   // ---------- Filtres, tri, rendu ----------
   const base = () => App.objets.filter((o) => ctx.inventaire.has(o.numero) || (f.manquants && o.actif));
@@ -127,6 +139,9 @@ App.demarrer("collection", async (main, ctx) => {
     btnRar.forEach((x) => { x.setAttribute("aria-pressed", String(f.raretes.has(x.dataset.v))); x.lastChild.textContent = b.filter((o) => o.rarete === x.dataset.v && passe(o, "rarete")).length; });
     btnEff.forEach((x) => { x.setAttribute("aria-pressed", String(f.effets.has(x.dataset.v))); x.lastChild.textContent = b.filter((o) => effetsDe.get(o.numero).includes(x.dataset.v) && passe(o, "effet")).length; });
     inter.setAttribute("aria-checked", String(f.manquants));
+    const nf = (f.slot !== "tout") + f.raretes.size + f.effets.size + f.manquants;
+    nFiltres.textContent = nf || "";
+    btnFiltres.setAttribute("aria-label", nf ? `Filtres, ${nf} actif${nf > 1 ? "s" : ""}` : "Filtres");
     majUrl();
 
     const vis = b.filter((o) => passe(o)).sort(cle[f.tri]);

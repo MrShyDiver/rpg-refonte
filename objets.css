@@ -97,3 +97,32 @@
   .table-objets th, .table-objets td { padding: 10px 11px; }
   .tiroir-pied > .btn-principal, .tiroir-pied > .btn-second { flex: 1 1 auto; min-height: 44px; }
 }
+
+/* ---------- Mobile : cartes d'abord (audit 30/09) ---------- */
+/* Résumé en une ligne qui déplie les chiffres, filtres repliés derrière « Filtres ». Desktop inchangé. */
+.resume-objets, .btn-filtres { display: none; }
+.lien-aide { position: relative; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 6px; border-radius: 50%; border: 1px solid var(--trait-fort); color: var(--encre-2); font: 700 12px/1 var(--texte); text-decoration: none; vertical-align: 1px; }
+.lien-aide::before { content: ""; position: absolute; inset: -12px; }
+.lien-aide:hover { color: var(--encre); border-color: var(--encre-3); }
+@media (max-width: 900px) {
+  .entete-page.entete-objets { flex-wrap: nowrap; align-items: center; margin-bottom: 12px; }
+  .entete-objets h1 { font-size: 26px; }
+  .entete-objets p { display: none; }
+  .entete-objets .actions .btn-second { min-height: 44px; padding: 8px 12px; }
+  .resume-objets { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 10px 14px; border-radius: 12px; background: var(--sol-2); border: 1px solid var(--trait); font-size: 14px; color: var(--encre-2); text-align: left; }
+  .resume-objets b { color: var(--encre); font-weight: 700; }
+  .resume-objets > span { flex: 1; min-width: 0; }
+  .resume-objets svg { width: 16px; height: 16px; flex: none; transform: rotate(90deg); transition: transform .2s; }
+  .resume-objets[aria-expanded="true"] svg { transform: rotate(-90deg); }
+  .stats-objets:not(.ouvert) { display: none; }
+  .stats-objets { margin-top: 10px; }
+  .section-objets { margin-top: 14px; }
+  .outils-objets { gap: 10px; margin-bottom: 16px; }
+  .outils-objets > .rangee-recherche { order: -1; }
+  .outils-objets:not(.filtres-ouverts) > .repliable { display: none; }
+  .btn-filtres { display: inline-flex; min-height: 44px; }
+  .btn-filtres[aria-expanded="true"] { border-color: var(--legendaire); }
+  .btn-filtres .n-filtres { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--legendaire); color: #16120a; font-size: 12px; font-weight: 800; display: inline-grid; place-items: center; }
+  .btn-filtres .n-filtres:empty { display: none; }
+  .rangee-recherche .champ.tri { flex: 1 1 auto; }
+}

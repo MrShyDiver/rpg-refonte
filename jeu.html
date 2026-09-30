@@ -5,13 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Sécurité : mêmes règles que jeu.html. Si tu modifies le script en bas de page, son empreinte
      sha256 change : regénère-la (sinon le navigateur refuse de l'exécuter). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net 'sha256-bq8QK2aeWTa004AQt+N7hFO/EVBhnKwy0ZNmtcp1LTs='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js 'sha256-e4zNy7qN7nGuS2L0GZBcNcKUh5gNfKL0SSKH6ZmfIS8='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Stream RPG</title>
 <meta name="description" content="Le jeu de rôle de la chaîne MrShyDiver : gagne des lootbox en live, ouvre-les ici, équipe ton personnage et affronte le chat en duel.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Pixelify+Sans:wght@500;700&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="polices.css">
 <style>
 :root {
   --sol: #0c0d12;
@@ -526,7 +524,8 @@ body { overflow-x: clip; }
 .cloture p { margin-top: 16px; color: var(--encre-2); font-size: 17px; max-width: 52ch; }
 .cloture .btn-twitch { margin-top: 28px; max-width: 360px; }
 .pied { padding: 28px 0 40px; border-top: 1px solid var(--trait); margin-top: 90px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 13.5px; color: var(--encre-3); }
-.pied nav { display: flex; gap: 18px; }
+.pied nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.pied .pied-fan { flex-basis: 100%; font-size: 12.5px; }
 .pied a { color: var(--encre-2); text-decoration: none; }
 .pied a:hover { color: var(--encre); }
 
@@ -566,7 +565,7 @@ body { overflow-x: clip; }
 .main-legendaire .carte:nth-child(1) { transform: translateX(-50%) rotate(-16deg) translateX(-18px); }
 .main-legendaire .carte:nth-child(2) { transform: translateX(-50%) rotate(16deg) translateX(18px); }
 .main-legendaire .carte:nth-child(3) { transform: translateX(-50%) translateY(-18px); z-index: 2; }
-.panneau-pied { padding: 16px 38px 20px; border-top: 1px solid var(--trait); display: flex; gap: 18px; font-size: 13px; background: var(--sol-2); position: relative; z-index: 3; }
+.panneau-pied { padding: 16px 38px 20px; border-top: 1px solid var(--trait); display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; background: var(--sol-2); position: relative; z-index: 3; }
 .panneau-pied a { color: var(--encre-2); text-decoration: none; }
 .panneau-pied a:hover { color: var(--encre); }
 @media (max-height: 820px) and (min-width: 981px) { .main-legendaire { display: none; } .panneau h2 { margin-top: 30px; } }
@@ -877,7 +876,12 @@ body { overflow-x: clip; }
               <a href="/rpg/codex.html">Codex</a>
               <a href="/rpg/ranking.html">Classement</a>
               <a href="https://www.twitch.tv/mrshydiver" rel="noopener">La chaîne</a>
+              <a href="aide.html">Comment jouer</a>
+              <a href="reglement.html">Règlement</a>
+              <a href="confidentialite.html">Confidentialité</a>
+              <a href="mentions-legales.html">Mentions légales</a>
             </nav>
+            <span class="pied-fan">Projet de fan gratuit, non affilié à Twitch, FromSoftware, Activision, Arrowhead ni Sony. Les marques et noms cités appartiennent à leurs propriétaires.</span>
           </footer>
         </div>
       </section>
@@ -908,6 +912,7 @@ body { overflow-x: clip; }
     </div>
     <div class="panneau-pied">
       <a href="/rpg/codex.html">Codex</a><a href="/rpg/ranking.html">Classement</a><a href="https://www.twitch.tv/mrshydiver" rel="noopener">La chaîne</a>
+      <a href="aide.html">Comment jouer</a><a href="reglement.html">Règlement</a><a href="confidentialite.html">Confidentialité</a><a href="mentions-legales.html">Mentions légales</a>
     </div>
   </aside>
 </div>
@@ -918,9 +923,10 @@ body { overflow-x: clip; }
 
 <div class="message-erreur" id="message-erreur" role="alert" hidden></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
 <script>
 "use strict";
+if (window.top !== window.self) { document.body.textContent = "Stream RPG ne s'affiche pas dans une autre page. Ouvre-le directement dans ton navigateur."; throw new Error("cadre"); }
 // ============================================================
 // Données : les 50 objets du catalogue (catalog.cs). À garder synchronisé quand un objet
 // est ajouté : [numéro, image, nom, rareté, emplacement, mains, fait marquant, effets, contributeur]
@@ -1003,14 +1009,9 @@ const EFFETS = [
 
 // Images : gear/<nom>.png à côté de cette page (même dossier que codex.html).
 const IMAGES_INTEGREES = {};
-const image = (nom) => IMAGES_INTEGREES[nom] || ("gear/" + nom + ".png");
-// Site publié ailleurs que dans /rpg/ (dépôt de test) : les images manquantes viennent de /rpg/gear/.
-document.addEventListener("error", (e) => {
-  const im = e.target;
-  if (!(im instanceof HTMLImageElement) || im.dataset.repli) return;
-  const src = im.getAttribute("src") || "";
-  if (/^gear\//.test(src) && !location.pathname.startsWith("/rpg/")) { im.dataset.repli = "1"; im.src = "/rpg/" + src; }
-}, true);
+// Site publié ailleurs que dans /rpg/ (dépôt de test) : les images viennent de /rpg/gear/.
+const BASE_GEAR = location.pathname.startsWith("/rpg/") ? "gear/" : "/rpg/gear/";
+const image = (nom) => IMAGES_INTEGREES[nom] || (BASE_GEAR + nom + ".png");
 
 const $ = (id) => document.getElementById(id);
 const reduit = matchMedia("(prefers-reduced-motion: reduce)").matches;

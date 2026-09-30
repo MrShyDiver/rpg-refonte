@@ -269,3 +269,10 @@
   .medaille { width: 40px; }
   .rang-ligne .val span { display: none; }
 }
+
+/* ---------- Paramètres : export des données (audit 30/09) ---------- */
+.export-donnees { display: flex; align-items: center; justify-content: space-between; gap: 14px 18px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--trait); }
+.export-donnees > div { flex: 1 1 320px; min-width: 0; }
+.export-donnees b { display: block; font-size: 15px; }
+.export-donnees p { margin-top: 2px; font-size: 13.5px; color: var(--encre-2); max-width: 60ch; }
+.export-donnees .btn-second { min-height: 44px; }

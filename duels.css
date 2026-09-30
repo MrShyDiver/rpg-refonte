@@ -172,3 +172,10 @@ code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1
   .commandes { justify-content: center; }
   .piste { order: -1; flex-basis: 100%; }
 }
+
+/* ---------- Audit 30/09 : aide contextuelle, compte hors classement ---------- */
+.lien-aide { position: relative; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 6px; border-radius: 50%; border: 1px solid var(--trait-fort); color: var(--encre-2); font: 700 12px/1 var(--texte); text-decoration: none; vertical-align: 1px; }
+.lien-aide::before { content: ""; position: absolute; inset: -12px; }
+.lien-aide:hover { color: var(--encre); border-color: var(--encre-3); }
+.hors-classement { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 14px; font-size: 14px; color: var(--encre-2); }
+.hors-classement .pilule { --c: var(--epique); }

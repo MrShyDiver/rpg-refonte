@@ -1,7 +1,7 @@
 "use strict";
 /* Profil : le sien (modifiable) ou celui d'un autre joueur (?joueur=<login>, lecture seule). */
 (function () {
-  const { $, el, icone, fmt, nombre, date, reduit, RARETES, ORDRE_RARETE, SLOTS, STATS, rangRarete } = App;
+  const { $, el, icone, fmt, nombre, date, RARETES, ORDRE_RARETE, SLOTS, STATS, rangRarete } = App;
 
   const STATS_POINTS = ["atk", "def", "pv", "spd", "luck"];
   const CLE_CACHE = "profil-puissances-v1";
@@ -92,19 +92,23 @@
           el("div", { class: "pf-avatar" }, App.avatar(j, 96)),
           el("div", { class: "pf-id-texte" },
             el("h1", { id: "pf-nom", texte: j.display_name }),
-            el("p", { class: "pf-login" }, el("span", { texte: "@" + j.twitch_login }), el("span", { "aria-hidden": "true", texte: " · " }), "Joueur depuis le ", el("time", { datetime: j.cree_le || "", texte: date(j.cree_le) })),
+            el("p", { class: "pf-login" }, el("span", { texte: "@" + j.twitch_login }), el("span", { "aria-hidden": "true", texte: " · " }), App.estImporte(j) ? "Sur le stream avant l'ouverture du site" : ["Joueur depuis le ", el("time", { datetime: j.cree_le || "", texte: date(j.cree_le) })]),
             el("div", { class: "pf-liens" },
               proprio ? el("a", { class: "btn-second", href: "collection.html" }, icone("i-cartes"), "Voir tous mes objets") : el("a", { class: "btn-second", href: "profil.html" }, icone("i-profil"), "Mon profil"),
               el("a", { class: "btn-second", href: "classements.html" }, icone("i-podium"), "Classements")),
             credits > 0 ? el("a", { class: "pf-alerte", href: "#points" }, icone("i-etoile"), pluriel(credits, "point") + " à placer") : null)),
         el("div", { class: "pf-puissance", "data-puissance": "" },
-          el("span", { class: "pf-etiq", texte: "Puissance" }),
+          el("span", { class: "pf-etiq" }, "Puissance", el("a", { class: "lien-aide", href: "aide.html#puissance", "aria-label": "Aide : la puissance", title: "Aide : la puissance", texte: "?" })),
           el("b", { class: "num pf-pl", "data-pl": "", texte: fmt(pl()) }),
           el("span", { class: "pf-rang", "data-rang": "" }, texteRang())),
-        el("div", { class: "pf-record" },
+        App.horsClassement(j) ? el("div", { class: "pf-record pf-hors" }, horsClassement()) : el("div", { class: "pf-record" },
           stat("Victoires", fmt(v), "v"), stat("Défaites", fmt(d), "d"), stat("Égalités", fmt(e)),
           stat("Winrate", tot ? nombre(Math.round((v / tot) * 1000) / 10) + " %" : "—"),
           stat("Série en cours", fmt(j.serie_actuelle || 0), (j.serie_actuelle || 0) >= 5 ? "chaud" : "")));
+    }
+    function horsClassement() {
+      return el("p", { class: "hors-classement" }, el("span", { class: "pilule", texte: "Compte hors classement" }),
+        el("span", { texte: "Le streamer et les comptes de test jouent sans bilan ni stats : leurs victoires ne comptent pas." }));
     }
     function texteRang() {
       if (!s.puissances) return el("span", { class: "pf-attente", texte: "Classement en cours de calcul…" });
@@ -355,7 +359,7 @@
       s.res = calculer();
       rendre();
       animerPuissance(avant, pl());
-      const b = main.querySelector("#t-points"); if (b) b.scrollIntoView({ block: "start", behavior: reduit ? "auto" : "smooth" });
+      const b = main.querySelector("#t-points"); if (b) b.scrollIntoView({ block: "start", behavior: App.reduit ? "auto" : "smooth" });
       App.toast("Tes points sont en place.", { titre: "Puissance " + fmt(pl()) + " (" + signe(Math.round(pl() - avant)) + ")" });
       await App.verifierSucces();
     }
@@ -374,7 +378,7 @@
           s.res = calculer();
           rendre();
           animerPuissance(avant, pl());
-          const p = main.querySelector("#points"); if (p) p.scrollIntoView({ block: "start", behavior: reduit ? "auto" : "smooth" });
+          const p = main.querySelector("#points"); if (p) p.scrollIntoView({ block: "start", behavior: App.reduit ? "auto" : "smooth" });
           App.toast("Répartis-les comme tu veux, puis valide.", { titre: pluriel(r.points_a_placer, "point") + " à placer" });
           await App.verifierSucces();
         } catch (e) { App.erreur(e); confirmer.disabled = false; }
@@ -450,7 +454,7 @@
       if (j.medailles_revente) med.push(fmt(j.medailles_revente) + " en revente");
       const sec = el("section", { class: "section-page", id: "carriere", "aria-labelledby": "t-carriere" },
         el("h2", { id: "t-carriere", texte: "Carrière" }),
-        el("p", { class: "sous", texte: tot ? pluriel(tot, "duel") + " disputé" + (tot > 1 ? "s" : "") + " depuis l'arrivée sur Stream RPG." : "Aucun duel pour l'instant : la carrière commence au premier combat." }),
+        App.horsClassement(j) ? horsClassement() : el("p", { class: "sous", texte: tot ? pluriel(tot, "duel") + " disputé" + (tot > 1 ? "s" : "") + " depuis l'arrivée sur Stream RPG." : "Aucun duel pour l'instant : la carrière commence au premier combat." }),
         el("div", { class: "grille-chiffres" },
           chiffre(fmt(v), "Victoires", tot ? nombre(Math.round((v / tot) * 1000) / 10) + " % de winrate" : null),
           chiffre(fmt(d), "Défaites"),
@@ -527,7 +531,7 @@
       if (!diff) return;
       zone.append(el("span", { class: "pf-delta " + (diff > 0 ? "plus" : "moins"), "aria-hidden": "true", texte: signe(diff) }));
       zone.classList.add(diff > 0 ? "monte" : "baisse");
-      if (reduit) { nb.textContent = fmt(a); return; }
+      if (App.reduit) { nb.textContent = fmt(a); return; }
       const t0 = performance.now(), duree = 900;
       nb.textContent = fmt(de);
       const pas = (t) => { const k = Math.min(1, (t - t0) / duree), e = 1 - Math.pow(1 - k, 4); nb.textContent = fmt(de + (a - de) * e); if (k < 1) requestAnimationFrame(pas); };

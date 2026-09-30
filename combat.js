@@ -11,9 +11,7 @@ const { el, icone, fmt } = App;
 const params = new URLSearchParams(location.search);
 const SEUIL_SAIGNEMENT = 20;
 const ARRET = Symbol("arret");
-const calme = App.reduit;
 const cle = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-const estAbonne = (j) => !!(j && j.abonne_jusqu_au && new Date(j.abonne_jusqu_au).getTime() > Date.now());
 const TRANCHES = { dans_tranche: "Combat équitable", au_dessus: "Cible plus forte", en_dessous: "Cible plus faible" };
 const PICTOS = {
   lecture: "M7 4.5v15l12.5-7.5z", pause: "M6.5 5H10v14H6.5zM14 5h3.5v14H14z", fin: "M15.5 5H18v14h-2.5zM5 5v14l9.5-7z",
@@ -113,7 +111,7 @@ async function ecranVersus(main, ctx, login, modeInitial) {
   const nivAdv = new Map((inv || []).map((l) => [l.item_numero, l.niveau]));
   const pMoi = (App.puissance(moi, App.niveaux(), ctx.loadout) || {}).powerLevel || 0;
   const pAdv = (App.puissance(adv, nivAdv, lo) || {}).powerLevel || 0;
-  const abonne = estAbonne(moi);
+  const abonne = App.peutEntrainer(moi);
   let mode = modeInitial === "entrainement" && abonne ? "entrainement" : "classe";
 
   const carteJoueur = (j, loadout, niveaux, puissance, toi) => {
@@ -272,7 +270,7 @@ function arene(main, ctx, opts) {
     const slot = (k, lib) => el("div", { class: "slot slot-" + k }, carteOuVide(X.it[k], lib));
     const sArme = slot("arme", "Mains nues"), sArmure = slot("armure", "Sans armure"), sOff = slot("offhand", "Main gauche");
     sArmure.append(fissuresArmure(graine(X.login + "armure")));
-    const pile = el("div", { class: "pile" }), pips = el("div", { class: "pips" }), cd = el("span", { class: "cd num" });
+    const pile = el("div", { class: "pile" }), pips = el("div", { class: "pips", role: "img" }), cd = el("span", { class: "cd num" });
     const deck = el("div", { class: "slot deck" + (X.it.strategeme ? "" : " sans"), title: X.it.strategeme ? "Stratagème : " + X.it.strategeme.o.nom : "Pas de stratagème" },
       pile, cd, pips, X.it.strategeme ? null : el("small", { texte: "Aucun stratagème" }));
     const racine = el("div", { class: "cbt " + (X.g ? "gauche" : "droite") + (X.login === moi ? " moi" : "") },
@@ -425,7 +423,7 @@ function arene(main, ctx, opts) {
     const dx = total > 1 ? (k - (total - 1) / 2) * Math.min(34, p.w / total) : hasard(-18, 18);
     const e = point("nombre " + genre, p.x + dx, p.y - p.h * 0.12, {});
     e.textContent = texte;
-    if (calme) { anime(e, [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }], 1300, { retirer: true, ease: "linear" }); return; }
+    if (App.reduit) { anime(e, [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }], 1300, { retirer: true, ease: "linear" }); return; }
     const gros = /crit|gros/.test(genre) ? 1.35 : 1;
     const y0 = p.y - p.h * 0.12, x0 = p.x + dx;
     anime(e, [
@@ -436,7 +434,7 @@ function arene(main, ctx, opts) {
     ], genre.includes("etat") ? 1400 : 1150, { retirer: true, ease: "cubic-bezier(.2,.8,.3,1)" });
   }
   function secouer(elem, force = 6, d = 320) {
-    if (calme) return;
+    if (App.reduit) return;
     anime(elem, [0, -1, 0.8, -0.6, 0.4, 0].map((k, i) => ({ transform: `translate(${(k * force).toFixed(1)}px, ${(i % 2 ? force * 0.4 : -force * 0.3).toFixed(1)}px)` })), d, { fill: "none", ease: "linear" });
   }
   function frappe(X, fort = false) {
@@ -455,11 +453,11 @@ function arene(main, ctx, opts) {
   function annonce(texte, genre = "") {
     const e = el("div", { class: "annonce-txt " + genre, texte });
     annonceur.replaceChildren(e);
-    if (calme) { anime(e, [{ opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], 1500, { retirer: true, ease: "linear" }); return; }
+    if (App.reduit) { anime(e, [{ opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], 1500, { retirer: true, ease: "linear" }); return; }
     anime(e, [{ transform: "scale(1.6)", opacity: 0 }, { transform: "scale(1)", opacity: 1, offset: 0.12 }, { transform: "scale(1)", opacity: 1, offset: 0.8 }, { transform: "scale(.96)", opacity: 0 }], 1500, { retirer: true });
   }
   function particules(x, y, nb, cls, portee = 60, d = 700, gravite = 0) {
-    if (calme) return;
+    if (App.reduit) return;
     for (let i = 0; i < nb; i++) {
       const a = Math.random() * Math.PI * 2, r = hasard(portee * 0.4, portee);
       const e = point("particule " + cls, x, y, {});
@@ -468,17 +466,17 @@ function arene(main, ctx, opts) {
     }
   }
   function onde(x, y, cls = "", taille = 2.4, d = 520) {
-    if (calme) return;
+    if (App.reduit) return;
     const e = point("onde " + cls, x, y, {});
     anime(e, [{ transform: T(x, y, "scale(.15)"), opacity: 0.95 }, { transform: T(x, y, `scale(${taille})`), opacity: 0 }], d, { retirer: true, ease: "cubic-bezier(.1,.7,.3,1)" });
   }
   function eclatBlanc(X) { const e = X.dom.portrait.querySelector(".eclair-blanc"); anime(e, [{ opacity: 0.85 }, { opacity: 0 }], 260, { fill: "none", ease: "linear" }); }
-  function flashArene(cls = "", d = 380) { const e = point("flash-arene " + cls, 0, 0, {}); e.style.transform = "none"; anime(e, [{ opacity: calme ? 0.25 : 0.7 }, { opacity: 0 }], d, { retirer: true, ease: "linear" }); }
+  function flashArene(cls = "", d = 380) { const e = point("flash-arene " + cls, 0, 0, {}); e.style.transform = "none"; anime(e, [{ opacity: App.reduit ? 0.25 : 0.7 }, { opacity: 0 }], d, { retirer: true, ease: "linear" }); }
 
   // -------------------------------------------------------------- Attaques
   const MELEE = new Set(["slash", "smash", "poing", "slash_energy"]);
   async function elan(A, C, style) {
-    if (calme) return;
+    if (App.reduit) return;
     const a = pos(A.dom.portrait), c = pos(C.dom.portrait);
     const dx = (c.x - a.x) * (style === "smash" ? 0.42 : 0.3), dy = (c.y - a.y) * (style === "smash" ? 0.42 : 0.3);
     const kf = style === "smash"
@@ -488,7 +486,7 @@ function arene(main, ctx, opts) {
     await dormir(style === "smash" ? 360 : 190);
   }
   function entaille(C, crit, energie) {
-    if (calme) return;
+    if (App.reduit) return;
     const c = pos(C.dom.portrait), rot = hasard(-40, -18) * (C.g ? -1 : 1);
     const e = point("entaille" + (crit ? " crit" : "") + (energie ? " energie" : ""), c.x, c.y, { width: c.w * 1.5 + "px", height: c.w * 0.5 + "px" });
     anime(e, [{ transform: T(c.x, c.y, `rotate(${rot}deg) scaleX(.1)`), opacity: 0 }, { transform: T(c.x, c.y, `rotate(${rot + 8}deg) scaleX(1)`), opacity: 1, offset: 0.35 }, { transform: T(c.x, c.y, `rotate(${rot + 12}deg) scaleX(1.08)`), opacity: 0 }], 420, { retirer: true });
@@ -505,7 +503,7 @@ function arene(main, ctx, opts) {
     const a = pos(A.dom.portrait), c = pos(C.dom.portrait);
     const x0 = a.x + (c.x - a.x) * 0.18, y0 = a.y + (c.y - a.y) * 0.18 + decal * 0.4;
     const x1 = c.x + hasard(-c.w * 0.18, c.w * 0.18), y1 = c.y + hasard(-c.h * 0.18, c.h * 0.18) + decal;
-    if (calme) return { x: x1, y: y1 };
+    if (App.reduit) return { x: x1, y: y1 };
     const ang = angle({ x: x0, y: y0 }, { x: x1, y: y1 });
     const e = point("projectile " + cls, x0, y0, {});
     const tourne = cls.includes("shuriken") ? 720 : 0;
@@ -520,7 +518,7 @@ function arene(main, ctx, opts) {
     return { x: x1, y: y1 };
   }
   function eclairBouche(A, C, gros) {
-    if (calme) return;
+    if (App.reduit) return;
     const a = pos(A.dom.portrait), c = pos(C.dom.portrait);
     const x = a.x + (c.x - a.x) * 0.2, y = a.y + (c.y - a.y) * 0.2;
     const e = point("bouche" + (gros ? " gros" : ""), x, y, {});
@@ -549,7 +547,7 @@ function arene(main, ctx, opts) {
     const esquive = () => {
       nombre(C, "ESQUIVE", "etat rate");
       son("esquive", { pan: C.pan });
-      if (!calme) anime(C.dom.portrait.parentElement, [{ transform: "none" }, { transform: `translate(${C.g ? -26 : 26}px, -8px) rotate(${C.g ? -6 : 6}deg)`, offset: 0.4 }, { transform: "none" }], 520, { fill: "none" });
+      if (!App.reduit) anime(C.dom.portrait.parentElement, [{ transform: "none" }, { transform: `translate(${C.g ? -26 : 26}px, -8px) rotate(${C.g ? -6 : 6}deg)`, offset: 0.4 }, { transform: "none" }], 520, { fill: "none" });
     };
 
     if (strat && ["missile", "eclair", "gaz", "feu", "bombardement", "hache", "shuriken"].includes(profil)) {
@@ -623,7 +621,7 @@ function arene(main, ctx, opts) {
     fx.append(carte);
     son("carte", { pan: X.pan });
     briller(X, "strategeme");
-    if (calme) {
+    if (App.reduit) {
       carte.classList.add("face");
       carte.style.transform = T(cible.x, cible.y, `scale(${echelle})`);
       await fin(anime(carte, [{ opacity: 0 }, { opacity: 1 }], 250));
@@ -651,7 +649,7 @@ function arene(main, ctx, opts) {
     if (derniere) { await bruler(X, carte); return; }
     const d = pos(X.dom.deck);
     son("carte_retour", { pan: X.pan });
-    if (calme) { await fin(anime(carte, [{ opacity: 1 }, { opacity: 0 }], 250)); carte.remove(); return; }
+    if (App.reduit) { await fin(anime(carte, [{ opacity: 1 }, { opacity: 0 }], 250)); carte.remove(); return; }
     await fin(anime(carte, [{ transform: carte._t }, { transform: T(d.x, d.y, "scale(.9)"), opacity: 0.4 }], 420, { ease: "cubic-bezier(.5,0,.7,.4)" }));
     carte.remove();
   }
@@ -660,7 +658,7 @@ function arene(main, ctx, opts) {
     carte.classList.add("brule");
     annonce("Dernière utilisation", "brule");
     son("carte_brule", { pan: 0 });
-    if (!calme) {
+    if (!App.reduit) {
       for (let i = 0; i < 26; i++) {
         const x = p.x + hasard(-p.w / 2, p.w / 2), y = p.y + hasard(-p.h / 2, p.h / 2);
         const e = point("braise", x, y, {});
@@ -675,7 +673,7 @@ function arene(main, ctx, opts) {
   function reticule(C) {
     const c = pos(C.dom.portrait);
     const e = point("reticule", c.x, c.y, { width: c.w * 1.15 + "px", height: c.w * 1.15 + "px" });
-    if (!calme) anime(e, [{ transform: T(c.x, c.y, "scale(1.8) rotate(-90deg)"), opacity: 0 }, { transform: T(c.x, c.y, "scale(1) rotate(0deg)"), opacity: 1 }], 520);
+    if (!App.reduit) anime(e, [{ transform: T(c.x, c.y, "scale(1.8) rotate(-90deg)"), opacity: 0 }, { transform: T(c.x, c.y, "scale(1) rotate(0deg)"), opacity: 1 }], 520);
     return e;
   }
   async function effetStrategeme(profil, A, C, r, balles, crits, toucher) {
@@ -683,7 +681,7 @@ function arene(main, ctx, opts) {
     if (C.reticule) { C.reticule.classList.add("verrouille"); }
     if (profil === "eclair") {
       son("eclair", { pan: C.pan, fichiers: r.sons_override });
-      if (!calme) {
+      if (!App.reduit) {
         const e = point("foudre", c.x, c.y - z.h, { height: z.h + "px" });
         e.innerHTML = '<svg viewBox="0 0 40 200" preserveAspectRatio="none"><polyline points="' + eclairPoints() + '"/></svg>';
         anime(e, [{ opacity: 0 }, { opacity: 1, offset: 0.08 }, { opacity: 0.3, offset: 0.2 }, { opacity: 1, offset: 0.3 }, { opacity: 0 }], 520, { retirer: true, ease: "linear" });
@@ -696,7 +694,7 @@ function arene(main, ctx, opts) {
       await dormir(300);
     } else if (profil === "gaz") {
       son("gaz", { pan: C.pan });
-      if (!calme) for (let i = 0; i < 7; i++) {
+      if (!App.reduit) for (let i = 0; i < 7; i++) {
         const x = c.x + hasard(-c.w * 0.5, c.w * 0.5), y = c.y + hasard(-c.h * 0.4, c.h * 0.4);
         const e = point("nuage", x, y, {});
         anime(e, [{ transform: T(x, y, "scale(.2)"), opacity: 0 }, { transform: T(x, y, "scale(1)"), opacity: 0.8, offset: 0.35 }, { transform: T(x + hasard(-30, 30), y - 30, "scale(1.5)"), opacity: 0 }], 1400, { retirer: true, retard: i * 70 });
@@ -707,7 +705,7 @@ function arene(main, ctx, opts) {
     } else if (profil === "feu") {
       son("feu", { pan: C.pan });
       const a = pos(A.dom.portrait);
-      if (!calme) for (let i = 0; i < 14; i++) {
+      if (!App.reduit) for (let i = 0; i < 14; i++) {
         const e = point("flamme", a.x, a.y, {});
         const x1 = c.x + hasard(-c.w * 0.3, c.w * 0.3), y1 = c.y + hasard(-c.h * 0.3, c.h * 0.3);
         anime(e, [{ transform: T(a.x + (c.x - a.x) * 0.15, a.y + (c.y - a.y) * 0.15, "scale(.4)"), opacity: 0.2 }, { transform: T(x1, y1, `scale(${hasard(1.2, 2).toFixed(2)})`), opacity: 1, offset: 0.7 }, { transform: T(x1, y1 - 30, "scale(2.2)"), opacity: 0 }], 620, { retirer: true, retard: i * 38, ease: "ease-out" });
@@ -717,7 +715,7 @@ function arene(main, ctx, opts) {
       await dormir(250);
     } else if (profil === "bombardement") {
       son("frappe_aerienne", { pan: 0 });
-      if (!calme) {
+      if (!App.reduit) {
         const e = point("avion", 0, z.y - z.h * 0.46, {});
         const y = z.y - z.h * 0.46, sens = A.g ? 1 : -1;
         anime(e, [{ transform: T(sens > 0 ? -80 : z.w + 80, y, `scaleX(${sens})`) }, { transform: T(sens > 0 ? z.w + 80 : -80, y, `scaleX(${sens})`) }], 900, { retirer: true, ease: "linear" });
@@ -739,7 +737,7 @@ function arene(main, ctx, opts) {
     } else if (profil === "hache") {
       son("hache_chargee", { pan: C.pan });
       const h = point("hache-vol", c.x, c.y - z.h * 0.6, {});
-      if (!calme) await fin(anime(h, [{ transform: T(c.x, c.y - z.h * 0.6, "rotate(0deg) scale(.6)"), opacity: 0 }, { transform: T(c.x, c.y, "rotate(900deg) scale(1)"), opacity: 1 }], 360, { ease: "cubic-bezier(.5,0,.9,.6)" }));
+      if (!App.reduit) await fin(anime(h, [{ transform: T(c.x, c.y - z.h * 0.6, "rotate(0deg) scale(.6)"), opacity: 0 }, { transform: T(c.x, c.y, "rotate(900deg) scale(1)"), opacity: 1 }], 360, { ease: "cubic-bezier(.5,0,.9,.6)" }));
       h.remove();
       impactLourd(C, crits[0]); onde(c.x, c.y, "electrique", 2, 480);
       toucher(0, c.x, c.y, true);
@@ -748,8 +746,8 @@ function arene(main, ctx, opts) {
       // Missile / frappe orbitale : ombre qui grossit, sifflement, chute, souffle.
       son("sifflement", { pan: C.pan });
       const ombre = point("ombre", c.x, c.y + c.h * 0.42, {});
-      if (!calme) anime(ombre, [{ transform: T(c.x, c.y + c.h * 0.42, "scale(.2)"), opacity: 0 }, { transform: T(c.x, c.y + c.h * 0.42, "scale(1.3)"), opacity: 0.8 }], 520, { ease: "ease-in" });
-      if (!calme) {
+      if (!App.reduit) anime(ombre, [{ transform: T(c.x, c.y + c.h * 0.42, "scale(.2)"), opacity: 0 }, { transform: T(c.x, c.y + c.h * 0.42, "scale(1.3)"), opacity: 0.8 }], 520, { ease: "ease-in" });
+      if (!App.reduit) {
         const m = point("missile", c.x, c.y - z.h, {});
         await fin(anime(m, [{ transform: T(c.x + 30, c.y - z.h * 0.8, "rotate(8deg)") }, { transform: T(c.x, c.y, "rotate(0deg)") }], 520, { retirer: true, ease: "cubic-bezier(.6,0,1,.6)" }));
       } else await dormir(400);
@@ -757,7 +755,7 @@ function arene(main, ctx, opts) {
       son("explosion", { pan: C.pan });
       flashArene("feu", 360);
       const boule = point("boule-feu", c.x, c.y, {});
-      if (!calme) anime(boule, [{ transform: T(c.x, c.y, "scale(.2)"), opacity: 1 }, { transform: T(c.x, c.y, "scale(1.6)"), opacity: 0.9, offset: 0.4 }, { transform: T(c.x, c.y - 20, "scale(2.2)"), opacity: 0 }], 820, { retirer: true });
+      if (!App.reduit) anime(boule, [{ transform: T(c.x, c.y, "scale(.2)"), opacity: 1 }, { transform: T(c.x, c.y, "scale(1.6)"), opacity: 0.9, offset: 0.4 }, { transform: T(c.x, c.y - 20, "scale(2.2)"), opacity: 0 }], 820, { retirer: true });
       else boule.remove();
       onde(c.x, c.y, "feu", 3.2, 600); particules(c.x, c.y, 18, "debris", 130, 900, 60); particules(c.x, c.y, 12, "braise", 90, 800);
       secouer(scene, 14, 480);
@@ -776,7 +774,7 @@ function arene(main, ctx, opts) {
     X.dom.portrait.classList.remove("pulse-poison", "pulse-brulure", "pulse-saignement", "pulse-fatigue", "soigne", "dome"); void X.dom.portrait.offsetWidth; X.dom.portrait.classList.add("pulse-" + genre);
   }
   function etoiles(X) {
-    if (calme) return;
+    if (App.reduit) return;
     const p = pos(X.dom.portrait);
     for (let i = 0; i < 4; i++) {
       const e = point("etoile-stun", p.x, p.y - p.h * 0.5, {});
@@ -785,7 +783,7 @@ function arene(main, ctx, opts) {
     }
   }
   function arcs(X) {
-    if (calme) return;
+    if (App.reduit) return;
     const p = pos(X.dom.portrait);
     for (let i = 0; i < 3; i++) {
       const e = point("arc-elec", p.x + hasard(-p.w * 0.3, p.w * 0.3), p.y + hasard(-p.h * 0.3, p.h * 0.3), {});
@@ -817,7 +815,7 @@ function arene(main, ctx, opts) {
     const s = X.dom.sArmure, p = pos(s);
     son("armure", { pan: X.pan, etape, retard: 0.05 });
     s.classList.remove("craque"); void s.offsetWidth; s.classList.add("craque");
-    if (calme) return;
+    if (App.reduit) return;
     for (let i = 0; i < 3 + etape; i++) {
       const x = p.x + hasard(-p.w * 0.4, p.w * 0.4), y = p.y + hasard(-p.h * 0.2, p.h * 0.35);
       const e = point("eclat-armure " + (X.it.armure ? X.it.armure.o.rarete : "commun"), x, y, { "--forme": String(Math.floor(hasard(0, 3))) });
@@ -855,10 +853,10 @@ function arene(main, ctx, opts) {
       A.stance2 = img === A.image2;
       const s = A.dom.sArme;
       son("stance", { pan: A.pan });
-      if (!calme) await fin(anime(s, [{ transform: "none" }, { transform: "scaleX(0)" }], 150, { fill: "none", ease: "ease-in" }));
+      if (!App.reduit) await fin(anime(s, [{ transform: "none" }, { transform: "scaleX(0)" }], 150, { fill: "none", ease: "ease-in" }));
       rendre(A, false);
       annonce(A.stance2 ? "Deuxième forme" : "Première forme", "strat");
-      if (!calme) await fin(anime(s, [{ transform: "scaleX(0)" }, { transform: "scaleX(1.08)", offset: 0.7 }, { transform: "none" }], 260, { fill: "none" }));
+      if (!App.reduit) await fin(anime(s, [{ transform: "scaleX(0)" }, { transform: "scaleX(1.08)", offset: 0.7 }, { transform: "none" }], 260, { fill: "none" }));
       briller(A, "arme");
       await dormir(250);
     }
@@ -923,7 +921,7 @@ function arene(main, ctx, opts) {
     if (A && r.vol_de_vie > 0) {
       const a = pos(A.dom.portrait), c = pos(C.dom.portrait);
       son("volvie", { pan: A.pan });
-      if (!calme) for (let i = 0; i < 6; i++) { const e = point("orbe-vie", c.x, c.y, {}); anime(e, [{ transform: T(c.x + hasard(-20, 20), c.y + hasard(-20, 20), "scale(.6)"), opacity: 0 }, { transform: T((a.x + c.x) / 2, (a.y + c.y) / 2 - 40, "scale(1)"), opacity: 1, offset: 0.5 }, { transform: T(a.x, a.y, "scale(.4)"), opacity: 0 }], 620, { retirer: true, retard: i * 50, ease: "ease-in-out" }); }
+      if (!App.reduit) for (let i = 0; i < 6; i++) { const e = point("orbe-vie", c.x, c.y, {}); anime(e, [{ transform: T(c.x + hasard(-20, 20), c.y + hasard(-20, 20), "scale(.6)"), opacity: 0 }, { transform: T((a.x + c.x) / 2, (a.y + c.y) / 2 - 40, "scale(1)"), opacity: 1, offset: 0.5 }, { transform: T(a.x, a.y, "scale(.4)"), opacity: 0 }], 620, { retirer: true, retard: i * 50, ease: "ease-in-out" }); }
       nombre(A, "+" + r.vol_de_vie, "soin vol"); soigne(A, r.vol_de_vie); attente = 450;
     }
     if (A && r.degats_reflechis > 0) { son("renvoi", { pan: A.pan }); frappe(A); nombre(A, "−" + r.degats_reflechis, "renvoi"); blesse(A, r.degats_reflechis); attente = 450; }
@@ -956,7 +954,7 @@ function arene(main, ctx, opts) {
   async function decompte(v) {
     const { voile, compte } = v;
     voile.classList.remove("porte");
-    if (!calme) {
+    if (!App.reduit) {
       anime(voile.querySelector(".intro-cote.g"), [{ transform: "translateX(-40vw)", opacity: 0 }, { transform: "none", opacity: 1 }], 520);
       anime(voile.querySelector(".intro-cote.d"), [{ transform: "translateX(40vw)", opacity: 0 }, { transform: "none", opacity: 1 }], 520);
       anime(voile.querySelector(".intro-vs"), [{ transform: "scale(3)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }], 420, { retard: 280 });
@@ -965,11 +963,11 @@ function arene(main, ctx, opts) {
     await dormir(700);
     for (const t of ["3", "2", "1"]) {
       compte.textContent = t; son("decompte");
-      if (!calme) anime(compte, [{ transform: "scale(1.8)", opacity: 0 }, { transform: "scale(1)", opacity: 1, offset: 0.3 }, { transform: "scale(.9)", opacity: 0.2 }], 520, { fill: "none" });
+      if (!App.reduit) anime(compte, [{ transform: "scale(1.8)", opacity: 0 }, { transform: "scale(1)", opacity: 1, offset: 0.3 }, { transform: "scale(.9)", opacity: 0.2 }], 520, { fill: "none" });
       await dormir(520);
     }
     compte.textContent = "Combat !"; son("go");
-    if (!calme) anime(compte, [{ transform: "scale(2.2)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }], 380);
+    if (!App.reduit) anime(compte, [{ transform: "scale(2.2)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }], 380);
     await dormir(480);
     await fin(anime(voile, [{ opacity: 1 }, { opacity: 0 }], 300));
     voile.remove();
@@ -1020,14 +1018,14 @@ function arene(main, ctx, opts) {
       son("egalite");
     }
     const j = jeton;
-    await new Promise((ok) => setTimeout(ok, calme ? 200 : 900));
+    await new Promise((ok) => setTimeout(ok, App.reduit ? 200 : 900));
     if (j !== jeton) return;
     outro(V);
   }
   async function ko(X) {
     const p = pos(X.dom.portrait);
     son("ko", { pan: X.pan });
-    if (!calme) {
+    if (!App.reduit) {
       flashArene("blanc", 300);
       eclatsVisage(X, p);
       // L'armure cède
@@ -1045,7 +1043,7 @@ function arene(main, ctx, opts) {
     X.dom.sArmure.dataset.etape = "5";
     X.dom.racine.classList.add("vaincu");
     X.dom.portrait.append(el("span", { class: "tampon-ko", texte: "K.O." }));
-    await new Promise((ok) => setTimeout(ok, calme ? 150 : 1100));
+    await new Promise((ok) => setTimeout(ok, App.reduit ? 150 : 1100));
   }
   function eclatsVisage(X, p) {
     const n0 = 12, cx = 50 + hasard(-12, 12), cy = 45 + hasard(-12, 12);
@@ -1100,7 +1098,7 @@ function arene(main, ctx, opts) {
         el("div", { class: "outro-actions" }, actions)));
     titreEl.id = "outro-titre";
     racine.append(panneau);
-    if (!calme) anime(panneau.firstChild, [{ transform: "translateY(24px) scale(.96)", opacity: 0 }, { transform: "none", opacity: 1 }], 520);
+    if (!App.reduit) anime(panneau.firstChild, [{ transform: "translateY(24px) scale(.96)", opacity: 0 }, { transform: "none", opacity: 1 }], 520);
     log.textContent = titre + (sous ? " — " + sous : "") + ".";
     titreEl.focus({ preventScroll: true });
     if (participant && opts.mode !== "entrainement" && opts.resultat) App.verifierSucces();

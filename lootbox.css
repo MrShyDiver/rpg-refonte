@@ -141,3 +141,37 @@
   .lb-histo-rang { margin: 0 -16px; padding: 4px 16px 10px; }
   .lb-histo-rang .zone { width: 80px; }
 }
+
+/* ---------- Premiers pas et prochaine étape (audit 30/09) ---------- */
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.lb-premiers-pas[hidden], .lb-suite[hidden] { display: none; }
+.lb-premiers-pas { display: grid; gap: 12px; padding: 16px 18px; }
+.lb-pp-tete { display: flex; align-items: center; gap: 10px; }
+.lb-pp-tete h2 { font-size: 17px; }
+.lb-pp-tete .bouton-icone { margin-left: auto; width: 44px; height: 44px; }
+.lb-pp-etapes { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lb-pp-etapes li { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px 10px; padding: 12px; border-radius: 12px; background: var(--sol-3); border: 1px solid var(--trait); }
+.lb-pp-etapes li > .btn-second { grid-column: 1 / -1; min-height: 44px; padding: 8px 12px; font-size: 14px; }
+.lb-pp-puce { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-family: var(--titre); font-weight: 800; font-size: 13px; color: var(--legendaire); border: 1.5px solid color-mix(in oklab, var(--legendaire) 55%, transparent); }
+.lb-pp-puce svg { width: 16px; height: 16px; }
+.lb-pp-etapes li.fait .lb-pp-puce { color: #0f2a1b; background: var(--normal); border-color: var(--normal); }
+.lb-pp-etapes li.fait small { display: none; }
+.lb-pp-etapes li.fait b { color: var(--encre-2); text-decoration: line-through; text-decoration-color: var(--encre-3); }
+.lb-pp-texte { display: grid; min-width: 0; }
+.lb-pp-texte b { font-size: 14.5px; }
+.lb-pp-texte small { font-size: 13px; color: var(--encre-2); }
+.lb-premiers-pas > .lb-lien { justify-self: start; }
+.lb-suite { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; justify-content: center; }
+.lb-suite-lib { font-family: var(--pixel); font-size: 13px; color: var(--legendaire); text-transform: uppercase; letter-spacing: .08em; }
+.lb-suite .mention { flex-basis: 100%; text-align: center; }
+.lien-aide { position: relative; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 6px; border-radius: 50%; border: 1px solid var(--trait-fort); color: var(--encre-2); font: 700 12px/1 var(--texte); text-decoration: none; vertical-align: 1px; }
+.lien-aide::before { content: ""; position: absolute; inset: -12px; }
+.lien-aide:hover { color: var(--encre); border-color: var(--encre-3); }
+@media (max-width: 900px) {
+  .lb-pp-etapes { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .lb-pp-etapes li { grid-template-columns: 30px minmax(0, 1fr) auto; padding: 8px 10px; }
+  .lb-pp-etapes li > .btn-second { grid-column: auto; }
+  .lb-pp-etapes li.fait { display: none; } /* le compteur « 2 / 3 » suffit : le coffre reste visible */
+  .lb-premiers-pas { gap: 10px; }
+  .lb-premiers-pas { padding: 14px; }
+}

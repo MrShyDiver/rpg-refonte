@@ -251,3 +251,13 @@
   .pf-filtres-ligne { grid-template-columns: minmax(0, 1fr); }
   .pf-fetiches-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- Audit 30/09 : aide contextuelle, compte hors classement ---------- */
+.lien-aide { position: relative; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 6px; border-radius: 50%; border: 1px solid var(--trait-fort); color: var(--encre-2); font: 700 12px/1 var(--texte); letter-spacing: 0; text-transform: none; text-decoration: none; vertical-align: 1px; }
+.lien-aide::before { content: ""; position: absolute; inset: -12px; }
+.lien-aide:hover { color: var(--encre); border-color: var(--encre-3); }
+.hors-classement { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 14px; color: var(--encre-2); max-width: 70ch; }
+.hors-classement .pilule { --c: var(--epique); }
+.pf-record.pf-hors { display: block; padding: 16px 30px 18px; }
+.section-page > .hors-classement { margin-bottom: 18px; }
+@media (max-width: 900px) { .pf-record.pf-hors { padding: 14px 18px 16px; } }

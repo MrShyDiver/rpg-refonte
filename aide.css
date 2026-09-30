@@ -1,0 +1,67 @@
+/* Comment jouer (aide.html) — le reste vient d'app.css. */
+.aide-sommaire { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -8px; }
+.aide-sommaire a { display: inline-flex; align-items: center; min-height: 40px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--trait-fort); font-size: 14px; font-weight: 600; color: var(--encre-2); text-decoration: none; }
+.aide-sommaire a:hover { color: var(--encre); background: var(--sol-2); }
+.aide-section { scroll-margin-top: 84px; max-width: 1080px; }
+.aide-section p { max-width: 68ch; }
+.aide-h3 { font-size: 16px; margin: 26px 0 10px; }
+.aide-section code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1px 6px; border-radius: 6px; background: var(--sol-3); border: 1px solid var(--trait-fort); color: var(--encre); white-space: nowrap; }
+.aide-lien { display: inline-flex; align-items: center; gap: 5px; color: var(--legendaire); font-weight: 600; font-size: 14px; text-decoration: none; }
+.aide-lien:hover { text-decoration: underline; }
+.aide-lien svg { width: 15px; height: 15px; }
+
+/* La boucle : six étapes numérotées */
+.aide-boucle { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.aide-boucle li { display: grid; align-content: start; gap: 8px; padding: 16px; border-radius: 16px; background: var(--sol-2); border: 1px solid var(--trait); }
+.aide-etape-tete { display: flex; align-items: center; justify-content: space-between; }
+.aide-etape-tete svg { width: 26px; height: 26px; color: var(--legendaire); }
+.aide-num { font-family: var(--titre); font-weight: 800; font-size: 13px; color: var(--encre-3); }
+.aide-boucle b { font-size: 16px; }
+.aide-boucle p { font-size: 14px; color: var(--encre-2); }
+.aide-boucle .aide-lien { justify-self: start; align-self: end; }
+
+/* En live */
+.aide-liste { list-style: none; display: grid; border-radius: 16px; border: 1px solid var(--trait); overflow: hidden; margin-bottom: 12px; }
+.aide-liste li { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 8px 20px; padding: 14px 18px; font-size: 14.5px; color: var(--encre-2); }
+.aide-liste li + li { border-top: 1px solid var(--trait); }
+.aide-quoi { color: var(--encre); }
+
+/* Duels */
+.aide-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.aide-grille > div { padding: 16px 18px; border-radius: 16px; background: var(--sol-2); border: 1px solid var(--trait); }
+.aide-grille h3 { font-size: 16px; margin-bottom: 6px; }
+.aide-grille p { font-size: 14.5px; color: var(--encre-2); }
+.aide-grille b { color: var(--encre); }
+.aide-table-zone { overflow-x: auto; border-radius: 14px; border: 1px solid var(--trait); background: var(--sol-2); margin-bottom: 10px; max-width: 760px; }
+.aide-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.aide-table th, .aide-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--trait); }
+.aide-table tbody tr:last-child > * { border-bottom: 0; }
+.aide-table thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--encre-3); background: var(--sol-3); white-space: nowrap; }
+.aide-table td { color: var(--encre-2); }
+.aide-table td.num { color: var(--encre); font-weight: 600; white-space: nowrap; }
+.aide-taux .mention { margin-top: 6px; }
+
+/* Lexique */
+.aide-lexique { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+.aide-terme { padding: 14px 0; border-top: 1px solid var(--trait); scroll-margin-top: 84px; border-radius: 4px; }
+.aide-terme dt { font-weight: 700; font-size: 15.5px; }
+.aide-terme dd { margin-top: 4px; font-size: 14.5px; color: var(--encre-2); }
+.aide-terme.cible { background: color-mix(in oklab, var(--legendaire) 8%, transparent); box-shadow: -12px 0 0 color-mix(in oklab, var(--legendaire) 8%, transparent), 12px 0 0 color-mix(in oklab, var(--legendaire) 8%, transparent); }
+.aide-terme.cible dt { color: var(--legendaire); }
+
+/* FAQ */
+.aide-faq { display: grid; gap: 8px; max-width: 820px; }
+.aide-faq details { border-radius: 14px; background: var(--sol-2); border: 1px solid var(--trait); }
+.aide-faq summary { cursor: pointer; padding: 14px 18px; min-height: 44px; font-weight: 700; list-style-position: inside; }
+.aide-faq details[open] summary { border-bottom: 1px solid var(--trait); }
+.aide-faq details p { padding: 12px 18px 16px; font-size: 14.5px; color: var(--encre-2); }
+.aide-faq a, .aide-liste a, .aide-section .mention a { color: var(--encre); }
+
+@media (max-width: 900px) {
+  .aide-sommaire { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -16px; padding-right: 16px; }
+  .aide-sommaire a { flex: none; min-height: 44px; }
+  .aide-boucle { grid-template-columns: 1fr 1fr; }
+  .aide-liste li { grid-template-columns: minmax(0, 1fr); padding: 14px 16px; }
+  .aide-lexique { grid-template-columns: minmax(0, 1fr); }
+  .aide-section { margin-top: 36px; }
+}

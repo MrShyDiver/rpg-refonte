@@ -163,7 +163,7 @@
         el("div", { class: "chiffre" }, el("span", { texte: "Ton succès le plus rare" }),
           plusRare ? el("div", { class: "mini" }, medaille(plusRare.palier, plusRare.categorie, true),
             el("div", {}, el("div", { class: "titre-mis", texte: plusRare.titre }),
-              el("small", { class: "num", texte: joueursActifs ? "Seulement " + pourcent(parCode.get(plusRare.code) || 1, joueursActifs) + " des joueurs l'ont" : "" })))
+              el("small", { class: "num", texte: joueursActifs >= 10 ? "Seulement " + pourcent(parCode.get(plusRare.code) || 1, joueursActifs) + " des joueurs l'ont" : "Rareté affichée dès 10 joueurs" })))
             : el("small", { texte: "Débloque ton premier succès pour le voir ici." })),
         el("div", { class: "chiffre" }, el("span", { texte: "Le plus proche" }),
           proche ? [el("div", { class: "titre-mis", texte: proche.s.titre }),
@@ -173,7 +173,7 @@
 
       const filtres = el("div", { class: "barre-filtres filtres-succes" },
         el("div", { class: "onglets-b", role: "group", "aria-label": "Filtrer les succès" }, boutonsFiltre),
-        joueursActifs ? el("span", { class: "mention", texte: "Rareté calculée sur les " + fmt(joueursActifs) + " joueurs du site qui ont au moins un succès." }) : null);
+        joueursActifs ? el("span", { class: "mention", texte: "Rareté calculée sur " + (joueursActifs > 1 ? "les " + fmt(joueursActifs) + " joueurs" : "1 joueur") + " du site qui " + (joueursActifs > 1 ? "ont" : "a") + " au moins un succès." }) : null);
 
       // --- Catégories ---
       const sections = [];
