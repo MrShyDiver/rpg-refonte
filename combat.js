@@ -14,7 +14,7 @@ const ARRET = Symbol("arret");
 // « 1× » = 0,7 de la vitesse d'origine : on doit pouvoir suivre chaque coup à l'œil.
 const TEMPO = 0.7;
 const AURAS = ["poison", "feu", "sang", "elec", "stun", "marque", "antisoin", "brise", "rage", "envol", "bouclier", "souffle"];
-// Pistes de l'ancien overlay (sons/musiques/ du site /rpg/) : une au hasard par duel.
+// Pistes de l'ancien overlay (sons/musiques/) : une au hasard par duel.
 const MUSIQUES = ["dbz_battle_2.mp3", "sf2-guile-theme.mp3", "shokugeki_battle.mp3", "naturo_battle_1.mp3", "naturo_battle_2.mp3", "renoir_battle_2.mp3"];
 const prefMusique = { get() { try { return localStorage.getItem("rpg-musique") !== "off"; } catch (e) { return true; } }, set(v) { try { localStorage.setItem("rpg-musique", v ? "on" : "off"); } catch (e) {} } };
 const cle = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();

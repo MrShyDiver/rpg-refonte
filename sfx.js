@@ -3,8 +3,8 @@
    window.SFX : synthèse en couches (bruits filtrés, balayages, saturation,
    réverbe générée), panoramique gauche/droite par combattant.
    Fichiers : les noms de sons du replay (ex. "sword_slash_1.mp3", choisis par
-   objet dans le catalogue) sont joués depuis le dossier sons/ de l'ancien site
-   (/rpg/sons/, même domaine) ; un fichier absent retombe sur la synthèse.
+   objet dans le catalogue) sont joués depuis le dossier sons/ du site ;
+   un fichier absent retombe sur la synthèse.
    Événements : sons/combat/<nom>.mp3, s'il est listé dans sons/combat/liste.json,
    remplace la synthèse de cet événement (crit, ko, esquive…).
    Musique : SFX.musique enchaîne les pistes de sons/musiques/ en fondu.
@@ -14,8 +14,7 @@
 let ctx = null, maitre = null, reverb = null, bruitBuf = null, actif = true, volume = 0.8;
 const courbes = new Map();
 const fichiers = new Map(); // nom -> AudioBuffer | Promise
-// ponytail: dépend de /rpg/sons/ sur le même domaine ; copier sons/ lors de la migration Cloudflare.
-const BASE = location.pathname.startsWith("/rpg/") ? "sons/" : "/rpg/sons/";
+const BASE = "sons/"; // dossier sons/ du site (les pages sont toutes à la racine)
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const al = (a, b) => a + Math.random() * (b - a);
