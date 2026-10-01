@@ -218,17 +218,14 @@ App.demarrer("duels", async (main, ctx) => {
     if (cible) ouvrirReplay(cible);
   }
 
-  // Échos : proposés quand moins de 5 joueurs actifs sont dans la tranche. Ce sont les builds
-  // (avec une arme) des joueurs actifs les plus proches hors tranche ; le serveur revérifie tout.
+  // Échos : proposés quand moins de 5 joueurs actifs sont dans la tranche. C'est le serveur qui
+  // dresse la liste : seuls les builds qu'il sait ramener à ton niveau y figurent.
   const actifs = adv.liste.filter((x) => App.estClasse(x.j));
   const nbProchesActifs = actifs.filter((x) => App.dansTranche(x.puissance, maPuissance)).length;
   if (maPuissance && nbProchesActifs < MIN_TRANCHE_SANS_ECHO) {
     try {
-      const armes = new Set((await App.api.loadouts()).filter((l) => l.arme != null).map((l) => l.player_id));
-      let refuses = [];
-      try { refuses = JSON.parse(sessionStorage.getItem("echos-refuses") || "[]"); } catch (e) { /* navigation privée */ }
-      adv.echos = actifs.filter((x) => !App.dansTranche(x.puissance, maPuissance) && armes.has(x.j.id) && !refuses.includes(x.j.twitch_login))
-        .sort((a, b) => ecart(a) - ecart(b)).slice(0, MIN_TRANCHE_SANS_ECHO - nbProchesActifs);
+      const valides = new Set((await App.echos(maPuissance)).map((e) => e.login));
+      adv.echos = actifs.filter((x) => valides.has(x.j.twitch_login)).sort((a, b) => ecart(a) - ecart(b));
       rendreAdversaires();
     } catch (e) { console.warn(e); }
   }

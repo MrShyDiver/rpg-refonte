@@ -195,6 +195,15 @@ async function fonctionDuel(corps) {
 App.lancerDuel = ({ adversaire, mode = "classe", echo = false }) => fonctionDuel(mode === "auto" ? { mode } : { adversaire, mode, echo: !!echo });
 // Les puissances sont stockées en base ; le serveur recalcule celles dont le build a changé.
 App.rafraichirPuissances = () => fonctionDuel({ action: "puissances" });
+// Échos que le serveur sait ramener à ton niveau : [{ login, equipement: { arme: { numero, niveau } | null, … } }].
+// Le calcul coûte ~1 s au serveur : la liste est gardée pour la session tant que ta puissance ne bouge pas.
+App.echos = async (maPuissance) => {
+  const cle = "echos-valides";
+  try { const c = JSON.parse(sessionStorage.getItem(cle) || "null"); if (c && c.p === maPuissance) return c.echos; } catch (e) { /* navigation privée */ }
+  const { echos } = await fonctionDuel({ action: "echos" });
+  try { sessionStorage.setItem(cle, JSON.stringify({ p: maPuissance, echos })); } catch (e) { /* navigation privée */ }
+  return echos;
+};
 // Tranche de puissance : ±30 %, comme le serveur (enregistrer_combat).
 App.dansTranche = (puissance, moi) => puissance > 0 && moi > 0 && Math.abs(puissance - moi) / Math.max(1, moi) <= 0.30;
 // Écho : build d'un autre joueur ramené à ton niveau. En base, son login est « echo:<login du joueur> ».

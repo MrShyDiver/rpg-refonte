@@ -185,7 +185,15 @@ async function ecranVersus(main, ctx, login, modeInitial, echo) {
     if (adv) [lo, inv] = await Promise.all([App.api.loadout(adv.id), App.api.inventaire(adv.id)]);
   } catch (e) { App.erreur(e); main.replaceChildren(blocVide("Le face-à-face n'a pas pu se charger.", "Vérifie ta connexion puis recharge la page.")); return; }
   if (!adv) { main.replaceChildren(blocVide("Ce joueur est introuvable.", "Il a peut-être changé de pseudo.")); return; }
-  const nivAdv = new Map((inv || []).map((l) => [l.item_numero, l.niveau]));
+  let nivAdv = new Map((inv || []).map((l) => [l.item_numero, l.niveau]));
+  if (echo) {
+    // L'écho se bat avec l'équipement calibré par le serveur (améliorations réduites, pièces parfois retirées).
+    try {
+      const e = JSON.parse(sessionStorage.getItem("echos-valides")).echos.find((x) => x.login === login).equipement;
+      lo = Object.fromEntries(Object.entries(e).map(([k, x]) => [k, x ? x.numero : null]));
+      nivAdv = new Map(Object.values(e).filter(Boolean).map((x) => [x.numero, x.niveau]));
+    } catch (x) { /* lien direct ou navigation privée : on montre le build d'origine */ }
+  }
   const pMoi = (App.puissance(moi, App.niveaux(), ctx.loadout) || {}).powerLevel || 0;
   const pAdv = (App.puissance(adv, nivAdv, lo) || {}).powerLevel || 0;
   const abonne = App.peutEntrainer(moi);
@@ -228,9 +236,9 @@ async function ecranVersus(main, ctx, login, modeInitial, echo) {
       App.rafraichirJoueur().catch(() => {});
     } catch (e) {
       App.erreur(e);
-      // Écho refusé par le serveur (impossible à ramener à ton niveau) : la page Duels ne le proposera plus.
+      // Écho refusé par le serveur (un build a changé depuis la liste) : la liste gardée est oubliée.
       if (echo && e.statut === 409) {
-        try { const l = JSON.parse(sessionStorage.getItem("echos-refuses") || "[]"); if (!l.includes(login)) sessionStorage.setItem("echos-refuses", JSON.stringify([...l, login])); } catch (x) { /* navigation privée */ }
+        try { sessionStorage.removeItem("echos-valides"); } catch (x) { /* navigation privée */ } // liste périmée : la page Duels la redemandera
       }
       lancer.classList.remove("occupe"); lancer.lastChild.textContent = "Lancer le duel"; choisir(mode);
     }
@@ -241,7 +249,7 @@ async function ecranVersus(main, ctx, login, modeInitial, echo) {
     el("div", { class: "vs-duo" }, carteVersus(moi, ctx.loadout, App.niveaux(), pMoi, true), el("div", { class: "vs-eclair", "aria-hidden": "true" }, el("span", { texte: "VS" })), carteVersus(adv, lo, nivAdv, pAdv, false, echo)),
     el("div", { class: "vs-bas" }, modes, cout, lancer, raison,
       el("p", { class: "mention vs-note" }, echo
-        ? ["Tu affrontes un ", el("a", { class: "lien", href: "aide.html#echo", texte: "écho" }), " : le build de " + (adv.display_name || login) + ", dont les stats sont ramenées à ton niveau par le serveur pour un combat serré. Lui ne gagne ni ne perd rien, et tu touches les récompenses d'un combat équitable."]
+        ? ["Tu affrontes un ", el("a", { class: "lien", href: "aide.html#echo", texte: "écho" }), " : le build de " + (adv.display_name || login) + ", dont les stats et l'équipement sont ramenés à ton niveau par le serveur pour un combat serré. Lui ne gagne ni ne perd rien, et tu touches les récompenses d'un combat équitable."]
         : "Le combat est calculé par le serveur avec vos deux builds actuels. " + (adv.display_name || login) + " n'a pas besoin d'être connecté : il verra le résultat dans ses notifications."),
       el("a", { class: "lien-retour", href: "duels.html" }, picto("retour"), "Retour aux duels"))));
   choisir(mode);
@@ -1287,7 +1295,7 @@ function arene(main, ctx, opts) {
         adverse && tickets < 1 ? el("p", { class: "mention", texte: "Plus de ticket de duel — gagne-en en live." }) : null,
         el("div", { class: "outro-actions" }, actions)));
     titreEl.id = "outro-titre";
-    racine.append(panneau);
+    scene.append(panneau); // dans la scène : la barre de commandes reste dégagée
     if (!App.reduit) anime(panneau.firstChild, [{ transform: "translateY(24px) scale(.96)", opacity: 0 }, { transform: "none", opacity: 1 }], 520);
     log.textContent = titre + (sous ? " — " + sous : "") + ".";
     titreEl.focus({ preventScroll: true });

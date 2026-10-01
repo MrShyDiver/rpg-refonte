@@ -310,15 +310,16 @@
 .intro-go { font-size: 16px; padding: 15px 26px; min-height: 52px; }
 
 /* Fin */
-.outro { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; padding: 18px; background: rgba(8,9,12,.6); backdrop-filter: blur(3px); }
+.outro { position: absolute; inset: 0; z-index: 9; display: grid; grid-template-rows: minmax(0, 1fr); place-items: center; padding: 12px; background: rgba(8,9,12,.6); backdrop-filter: blur(3px); }
 .outro.victoire { --c: var(--legendaire); } .outro.defaite { --c: var(--defaite); } .outro.egalite, .outro.neutre { --c: var(--encre); }
-.outro-carte { width: min(540px, 100%); max-height: 100%; overflow: auto; display: grid; justify-items: center; gap: 14px; padding: 26px 24px; border-radius: 22px; text-align: center;
+.outro-carte { width: min(660px, 100%); max-height: 100%; overflow: auto; display: grid; justify-items: center; gap: 10px; padding: 20px 24px; border-radius: 22px; text-align: center;
   background: radial-gradient(80% 50% at 50% 0%, color-mix(in oklab, var(--c) 10%, transparent), transparent 70%), var(--sol-2);
   border: 1px solid color-mix(in oklab, var(--c) 40%, transparent); box-shadow: 0 30px 60px -20px rgba(0,0,0,.95); }
 .outro-sur { font-family: var(--pixel); font-size: 13px; color: var(--encre-3); }
 .outro-titre { font-family: var(--titre); font-weight: 800; font-size: clamp(30px, 4.4vw, 52px); color: var(--c); line-height: 1.05; max-width: 100%; overflow-wrap: anywhere; text-wrap: balance; }
 .outro-titre:focus { outline: none; }
-.outro-sous { color: var(--encre-2); font-size: 15px; font-weight: 600; margin-top: -6px; }
+.outro-sous { color: var(--encre-2); font-size: 15px; font-weight: 600; margin-top: -4px; }
+.outro-carte .mention { margin: 0; font-size: 13px; }
 .outro-gains { display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: center; }
 .gain-medailles { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--sol-3); border: 1px solid var(--trait-fort); font-weight: 600; font-size: 14px; }
 .gain-medailles svg { width: 20px; height: 20px; }
@@ -326,9 +327,9 @@
 .gain-medailles.perte b { color: var(--defaite); }
 .gain-medailles small { color: var(--encre-3); font-size: 13px; }
 .outro-stats { width: 100%; border-collapse: collapse; font-size: 14px; }
-.outro-stats th, .outro-stats td { padding: 7px 8px; border-bottom: 1px solid var(--trait); }
+.outro-stats th, .outro-stats td { padding: 5px 8px; border-bottom: 1px solid var(--trait); }
 .outro-stats thead th { font-weight: 700; color: var(--encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
-.outro-stats tbody th { text-align: left; font-weight: 500; color: var(--encre-2); }
+.outro-stats tbody th { text-align: left; font-weight: 500; color: var(--encre-2); white-space: nowrap; }
 .outro-stats td { font-family: var(--titre); font-weight: 700; }
 .outro-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .outro-actions > * { min-height: 46px; }

@@ -29,6 +29,8 @@ const TRANCHE = 0.30;                // identique à enregistrer_combat et au mo
 const MIN_TRANCHE_SANS_ECHO = 5;     // à partir de 5 joueurs dans la tranche, plus d'écho ciblé
 const ESSAIS_ECHO_AUTO = 3;          // échos calibrés en combat automatique avant d'abandonner
 const SOURCES_ECHO_AUTO = 30;        // builds chargés pour y trouver ces échos (ceux sans arme sont écartés)
+const ESSAIS_LISTE_ECHOS = 12;       // échos calibrés au plus pour dresser la liste de la page Duels (~75 ms pièce)
+const RETRAIT_ECHO = ["strategeme", "offhand", "armure"] as const; // pièces retirées, dans l'ordre, à un écho trop fort
 const COMBATS_ESSAI = 24;            // combats simulés pour estimer si un écho est un adversaire honnête
 const TAUX_MIN = 0.2, TAUX_MAX = 0.8; // un écho gagné (ou perdu) d'avance est refusé
 const MARGE_TRANCHE = 0.28;          // l'écho est cherché un peu à l'intérieur de la tranche (arrondis)
@@ -56,9 +58,9 @@ function entetesCors(req: Request): Record<string, string> {
   };
 }
 
-function lireCorps(corps: unknown): { action: "duel" | "puissances"; mode: Mode; adversaire: string; echo: boolean } {
+function lireCorps(corps: unknown): { action: "duel" | "puissances" | "echos"; mode: Mode; adversaire: string; echo: boolean } {
   const c = (corps ?? {}) as Record<string, unknown>;
-  if (c.action === "puissances") return { action: "puissances", mode: "classe", adversaire: "", echo: false };
+  if (c.action === "puissances" || c.action === "echos") return { action: c.action, mode: "classe", adversaire: "", echo: false };
   if (c.mode !== "classe" && c.mode !== "entrainement" && c.mode !== "auto") {
     throw new ErreurJoueur(400, "Choisis un mode : classé, entraînement ou combat automatique");
   }
@@ -141,18 +143,24 @@ async function rafraichirPuissances(admin: Client): Promise<number> {
 //  - plus faible : ses stats sont multipliées, réparties comme les siennes (+1 partout : un joueur qui
 //    n'a monté qu'une stat ne donnerait pas un adversaire crédible une fois gonflé) ;
 //  - plus fort : ses stats sont réduites ; si son équipement seul dépasse encore la cible, ce sont
-//    les améliorations de ses objets qui sont réduites.
+//    les améliorations de ses objets qui sont réduites ; et si, même sans amélioration, il dépasse
+//    encore (cas d'un attaquant débutant), l'écho se bat avec moins de pièces — l'arme reste toujours.
 // La recherche est une dichotomie sur un seul facteur : déterministe, une trentaine d'évaluations.
 export function calibrerEcho(source: JoueurEntree, cible: number): { entree: JoueurEntree; puissance: number; ecart: number } {
   const profil = Object.fromEntries(STATS.map((k) => [k, (source.stacks[k] || 0) + 1])) as JoueurEntree["stacks"];
+  let pieces = source.equipement;
   const avec = (m: number, g = 1): JoueurEntree => ({
     ...source,
     stacks: Object.fromEntries(STATS.map((k) => [k, Math.round(profil[k] * m)])) as JoueurEntree["stacks"],
-    equipement: g === 1 ? source.equipement : Object.fromEntries(EMPLACEMENTS.map((e) => {
-      const x = source.equipement[e];
+    equipement: g === 1 ? pieces : Object.fromEntries(EMPLACEMENTS.map((e) => {
+      const x = pieces[e];
       return [e, x ? { ...x, niveau: Math.floor(x.niveau * g) } : null];
     })),
   });
+  for (const e of RETRAIT_ECHO) {
+    if (puissanceDe(avec(0, 0)) <= cible) break;
+    pieces = { ...pieces, [e]: null };
+  }
   const chercher = (f: (x: number) => JoueurEntree, haut: number): JoueurEntree => {
     let bas = 0;
     for (let i = 0; i < 30; i++) {
@@ -204,6 +212,42 @@ export function echoEquitable(source: JoueurEntree, moi: JoueurEntree): { entree
   return { ...m, valable: Math.abs(m.ecart) <= TRANCHE && m.taux >= TAUX_MIN && m.taux <= TAUX_MAX };
 }
 
+// Joueurs classés autour de l'attaquant : tous les candidats, et ceux de sa tranche.
+async function voisinage(admin: Client, moi: Joueur): Promise<{ candidats: Joueur[]; proches: Joueur[]; maPuissance: number }> {
+  await rafraichirPuissances(admin); // tranches exactes
+  const tous = verifier(await admin.from("players").select(COLONNES).limit(2000)) as Joueur[];
+  const maPuissance = puissanceDe(entree(moi, await chargerBuilds(admin, [moi.id])));
+  const candidats = tous.filter((j) => j.id !== moi.id && estClasse(j));
+  return { candidats, maPuissance, proches: candidats.filter((j) => j.puissance != null && dansTranche(j.puissance, maPuissance)) };
+}
+
+// Échos proposés sur la page Duels : uniquement ceux que le serveur sait ramener au niveau de
+// l'attaquant (même calcul que le combat, donc aucun refus au moment de défier).
+async function listerEchos(admin: Client, moi: Joueur) {
+  const { candidats, proches, maPuissance } = await voisinage(admin, moi);
+  const voulus = MIN_TRANCHE_SANS_ECHO - proches.length;
+  if (voulus <= 0) return [];
+  const loin = (j: Joueur) => Math.abs(Math.log(Math.max(1, j.puissance ?? 1) / Math.max(1, maPuissance)));
+  const sources = candidats.filter((j) => !proches.includes(j)).sort((a, b) => loin(a) - loin(b)).slice(0, SOURCES_ECHO_AUTO);
+  const builds = await chargerBuilds(admin, [moi.id, ...sources.map((j) => j.id)]);
+  const moiEntree = entree(moi, builds);
+  const echos: unknown[] = [];
+  let essais = 0;
+  for (const j of sources) {
+    const e = entree(j, builds);
+    if (!e.equipement.arme) continue;
+    if (++essais > ESSAIS_LISTE_ECHOS || echos.length >= voulus) break;
+    const c = echoEquitable(e, moiEntree);
+    if (c.valable) {
+      echos.push({ login: j.twitch_login, equipement: Object.fromEntries(EMPLACEMENTS.map((k) => {
+        const x = c.entree.equipement[k];
+        return [k, x ? { numero: x.numero, niveau: x.niveau } : null];
+      })) });
+    }
+  }
+  return echos;
+}
+
 // ---------------------------------------------------------------- requête
 export async function traiter(req: Request): Promise<Response> {
   const cors = entetesCors(req);
@@ -228,6 +272,7 @@ export async function traiter(req: Request): Promise<Response> {
     if (!moi) throw new ErreurJoueur(403, "Connecte-toi avec Twitch pour jouer");
 
     if (action === "puissances") return repondre(200, { mises_a_jour: await rafraichirPuissances(admin) });
+    if (action === "echos") return repondre(200, { echos: await listerEchos(admin, moi) });
 
     // Contrôles rapides (messages clairs) ; enregistrer_combat refait tout sous verrou.
     if (mode !== "entrainement" && moi.tickets <= 0) {
@@ -247,11 +292,7 @@ export async function traiter(req: Request): Promise<Response> {
     let cible: Joueur | null = null;
     let sources: Joueur[] = [];
     if (mode === "auto" || echo) {
-      await rafraichirPuissances(admin); // tranches exactes
-      const tous = verifier(await admin.from("players").select(COLONNES).limit(2000)) as Joueur[];
-      const maPuissance = puissanceDe(entree(moi, await chargerBuilds(admin, [moi.id])));
-      const candidats = tous.filter((j) => j.id !== moi.id && estClasse(j));
-      const proches = candidats.filter((j) => j.puissance != null && dansTranche(j.puissance, maPuissance));
+      const { candidats, proches } = await voisinage(admin, moi);
       if (mode === "auto") {
         if (proches.length) cible = proches[hasard(proches.length)];
         else {
