@@ -74,6 +74,7 @@ App.demarrer("duels", async (main, ctx) => {
   main.classList.add("contenu-arene");
   document.title = "Combat · Stream RPG";
   const id = params.get("duel"), adv = params.get("adversaire");
+  if (params.get("bac")) return ecranBac(main, ctx);
   if (id) return ecranReplay(main, ctx, id);
   if (adv) return ecranVersus(main, ctx, String(adv).toLowerCase(), params.get("mode") === "entrainement" ? "entrainement" : "classe");
   main.append(blocVide("Aucun combat à afficher.", "Choisis un adversaire ou un combat dans l'historique."));
@@ -100,6 +101,18 @@ async function ecranReplay(main, ctx, id) {
   if (!R || !Array.isArray(R.rounds)) { main.replaceChildren(blocVide("Ce replay est vide.", "Il ne contient aucun tour à rejouer.")); return; }
   await pSfx;
   arene(main, ctx, { R, duel, joueurs, mode: R.mode || (duel.type === "entrainement" ? "entrainement" : "classe") }).porte();
+}
+
+// Bac à sable de la recette : combat calculé sur recette.html, rien d'enregistré.
+async function ecranBac(main, ctx) {
+  let bac = null;
+  try { bac = JSON.parse(sessionStorage.getItem("rpg-bac") || "null"); } catch (e) {}
+  if (!App.estRecetteur(ctx.joueur) || !bac || !bac.R || !Array.isArray(bac.R.rounds)) {
+    main.replaceChildren(blocVide("Aucun combat de test à afficher.", "Lance-en un depuis la recette."));
+    return;
+  }
+  await pSfx;
+  arene(main, ctx, { R: bac.R, duel: { id: "bac", type: "bac_a_sable" }, joueurs: bac.joueurs, mode: "bac_a_sable", bac: true }).porte();
 }
 
 // ---------------------------------------------------------------------
@@ -302,7 +315,7 @@ function arene(main, ctx, opts) {
   const bPlein = document.fullscreenEnabled ? el("button", { type: "button", class: "bouton-icone", "aria-label": "Plein écran", title: "Plein écran", onclick: () => pleinEcran() }, picto("plein")) : null;
   const commandes = el("div", { class: "commandes-arene" },
     el("div", { class: "cmd-lecture" }, bPause, vitesses, bPasser), log,
-    el("div", { class: "cmd-outils" }, bSon, bMusique, bPlein, el("a", { class: "btn-second retour", href: "duels.html", "aria-label": "Retour aux duels" }, picto("retour"), el("span", { texte: "Retour aux duels" }))));
+    el("div", { class: "cmd-outils" }, bSon, bMusique, bPlein, el("a", { class: "btn-second retour", href: opts.bac ? "recette.html" : "duels.html", "aria-label": opts.bac ? "Retour à la recette" : "Retour aux duels" }, picto("retour"), el("span", { texte: opts.bac ? "Retour à la recette" : "Retour aux duels" }))));
   const racine = el("section", { class: "arene", "aria-label": `Combat : ${F.attaquant.nom} contre ${F.defenseur.nom}`, style: { "--vit": String(TEMPO) } }, scene, fx, commandes);
   // Fil du combat, sous l'arène : une ligne par tour, ajoutée au moment où le tour se joue.
   const feed = el("ol", { class: "feed", "aria-label": "Déroulé du combat" });
@@ -1037,7 +1050,7 @@ function arene(main, ctx, opts) {
     const bouton = avecPorte ? el("button", { type: "button", class: "btn-principal intro-go" }, picto("lecture"), "Regarder le combat") : null;
     const voile = el("div", { class: "intro" + (avecPorte ? " porte" : ""), role: avecPorte ? "dialog" : null, "aria-label": "Présentation du combat" },
       el("div", { class: "intro-ligne" }, cote(G), el("div", { class: "intro-vs", texte: "VS" }), cote(D)),
-      el("div", { class: "intro-infos" }, [opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel classé", auto_battle: "Combat auto" }[(opts.duel || {}).type] || "Duel", TRANCHES[R.tranche] || null].filter(Boolean).join(" · ")),
+      el("div", { class: "intro-infos" }, [opts.bac ? "Bac à sable" : opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel classé", auto_battle: "Combat auto" }[(opts.duel || {}).type] || "Duel", TRANCHES[R.tranche] || null].filter(Boolean).join(" · ")),
       compte, bouton);
     racine.append(voile);
     return { voile, compte, bouton };
@@ -1172,7 +1185,7 @@ function arene(main, ctx, opts) {
   }
 
   function outro(V) {
-    const participant = [R.attaquant, R.defenseur].includes(moi);
+    const participant = !opts.bac && [R.attaquant, R.defenseur].includes(moi);
     const genre = R.egalite || !V ? "egalite" : participant ? (V.login === moi ? "victoire" : "defaite") : "neutre";
     const titre = R.egalite || !V ? "Égalité" : participant ? (V.login === moi ? "Victoire" : "Défaite") : "Victoire de " + V.nom;
     const res = opts.resultat || {};
@@ -1182,7 +1195,8 @@ function arene(main, ctx, opts) {
     const cat = monCote === "defenseur" ? libCat(res.categorie_defenseur) : libCat(res.categorie);
     const sous = cat || (monCote && R["statut_" + monCote]) || TRANCHES[R.tranche || res.tranche] || "";
     const recompenses = [];
-    if (opts.mode === "entrainement") recompenses.push(el("p", { class: "mention", texte: "Entraînement : aucune récompense, ton bilan ne bouge pas." }));
+    if (opts.bac) recompenses.push(el("p", { class: "mention", texte: "Bac à sable : rien n'est enregistré." }));
+    else if (opts.mode === "entrainement") recompenses.push(el("p", { class: "mention", texte: "Entraînement : aucune récompense, ton bilan ne bouge pas." }));
     else {
       const med = (v, qui) => el("span", { class: "gain-medailles" + (v < 0 ? " perte" : "") }, icone("i-medaille"), el("b", { class: "num", texte: (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v)) }), " médaille" + (Math.abs(v) > 1 ? "s" : ""), qui ? el("small", { texte: " · " + qui }) : null);
       if (res.medailles_gagnees != null) { recompenses.push(med(res.medailles_gagnees)); if (res.medailles_perdues) recompenses.push(med(-res.medailles_perdues)); }
@@ -1196,12 +1210,14 @@ function arene(main, ctx, opts) {
     if (adverse) actions.push(tickets > 0
       ? el("a", { class: "btn-principal", href: `combat.html?adversaire=${encodeURIComponent(adverse)}&mode=classe` }, icone("i-epees"), "Revanche")
       : el("button", { type: "button", class: "btn-principal", disabled: true, title: "Plus de ticket de duel — gagne-en en live" }, icone("i-epees"), "Revanche"));
+    if (opts.bac) actions.push(el("a", { class: "btn-principal", href: "recette.html?relancer=1" }, icone("i-epees"), "Relancer"));
     actions.push(el("button", { type: "button", class: "btn-second", onclick: () => arene(main, ctx, opts).jouer() }, picto("rejouer"), "Revoir"));
-    actions.push(el("a", { class: "btn-second", href: "duels.html" }, picto("retour"), "Retour aux duels"));
+    actions.push(opts.bac ? el("a", { class: "btn-second", href: "recette.html" }, picto("retour"), "Retour à la recette")
+      : el("a", { class: "btn-second", href: "duels.html" }, picto("retour"), "Retour aux duels"));
     const titreEl = el("h2", { class: "outro-titre", tabindex: "-1", texte: titre });
     const panneau = el("div", { class: "outro " + genre, role: "dialog", "aria-labelledby": "outro-titre" },
       el("div", { class: "outro-carte" },
-        el("span", { class: "outro-sur", texte: opts.mode === "entrainement" ? "Entraînement terminé" : "Combat terminé" }),
+        el("span", { class: "outro-sur", texte: opts.bac ? "Combat de test terminé" : opts.mode === "entrainement" ? "Entraînement terminé" : "Combat terminé" }),
         titreEl, sous ? el("p", { class: "outro-sous", texte: sous }) : null,
         recompenses.length ? el("div", { class: "outro-gains" }, recompenses) : null,
         el("table", { class: "outro-stats" }, el("thead", {}, el("tr", {}, el("td"), el("th", { scope: "col", texte: G.nom }), el("th", { scope: "col", texte: D.nom }))),
