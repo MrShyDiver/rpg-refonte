@@ -1,10 +1,11 @@
-// Edge Function `duel` — Stream RPG (v3 : combat automatique, échos, puissances stockées).
+// Edge Function `duel` — Stream RPG (v4 : combat automatique, échos validés, puissances stockées).
 //
 // POST, Authorization: Bearer <jeton de session> :
 //   { mode: "classe" | "entrainement", adversaire: "<login>" }               duel ciblé
 //   { mode: "classe" | "entrainement", adversaire: "<login>", echo: true }   écho ciblé (moins de 5 joueurs dans la tranche)
 //   { mode: "auto" }                                                         combat automatique
 //   { action: "puissances" }                                                 recalcule les puissances périmées
+//   { action: "echos" }                                                      échos que le serveur sait ramener à ton niveau
 //
 // Le combat est calculé ICI, jamais dans le navigateur ; l'écriture (ticket, récompenses,
 // historique, replay) est faite en une transaction par la RPC enregistrer_combat (service_role
