@@ -11,12 +11,19 @@ const { el, icone, fmt } = App;
 const params = new URLSearchParams(location.search);
 const SEUIL_SAIGNEMENT = 20;
 const ARRET = Symbol("arret");
+// « 1× » = 0,7 de la vitesse d'origine : on doit pouvoir suivre chaque coup à l'œil.
+const TEMPO = 0.7;
+const AURAS = ["poison", "feu", "sang", "elec", "stun", "marque", "antisoin", "brise", "rage", "envol", "bouclier", "souffle"];
+// Pistes de l'ancien overlay (sons/musiques/ du site /rpg/) : une au hasard par duel.
+const MUSIQUES = ["dbz_battle_2.mp3", "sf2-guile-theme.mp3", "shokugeki_battle.mp3", "naturo_battle_1.mp3", "naturo_battle_2.mp3", "renoir_battle_2.mp3"];
+const prefMusique = { get() { try { return localStorage.getItem("rpg-musique") !== "off"; } catch (e) { return true; } }, set(v) { try { localStorage.setItem("rpg-musique", v ? "on" : "off"); } catch (e) {} } };
 const cle = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const TRANCHES = { dans_tranche: "Combat équitable", au_dessus: "Cible plus forte", en_dessous: "Cible plus faible" };
 const PICTOS = {
   lecture: "M7 4.5v15l12.5-7.5z", pause: "M6.5 5H10v14H6.5zM14 5h3.5v14H14z", fin: "M15.5 5H18v14h-2.5zM5 5v14l9.5-7z",
   plein: "M4 9V4h5v2H6v3zm11-5h5v5h-2V6h-3zM4 15h2v3h3v2H4zm14 3v-3h2v5h-5v-2z", rejouer: "M12 5a7 7 0 1 1-6.6 4.7l1.9.6A5 5 0 1 0 12 7v3L7.5 6 12 2z",
   retour: "M11 5 4 12l7 7 1.4-1.4L7.8 13H20v-2H7.8l4.6-4.6z",
+  musique: "M9 17.5A2.5 2.5 0 1 1 7 15.05V5.4l12-2.4v11.5a2.5 2.5 0 1 1-2-2.45V7.55l-8 1.6z",
 };
 function picto(nom) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -211,22 +218,20 @@ function arene(main, ctx, opts) {
   const autre = (X) => (X === F.attaquant ? F.defenseur : F.attaquant);
   const de = (login) => (login === R.attaquant ? F.attaquant : login === R.defenseur ? F.defenseur : null);
   function initialiser(X) {
-    Object.assign(X, { pv: X.pvMax0, pvMax: X.pvMax0, pvVis: X.pvMax0, shield: R[X.c + "_shield_max"] || 0, usure: 0, etape: 0, etapeVue: 0,
+    Object.assign(X, { pv: X.pvMax0, pvMax: X.pvMax0, pvVis: X.pvMax0, shield: R[X.c + "_shield_max"] || 0,
       usages: X.usagesMax, cd: 0, pending: false, reticule: null, stance2: false, etourdi: false, souffleUtilise: false, rage: 0,
-      r: null, ko: false, brisBouclier: false, saignement: 0 });
+      r: null, ko: false, brisBouclier: false, saignement: 0, etats: {} });
   }
 
   // Réducteur : applique un tour au modèle (sert à la lecture ET au saut vers la fin).
   function appliquer(r) {
     const A = r.frappeur ? de(r.frappeur) : null;
     for (const X of [F.attaquant, F.defenseur]) {
-      const s = X.c, avant = X.pv, bouclierAvant = X.shield;
+      const s = X.c, bouclierAvant = X.shield;
       X.pv = Math.max(0, r["pv_" + s + "_apres"] ?? X.pv);
       X.pvMax = r["pv_max_" + s + "_apres"] ?? X.pvMax;
       if (r["shield_" + s] !== undefined) X.shield = r["shield_" + s] || 0;
-      if (bouclierAvant > 0 && X.shield === 0) { X.brisBouclier = true; X.usure += 0.1; }
-      X.usure += Math.max(0, avant - X.pv) / X.pvMax0;
-      if (r.cible === X.login && r.crit && r.touche) X.usure += 0.06;
+      if (bouclierAvant > 0 && X.shield === 0) X.brisBouclier = true;
       X.saignement = r["saignement_stacks_" + s] || 0;
       if (r["dernier_souffle_" + s]) X.souffleUtilise = true;
       X.r = r;
@@ -249,11 +254,7 @@ function arene(main, ctx, opts) {
       if (r.etourdi_applique) C.etourdi = true;
       if (r.riposte_stun_frappeur) A.etourdi = true;
     }
-    for (const X of [F.attaquant, F.defenseur]) {
-      X.pvVis = X.pv;
-      const seuils = [0.15, 0.35, 0.55, 0.75];
-      X.etape = Math.max(X.etape, seuils.filter((s) => X.usure >= s).length);
-    }
+    for (const X of [F.attaquant, F.defenseur]) X.pvVis = X.pv;
   }
 
   // -------------------------------------------------------------- DOM
@@ -269,17 +270,18 @@ function arene(main, ctx, opts) {
     const portrait = el("div", { class: "portrait", "data-degats": "0" }, vis, fissuresPortrait(graine(X.login)), el("i", { class: "teinte" }), el("i", { class: "vignette" }), el("i", { class: "eclair-blanc" }));
     const slot = (k, lib) => el("div", { class: "slot slot-" + k }, carteOuVide(X.it[k], lib));
     const sArme = slot("arme", "Mains nues"), sArmure = slot("armure", "Sans armure"), sOff = slot("offhand", "Main gauche");
-    sArmure.append(fissuresArmure(graine(X.login + "armure")));
-    const pile = el("div", { class: "pile" }), pips = el("div", { class: "pips", role: "img" }), cd = el("span", { class: "cd num" });
-    const deck = el("div", { class: "slot deck" + (X.it.strategeme ? "" : " sans"), title: X.it.strategeme ? "Stratagème : " + X.it.strategeme.o.nom : "Pas de stratagème" },
-      pile, cd, pips, X.it.strategeme ? null : el("small", { texte: "Aucun stratagème" }));
+    // Stratagème : la carte elle-même, face visible, à la taille de la main gauche.
+    const pips = el("div", { class: "pips", role: "img" }), cd = el("span", { class: "cd num" });
+    const deck = el("div", { class: "slot deck", title: X.it.strategeme ? "Stratagème : " + X.it.strategeme.o.nom : "Pas de stratagème" },
+      carteOuVide(X.it.strategeme, "Stratagème"), cd, pips);
+    const socle = el("div", { class: "socle" }, portrait, auras(graine(X.login + "aura")));
     const racine = el("div", { class: "cbt " + (X.g ? "gauche" : "droite") + (X.login === moi ? " moi" : "") },
       el("div", { class: "jauge" },
         el("div", { class: "jauge-tete" }, el("b", { class: "jauge-nom", texte: X.nom }), X.login === moi ? el("span", { class: "toi", texte: "Toi" }) : null,
           X.puissance ? el("span", { class: "jauge-puissance num", texte: "Puissance " + fmt(X.puissance) }) : null),
         barre, el("div", { class: "jauge-pied" }, pvTxt, statuts)),
-      el("div", { class: "corps" }, el("div", { class: "socle" }, portrait), el("div", { class: "main-cartes" }, sArme, sArmure, sOff, deck)));
-    X.dom = { racine, barre, plein, fantome, bouclier, erosion, pvTxt, statuts, portrait, vis, sArme, sArmure, sOff, deck, pile, pips, cd };
+      el("div", { class: "corps" }, socle, el("div", { class: "main-cartes" }, sArme, sArmure, sOff, deck)));
+    X.dom = { racine, barre, plein, fantome, bouclier, erosion, pvTxt, statuts, portrait, vis, socle, sArme, sArmure, sOff, deck, pips, cd };
   }
   initialiser(F.attaquant); initialiser(F.defenseur);
   construire(G); construire(D);
@@ -287,20 +289,38 @@ function arene(main, ctx, opts) {
     el("div", { class: "centre" }, el("div", { class: "tour" }, el("span", { texte: "Tour" }), numTour, el("small", { class: "num", texte: "/ " + n })),
       el("span", { class: "vs-centre", "aria-hidden": "true", texte: "VS" })), D.dom.racine, annonceur);
 
-  let vitesse = 1, enPause = false, jeton = 0, prochain = 0, fini = false;
+  let vitesse = 1, ralenti = 1, enPause = false, jeton = 0, prochain = 0, fini = false;
   const bPause = el("button", { type: "button", class: "bouton-icone", "aria-label": "Pause", title: "Pause (espace)", onclick: () => basculerPause() }, picto("pause"));
   const vitesses = el("div", { class: "onglets-b vitesses", role: "group", "aria-label": "Vitesse" },
     [1, 2, 4].map((v) => el("button", { type: "button", "aria-pressed": String(v === 1), texte: v + "×", "aria-label": "Vitesse " + v + " fois", onclick: () => regler(v) })));
   const bPasser = el("button", { type: "button", class: "btn-second passer", onclick: () => passer() }, picto("fin"), "Passer");
   const bSon = el("button", { type: "button", class: "bouton-icone son", "aria-label": "Son", "aria-pressed": String(App.sons.actif), title: "Son",
     onclick: () => { App.sons.actif = !App.sons.actif; bSon.setAttribute("aria-pressed", String(App.sons.actif)); if (window.SFX) { SFX.actif = App.sons.actif; if (App.sons.actif) SFX.demarrer(); } } }, icone("i-son"));
+  const bMusique = el("button", { type: "button", class: "bouton-icone musique", "aria-label": "Musique", "aria-pressed": String(prefMusique.get()), title: "Musique",
+    onclick: () => { const v = !prefMusique.get(); prefMusique.set(v); bMusique.setAttribute("aria-pressed", String(v)); if (window.SFX) SFX.musique.coupee = !v; } }, picto("musique"));
   const bPlein = document.fullscreenEnabled ? el("button", { type: "button", class: "bouton-icone", "aria-label": "Plein écran", title: "Plein écran", onclick: () => pleinEcran() }, picto("plein")) : null;
   const commandes = el("div", { class: "commandes-arene" },
     el("div", { class: "cmd-lecture" }, bPause, vitesses, bPasser), log,
-    el("div", { class: "cmd-outils" }, bSon, bPlein, el("a", { class: "btn-second retour", href: "duels.html", "aria-label": "Retour aux duels" }, picto("retour"), el("span", { texte: "Retour aux duels" }))));
-  const racine = el("section", { class: "arene", "aria-label": `Combat : ${F.attaquant.nom} contre ${F.defenseur.nom}`, style: { "--vit": "1" } }, scene, fx, commandes);
-  main.replaceChildren(racine);
+    el("div", { class: "cmd-outils" }, bSon, bMusique, bPlein, el("a", { class: "btn-second retour", href: "duels.html", "aria-label": "Retour aux duels" }, picto("retour"), el("span", { texte: "Retour aux duels" }))));
+  const racine = el("section", { class: "arene", "aria-label": `Combat : ${F.attaquant.nom} contre ${F.defenseur.nom}`, style: { "--vit": String(TEMPO) } }, scene, fx, commandes);
+  // Fil du combat, sous l'arène : une ligne par tour, ajoutée au moment où le tour se joue.
+  const feed = el("ol", { class: "feed", "aria-label": "Déroulé du combat" });
+  const blocFeed = el("section", { class: "bloc-feed", hidden: true }, el("h2", { class: "feed-titre" }, el("span", { texte: "Déroulé du combat" })), feed);
+  main.replaceChildren(racine, blocFeed);
   const lignes = rounds.map((r) => decrire(r, R, nomDe));
+  let feedN = 0;
+  function ajouterFeed(i) {
+    for (; feedN <= i && feedN < n; feedN++) {
+      const r = rounds[feedN], A = r.frappeur ? de(r.frappeur) : null;
+      const li = el("li", { class: A ? (A.g ? "g" : "d") : "neutre" }, el("span", { class: "no-tour num", texte: "T" + (r.round ?? feedN + 1) }),
+        el("span", { class: "lignes-tour" }, lignes[feedN].map((x) => el("span", { class: "evt " + x.genre, texte: x.texte }))));
+      feed.querySelectorAll("[aria-current]").forEach((x) => x.removeAttribute("aria-current"));
+      li.setAttribute("aria-current", "step");
+      feed.prepend(li); // le plus récent en haut, juste sous l'arène
+    }
+    blocFeed.hidden = false;
+    feed.scrollTop = 0;
+  }
   rendreTout(false);
   document.addEventListener("keydown", function clavier(e) {
     if (!racine.isConnected) { document.removeEventListener("keydown", clavier); return; }
@@ -327,10 +347,14 @@ function arene(main, ctx, opts) {
     d.portrait.dataset.degats = String(deg);
     const r = X.r || {}, s = X.c;
     d.portrait.dataset.dot = r["brulure_duree_" + s] > 0 ? "brulure" : r["poison_duree_" + s] > 0 ? "poison" : X.saignement > 0 ? "saignement" : r["paralysie_duree_" + s] > 0 ? "paralysie" : "";
-    // Armure qui se fissure
-    d.sArmure.dataset.etape = String(X.ko ? 5 : X.etape);
-    if (anime && X.etape > X.etapeVue && !X.ko) eclatsArmure(X, X.etape);
-    X.etapeVue = X.etape;
+    // Auras d'état : une animation par effet tant qu'il dure, une gerbe quand il apparaît.
+    const e = X.ko ? {} : etatsDe(X);
+    for (const k of AURAS) {
+      d.socle.classList.toggle("a-" + k, !!e[k]);
+      if (anime && e[k] && !X.etats[k]) vient(X, k);
+    }
+    X.etats = e;
+    d.socle.style.setProperty("--sang", (Math.min(1, X.saignement / SEUIL_SAIGNEMENT)).toFixed(2));
     if (anime && X.brisBouclier) bouclierBrise(X);
     X.brisBouclier = false;
     d.sArmure.classList.toggle("protege", X.shield > 0);
@@ -345,7 +369,6 @@ function arene(main, ctx, opts) {
     const d = X.dom;
     if (!X.it.strategeme) return;
     const restant = X.usages == null ? 1 : X.usages;
-    d.pile.replaceChildren(...Array.from({ length: Math.min(3, restant) }, (_, i) => el("div", { class: "dos", style: { "--i": String(i) } }, symboleDos())));
     d.deck.classList.toggle("epuise", restant <= 0);
     d.pips.replaceChildren(...(X.usagesMax ? Array.from({ length: Math.min(6, X.usagesMax) }, (_, i) => el("i", { class: i < restant ? "plein" : null })) : []));
     d.pips.setAttribute("aria-label", X.usagesMax ? `${restant} utilisation${restant > 1 ? "s" : ""} restante${restant > 1 ? "s" : ""} sur ${X.usagesMax}` : "");
@@ -353,8 +376,26 @@ function arene(main, ctx, opts) {
     d.cd.textContent = enCd ? String(X.cd - 1) : "";
     d.deck.classList.toggle("recharge", enCd);
   }
+  function etatsDe(X) {
+    const r = X.r || {}, s = X.c;
+    return { poison: r["poison_duree_" + s] > 0, feu: r["brulure_duree_" + s] > 0, sang: X.saignement > 0, elec: r["paralysie_duree_" + s] > 0, stun: X.etourdi,
+      marque: !!r["marque_active_" + s], antisoin: !!r["anti_heal_actif_" + s], brise: !!r["brise_def_actif_" + s],
+      rage: r["frenesie_bonus_" + s] > 0 || X.rage > 0, envol: r["esquive_parade_buff_" + s] > 0, bouclier: X.shield > 0, souffle: X.souffle && !X.souffleUtilise };
+  }
+  // Apparition d'un état : l'aura entre en scène (classe vient-*) ; poison, paralysie et étourdissement ont déjà leur gerbe dans apres().
+  function vient(X, k) {
+    const s = X.dom.socle, p = pos(X.dom.portrait);
+    s.classList.remove("vient-" + k); void s.offsetWidth; s.classList.add("vient-" + k);
+    setTimeout(() => s.classList.remove("vient-" + k), 1000);
+    if (k === "feu") { particules(p.x, p.y + p.h * 0.3, 18, "braise", p.w * 0.6, 900, -90); onde(p.x, p.y, "feu", 2, 560); son("brulure", { pan: X.pan }); }
+    else if (k === "antisoin") bouffee(X, "antisoin", 4);
+    else if (k === "marque") onde(p.x, p.y, "marque", 1.5, 520);
+    else if (k === "rage") { onde(p.x, p.y, "rage", 1.8, 520); particules(p.x, p.y, 10, "etincelle rouge", p.w * 0.7, 700, -40); }
+    else if (k === "envol") particules(p.x, p.y, 10, "plume", p.w * 0.8, 900, -60);
+  }
   function statuts(X) {
     const r = X.r || {}, s = X.c, l = [];
+    if (X.ko) return l;
     const k = (v, t, c) => { if (v) l.push(el("span", { class: "statut " + c, texte: t })); };
     k(r["poison_duree_" + s] > 0, "Poison " + r["poison_duree_" + s], "poison");
     k(r["brulure_duree_" + s] > 0, "Brûlure " + r["brulure_duree_" + s], "brulure");
@@ -372,16 +413,23 @@ function arene(main, ctx, opts) {
   }
 
   // -------------------------------------------------------------- Temps
+  // Vitesse réelle = choix du joueur × tempo de base × ralenti (coup final).
+  const rythme = () => vitesse * TEMPO * ralenti;
+  function appliquerRythme() {
+    const v = rythme();
+    racine.style.setProperty("--vit", String(v));
+    racine.getAnimations({ subtree: true }).forEach((a) => { if (a instanceof CSSAnimation || a instanceof CSSTransition) return; try { a.updatePlaybackRate(v); } catch (e) { a.playbackRate = v; } });
+  }
   function regler(v) {
     vitesse = v;
-    racine.style.setProperty("--vit", String(v));
     vitesses.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.textContent === v + "×")));
-    racine.getAnimations({ subtree: true }).forEach((a) => { try { a.updatePlaybackRate(v); } catch (e) { a.playbackRate = v; } });
+    appliquerRythme();
   }
   function basculerPause(force) {
     if (fini) return;
     enPause = force ?? !enPause;
     racine.classList.toggle("en-pause", enPause);
+    if (window.SFX) SFX.suspendre(enPause);
     racine.getAnimations({ subtree: true }).forEach((a) => (enPause ? a.pause() : a.play()));
     bPause.replaceChildren(picto(enPause ? "lecture" : "pause"));
     bPause.setAttribute("aria-label", enPause ? "Reprendre" : "Pause");
@@ -392,7 +440,7 @@ function arene(main, ctx, opts) {
       let reste = ms, prec = performance.now();
       const f = (t) => {
         if (j !== jeton) return ko(ARRET);
-        if (!enPause) reste -= (t - prec) * vitesse;
+        if (!enPause && t >= gelJusqua) reste -= (t - prec) * rythme();
         prec = t;
         if (reste <= 0) ok(); else requestAnimationFrame(f);
       };
@@ -401,12 +449,23 @@ function arene(main, ctx, opts) {
   }
   function anime(e, kf, d, o = {}) {
     const a = e.animate(kf, { duration: d, easing: o.ease || "cubic-bezier(.16,1,.3,1)", fill: o.fill || "forwards", delay: o.retard || 0, iterations: o.iter || 1 });
-    a.playbackRate = vitesse;
+    a.playbackRate = rythme();
     if (enPause) a.pause();
     if (o.retirer) a.finished.then(() => e.remove(), () => e.remove());
     return a;
   }
   function fin(a) { const j = jeton; return a.finished.then(() => { if (j !== jeton) throw ARRET; }, () => { throw ARRET; }); }
+  // Arrêt sur image (hitstop) : tout se fige un instant au moment de l'impact, comme dans un jeu de combat.
+  let gelJusqua = 0;
+  function geler(ms) {
+    if (App.reduit || enPause) return;
+    gelJusqua = performance.now() + ms;
+    const figees = racine.getAnimations({ subtree: true }).filter((a) => a.playState === "running" && !(a instanceof CSSAnimation));
+    figees.forEach((a) => a.pause());
+    setTimeout(() => { if (!enPause) figees.forEach((a) => { try { a.play(); } catch (e) {} }); }, ms);
+  }
+  // Coup de zoom de caméra (propriété scale : ne gêne pas les secousses, qui animent transform).
+  function zoom(force = 0.03, d = 420) { if (!App.reduit) anime(scene, [{ scale: "1" }, { scale: String(1 + force), offset: 0.22 }, { scale: "1" }], d, { fill: "none", ease: "cubic-bezier(.2,.7,.3,1)" }); }
 
   // -------------------------------------------------------------- Géométrie
   function pos(elem) {
@@ -541,7 +600,8 @@ function arene(main, ctx, opts) {
       frappe(C, crit || lourd);
       eclatBlanc(C);
       nombre(C, (crit ? "−" : "−") + balles[k], crit ? "crit" : "", k, nb);
-      if (crit) { son("crit", { pan: C.pan }); flashArene("or", 260); particules(x, y, 10, "etincelle or", 90, 600); }
+      if (crit) { son("crit", { pan: C.pan }); flashArene("or", 260); particules(x, y, 10, "etincelle or", 90, 600); geler(nb > 1 ? 45 : 95); zoom(0.04); }
+      else if (lourd || Number(balles[k]) >= C.pvMax0 * 0.2) zoom(0.022);
       else if (nb > 1) son(style === "tir" && /arc/.test(profil) ? "impact_fleche" : "impact_balle", { pan: C.pan });
     };
     const esquive = () => {
@@ -579,6 +639,7 @@ function arene(main, ctx, opts) {
       }
       await Promise.all(arrivees);
     }
+    if (nb >= 3 && !rate && !r.parade_reussie) nombre(C, nb + " coups !", "etat combo");
     if (rate) esquive();
     if (r.parade_reussie) await parade(r, A, C);
     if (r.bloque && !rate) { nombre(C, "BLOQUÉ", "etat bloque"); son("bloque", { pan: C.pan }); briller(C, C.it.offhand ? "offhand" : "armure"); }
@@ -603,55 +664,44 @@ function arene(main, ctx, opts) {
   }
 
   // -------------------------------------------------------------- Stratagèmes
-  function symboleDos() {
-    const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", "0 0 40 40"); s.setAttribute("aria-hidden", "true");
-    const u = document.createElementNS("http://www.w3.org/2000/svg", "use"); u.setAttribute("href", "#i-marque"); s.append(u); return s;
-  }
+  // La carte quitte son emplacement face visible, s'envole au centre de l'arène et s'y illumine.
   async function tirer(X) {
-    const pile = X.dom.pile, d = pos(X.dom.deck);
-    const top = pile.lastElementChild; if (top) top.style.visibility = "hidden";
-    const w = Math.max(40, X.dom.deck.offsetWidth * 0.86);
-    const zone = pos(scene);
-    const grand = Math.min(zone.w * 0.32, zone.h * 0.42 * (5 / 7), 190);
-    const echelle = grand / w;
-    const cible = { x: zone.x, y: zone.y - zone.h * 0.04 };
-    const carte = el("div", { class: "f carte-vol", style: { width: w + "px" } },
-      el("div", { class: "dos" }, symboleDos()), el("div", { class: "cv-face" }, App.carte(X.it.strategeme.o, { niveau: X.it.strategeme.niveau, equipe: false })));
+    const src = X.dom.deck.querySelector(".carte") || X.dom.deck, d = pos(src);
+    const w = Math.max(40, d.w), zone = pos(scene);
+    const grand = Math.min(zone.w * 0.3, zone.h * 0.5 * (5 / 7), 210), echelle = grand / w;
+    const cible = { x: zone.x, y: zone.y - zone.h * 0.02 };
+    const carte = el("div", { class: "f carte-vol", style: { width: w + "px" } }, el("div", { class: "cv-face" }, App.carte(X.it.strategeme.o, { niveau: X.it.strategeme.niveau, equipe: false })));
     carte.style.transform = T(d.x, d.y);
     fx.append(carte);
+    X.dom.deck.classList.add("en-vol");
     son("carte", { pan: X.pan });
     briller(X, "strategeme");
-    if (App.reduit) {
-      carte.classList.add("face");
-      carte.style.transform = T(cible.x, cible.y, `scale(${echelle})`);
-      await fin(anime(carte, [{ opacity: 0 }, { opacity: 1 }], 250));
-    } else {
-      const mi = { x: (d.x + cible.x) / 2, y: Math.min(d.y, cible.y) - zone.h * 0.12 };
-      await fin(anime(carte, [
-        { transform: T(d.x, d.y, "scale(1)") },
-        { transform: T(d.x, d.y - 26, `scale(1.12) rotate(${X.g ? -8 : 8}deg)`), offset: 0.35 },
-        { transform: T(mi.x, mi.y, `scale(${(1 + echelle) / 2}, ${(1 + echelle) / 2}) rotate(${X.g ? 4 : -4}deg)`) },
-      ], 380, { ease: "cubic-bezier(.3,.7,.3,1)" }));
-      await fin(anime(carte, [{ transform: T(mi.x, mi.y, `scale(${(1 + echelle) / 2}) rotate(${X.g ? 4 : -4}deg)`) }, { transform: T(mi.x, mi.y, `scale(0, ${(1 + echelle) / 2})`) }], 130, { ease: "ease-in" }));
-      carte.classList.add("face");
+    const penche = X.g ? -10 : 10, haut = T(d.x, d.y - 30, `scale(1.15) rotate(${penche}deg)`);
+    if (App.reduit) await fin(anime(carte, [{ opacity: 0, transform: T(cible.x, cible.y, `scale(${echelle})`) }, { opacity: 1, transform: T(cible.x, cible.y, `scale(${echelle})`) }], 250));
+    else {
+      const mi = { x: (d.x + cible.x) / 2, y: Math.min(d.y, cible.y) - zone.h * 0.14 };
+      await fin(anime(carte, [{ transform: T(d.x, d.y, "scale(1)") }, { transform: haut }], 260, { ease: "cubic-bezier(.3,.7,.3,1)" }));
       son("carte", { pan: 0, vol: 0.6 });
-      await fin(anime(carte, [{ transform: T(mi.x, mi.y, `scale(0, ${(1 + echelle) / 2})`) }, { transform: T(cible.x, cible.y, `scale(${echelle})`) }], 340));
+      await fin(anime(carte, [{ transform: haut }, { transform: T(mi.x, mi.y, `scale(${(1 + echelle) / 2}) rotate(${-penche * 0.6}deg)`), offset: 0.55 },
+        { transform: T(cible.x, cible.y, `scale(${echelle * 1.08})`), offset: 0.85 }, { transform: T(cible.x, cible.y, `scale(${echelle})`) }], 540, { ease: "cubic-bezier(.25,.8,.3,1)" }));
+      onde(cible.x, cible.y, "or", 2.4, 560); particules(cible.x, cible.y, 16, "etincelle or", grand * 0.75, 760);
     }
     carte._t = T(cible.x, cible.y, `scale(${echelle})`);
     carte.classList.add("active");
     annonce(X.it.strategeme.o.nom, "strat");
-    await dormir(420);
+    await dormir(520);
     return carte;
   }
   async function ranger(X, carte, derniere) {
     if (!carte) return;
     carte.classList.remove("active");
     if (derniere) { await bruler(X, carte); return; }
-    const d = pos(X.dom.deck);
+    const src = X.dom.deck.querySelector(".carte") || X.dom.deck, d = pos(src);
     son("carte_retour", { pan: X.pan });
-    if (App.reduit) { await fin(anime(carte, [{ opacity: 1 }, { opacity: 0 }], 250)); carte.remove(); return; }
-    await fin(anime(carte, [{ transform: carte._t }, { transform: T(d.x, d.y, "scale(.9)"), opacity: 0.4 }], 420, { ease: "cubic-bezier(.5,0,.7,.4)" }));
+    if (App.reduit) await fin(anime(carte, [{ opacity: 1 }, { opacity: 0 }], 250));
+    else await fin(anime(carte, [{ transform: carte._t }, { transform: T(d.x, d.y, "scale(1)"), opacity: 0.9 }], 440, { ease: "cubic-bezier(.5,0,.7,.4)" }));
     carte.remove();
+    X.dom.deck.classList.remove("en-vol");
   }
   async function bruler(X, carte) {
     const p = pos(carte);
@@ -668,6 +718,7 @@ function arene(main, ctx, opts) {
     }
     await fin(anime(carte, [{ transform: carte._t, opacity: 1 }, { transform: carte._t, opacity: 1, offset: 0.75 }, { transform: carte._t.replace(/scale\(([^)]*)\)/, "scale($1) translateY(-6%)"), opacity: 0 }], 1500, { ease: "linear" }));
     carte.remove();
+    X.dom.deck.classList.remove("en-vol");
     X.dom.deck.classList.add("epuise");
   }
   function reticule(C) {
@@ -782,10 +833,10 @@ function arene(main, ctx, opts) {
       anime(e, [{ transform: T(p.x, p.y - p.h * 0.5, `rotate(${a0}deg) translateX(${p.w * 0.36}px) scaleY(.5)`), opacity: 0 }, { transform: T(p.x, p.y - p.h * 0.5, `rotate(${a0 + 180}deg) translateX(${p.w * 0.36}px) scaleY(.5)`), opacity: 1, offset: 0.4 }, { transform: T(p.x, p.y - p.h * 0.5, `rotate(${a0 + 400}deg) translateX(${p.w * 0.36}px) scaleY(.5)`), opacity: 0 }], 1100, { retirer: true, ease: "linear" });
     }
   }
-  function arcs(X) {
+  function arcs(X, nb = 3) {
     if (App.reduit) return;
     const p = pos(X.dom.portrait);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < nb; i++) {
       const e = point("arc-elec", p.x + hasard(-p.w * 0.3, p.w * 0.3), p.y + hasard(-p.h * 0.3, p.h * 0.3), {});
       e.innerHTML = '<svg viewBox="0 0 60 20"><polyline points="0,10 10,3 18,15 28,5 36,16 46,4 60,10"/></svg>';
       anime(e, [{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0.2, offset: 0.4 }, { opacity: 1, offset: 0.6 }, { opacity: 0 }], 420, { retirer: true, ease: "linear", retard: i * 90 });
@@ -811,41 +862,62 @@ function arene(main, ctx, opts) {
     nombre(X, "−" + v, "saignement gros");
     blesse(X, v);
   }
-  function eclatsArmure(X, etape) {
-    const s = X.dom.sArmure, p = pos(s);
-    son("armure", { pan: X.pan, etape, retard: 0.05 });
-    s.classList.remove("craque"); void s.offsetWidth; s.classList.add("craque");
-    if (App.reduit) return;
-    for (let i = 0; i < 3 + etape; i++) {
-      const x = p.x + hasard(-p.w * 0.4, p.w * 0.4), y = p.y + hasard(-p.h * 0.2, p.h * 0.35);
-      const e = point("eclat-armure " + (X.it.armure ? X.it.armure.o.rarete : "commun"), x, y, { "--forme": String(Math.floor(hasard(0, 3))) });
-      anime(e, [{ transform: T(x, y, "rotate(0deg)"), opacity: 1 }, { transform: T(x + hasard(-30, 30), y + hasard(80, 150), `rotate(${hasard(-260, 260).toFixed(0)}deg)`), opacity: 0 }], hasard(700, 1100), { retirer: true, ease: "cubic-bezier(.4,0,.9,.6)" });
-    }
-  }
   function bouclierBrise(X) {
-    const p = pos(X.dom.barre);
+    const p = pos(X.dom.portrait);
     son("bouclier_casse", { pan: X.pan });
     nombre(X, "BOUCLIER BRISÉ", "etat bouclier");
-    particules(p.x, p.y, 16, "verre", 70, 700, 40);
+    onde(p.x, p.y, "bouclier", 2, 480);
+    particules(p.x, p.y, 22, "verre", p.w * 0.75, 800, 50);
+  }
+  // Nuage (poison, anti-soin) : bouffées qui gonflent autour du portrait.
+  function bouffee(X, genre, nb = 4) {
+    if (App.reduit) return;
+    const p = pos(X.dom.portrait);
+    for (let i = 0; i < nb; i++) {
+      const a = (i / nb) * Math.PI * 2 + hasard(-0.4, 0.4), x = p.x + Math.cos(a) * p.w * 0.32, y = p.y + Math.sin(a) * p.h * 0.32;
+      const e = point("nuage " + genre, x, y, {});
+      anime(e, [{ transform: T(x, y, "scale(.25)"), opacity: 0 }, { transform: T(x, y, "scale(1)"), opacity: 0.85, offset: 0.3 }, { transform: T(x + Math.cos(a) * 30, y + Math.sin(a) * 20 - 26, "scale(1.6)"), opacity: 0 }], 1300, { retirer: true, retard: i * 60, ease: "ease-out" });
+    }
+    particules(p.x, p.y + p.h * 0.2, 8, genre === "poison" ? "bulle" : "bulle violet", p.w * 0.5, 900, -60);
+  }
+  // Décharge électrique : arcs tout autour, flash jaune, portrait qui tressaute.
+  function foudroie(X, fort) {
+    const p = pos(X.dom.portrait);
+    arcs(X, fort ? 6 : 4);
+    onde(p.x, p.y, "electrique", fort ? 2.2 : 1.6, 420);
+    particules(p.x, p.y, fort ? 14 : 8, "etincelle jaune", p.w * 0.7, 520);
+    if (fort) flashArene("elec", 300);
+    X.dom.socle.classList.remove("electrocute"); void X.dom.socle.offsetWidth; X.dom.socle.classList.add("electrocute");
+  }
+  // Brûlure qui reprend : les flammes s'embrasent.
+  function flambee(X) {
+    const p = pos(X.dom.portrait);
+    X.dom.socle.classList.remove("flambe"); void X.dom.socle.offsetWidth; X.dom.socle.classList.add("flambe");
+    particules(p.x, p.y + p.h * 0.25, 14, "braise", p.w * 0.6, 1000, -110);
+    onde(p.x, p.y + p.h * 0.1, "feu", 1.7, 480);
   }
 
   // -------------------------------------------------------------- Un tour
   async function tour(r, i) {
     numTour.textContent = String(r.round ?? i + 1);
     log.textContent = lignes[i].map((x) => x.texte).join(" ");
+    ajouterFeed(i);
     const A = r.frappeur ? de(r.frappeur) : null, C = A ? autre(A) : null;
+    // Projecteur sur celui qui agit, et un temps pour que l'œil le suive.
+    for (const X of [F.attaquant, F.defenseur]) X.dom.racine.classList.toggle("actif", X === A);
+    if (A) await dormir(200);
     if (R.round_debut_fatigue > 0 && r.round === R.round_debut_fatigue) {
       racine.classList.add("fatigue"); annonce("La fatigue s'installe", "etat"); son("fatigue"); await dormir(700);
     }
     let tic = false;
-    if (r.poison_tick && r.degats_poison) { const X = r.poison_tick_attaquant ? F.attaquant : F.defenseur; dot(X, "poison"); son("poison", { pan: X.pan }); nombre(X, "−" + r.degats_poison, "poison"); blesse(X, r.degats_poison); tic = true; }
-    if (r.brulure_tick && r.degats_brulure) { const X = r.brulure_tick_attaquant ? F.attaquant : F.defenseur; dot(X, "brulure"); son("brulure", { pan: X.pan }); nombre(X, "−" + r.degats_brulure, "brulure"); blesse(X, r.degats_brulure); tic = true; }
+    if (r.poison_tick && r.degats_poison) { const X = r.poison_tick_attaquant ? F.attaquant : F.defenseur; bouffee(X, "poison", 4); dot(X, "poison"); son("poison", { pan: X.pan }); nombre(X, "−" + r.degats_poison, "poison"); blesse(X, r.degats_poison); tic = true; }
+    if (r.brulure_tick && r.degats_brulure) { const X = r.brulure_tick_attaquant ? F.attaquant : F.defenseur; flambee(X); dot(X, "brulure"); son("brulure", { pan: X.pan }); nombre(X, "−" + r.degats_brulure, "brulure"); blesse(X, r.degats_brulure); tic = true; }
     if (r.fatigue_tick && r.degats_fatigue) { for (const X of [F.attaquant, F.defenseur]) { dot(X, "fatigue"); nombre(X, "−" + r.degats_fatigue, "fatigue"); blesse(X, r.degats_fatigue); } son("fatigue"); tic = true; }
     if (tic) await dormir(560);
     if (!A) { await apres(r, null, null); return; }
 
     if (r.etourdi) { etoiles(A); son("etourdi", { pan: A.pan }); nombre(A, "ÉTOURDI", "etat stun"); await dormir(760); return; }
-    if (r.paralysie) { arcs(A); son("paralysie", { pan: A.pan, fichiers: r.sons_paralysie }); nombre(A, r.message_paralysie || "PARALYSÉ", "etat paralysie"); await dormir(760); await apres(r, A, C); return; }
+    if (r.paralysie) { foudroie(A, true); son("paralysie", { pan: A.pan, fichiers: r.sons_paralysie }); nombre(A, r.message_paralysie || "PARALYSÉ", "etat paralysie"); await dormir(760); await apres(r, A, C); return; }
 
     // Changement de forme de l'arme
     const img = r.arme_image_override;
@@ -928,8 +1000,8 @@ function arene(main, ctx, opts) {
     if (A && r.execution_active) { annonce("Exécution +" + (r.execution_bonus || 0) + " %", "sang"); son("execution", { pan: C.pan }); }
     if (C && r.etourdi_applique) { etoiles(C); son("etourdi", { pan: C.pan }); nombre(C, "ÉTOURDI", "etat stun"); C.etourdi = true; attente = 600; }
     if (A && r.riposte_stun_frappeur) { etoiles(A); son("etourdi", { pan: A.pan }); nombre(A, "ÉTOURDI", "etat stun"); A.etourdi = true; attente = 600; }
-    if (C && r.paralysie_applique) { arcs(C); son("paralysie", { pan: C.pan, fichiers: r.sons_paralysie }); nombre(C, r.message_paralysie || "PARALYSÉ", "etat paralysie"); attente = 600; }
-    if (C && r.poison_applique) { dot(C, "poison"); if (!attente) son("poison", { pan: C.pan, vol: 0.6 }); }
+    if (C && r.paralysie_applique) { foudroie(C, true); son("paralysie", { pan: C.pan, fichiers: r.sons_paralysie }); nombre(C, r.message_paralysie || "PARALYSÉ", "etat paralysie"); attente = 600; }
+    if (C && r.poison_applique) { bouffee(C, "poison", 6); dot(C, "poison"); if (!attente) son("poison", { pan: C.pan, vol: 0.6 }); }
     if (C && (r["saignement_stacks_" + C.c] || 0) > C.saignement && !r["saignement_explosion_" + C.c]) { dot(C, "saignement"); son("saignement", { pan: C.pan, vol: 0.7 }); }
     for (const X of [F.attaquant, F.defenseur]) {
       if (r["saignement_explosion_" + X.c]) { explosionSaignement(X, r["degats_explosion_saignement_" + X.c] || 0); attente = 700; }
@@ -960,7 +1032,10 @@ function arene(main, ctx, opts) {
       anime(voile.querySelector(".intro-vs"), [{ transform: "scale(3)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }], 420, { retard: 280 });
     }
     son("esquive", { pan: 0 });
-    await dormir(700);
+    if (window.SFX) { SFX.musique.coupee = !prefMusique.get(); SFX.musique.jouer(); }
+    await dormir(300);
+    son("explosion_petite", { vol: 0.8 }); secouer(voile.querySelector(".intro-ligne"), 10, 380);
+    await dormir(420);
     for (const t of ["3", "2", "1"]) {
       compte.textContent = t; son("decompte");
       if (!App.reduit) anime(compte, [{ transform: "scale(1.8)", opacity: 0 }, { transform: "scale(1)", opacity: 1, offset: 0.3 }, { transform: "scale(.9)", opacity: 0.2 }], 520, { fill: "none" });
@@ -977,10 +1052,13 @@ function arene(main, ctx, opts) {
     try {
       await decompte(v);
       for (let i = prochain; i < n; i++) {
+        // Coup final au ralenti.
+        if (i === n - 1 && gagnant) { ralenti = 0.55; appliquerRythme(); }
         await tour(rounds[i], i);
         appliquer(rounds[i]); prochain = i + 1;
         rendreTout(true);
-        await dormir(rounds[i].etourdi || rounds[i].paralysie ? 260 : 420);
+        F.attaquant.dom.racine.classList.remove("actif"); F.defenseur.dom.racine.classList.remove("actif");
+        if (i < n - 1) await dormir(rounds[i].etourdi || rounds[i].paralysie ? 380 : 650);
       }
       await finale();
     } catch (e) { if (e !== ARRET) { console.error(e); passer(); } }
@@ -998,64 +1076,82 @@ function arene(main, ctx, opts) {
     prochain = n;
     const r = rounds[n - 1];
     if (r) { numTour.textContent = String(r.round ?? n); log.textContent = lignes[n - 1].map((x) => x.texte).join(" "); }
+    ajouterFeed(n - 1);
     rendreTout(false);
     finale().catch((e) => { if (e !== ARRET) console.error(e); });
   }
 
   const gagnant = R.egalite ? null : (R.vainqueur || (opts.duel || {}).vainqueur_login || (opts.resultat || {}).vainqueur_login || null);
   async function finale() {
-    fini = true;
+    fini = true; ralenti = 1; appliquerRythme();
     racine.classList.remove("fatigue"); racine.classList.add("terminee");
     bPause.disabled = true; bPasser.disabled = true;
+    F.attaquant.dom.racine.classList.remove("actif"); F.defenseur.dom.racine.classList.remove("actif");
     const V = gagnant ? de(gagnant) : null, P = V ? autre(V) : null;
+    if (window.SFX) SFX.musique.arreter(P ? 0.5 : 1.6);
     if (P) {
       P.ko = true; rendre(P, false);
       await ko(P);
       V.dom.racine.classList.add("vainqueur");
-      son(V.login === moi || P.login !== moi ? "victoire" : "defaite");
+      triomphe(V);
+      const perdu = P.login === moi;
+      son(perdu ? "defaite" : "victoire", { fichiers: perdu ? "lose.mp3" : "win.mp3" });
     } else {
       F.attaquant.dom.racine.classList.add("nul"); F.defenseur.dom.racine.classList.add("nul");
       son("egalite");
     }
     const j = jeton;
-    await new Promise((ok) => setTimeout(ok, App.reduit ? 200 : 900));
+    await new Promise((ok) => setTimeout(ok, App.reduit ? 200 : 1400));
     if (j !== jeton) return;
     outro(V);
   }
+  // K.O. : arrêt sur image, le portrait vole en éclats, « K.O. » s'écrase au centre de l'arène.
   async function ko(X) {
-    const p = pos(X.dom.portrait);
-    son("ko", { pan: X.pan });
+    const p = pos(X.dom.portrait), z = pos(scene);
+    son("ko", { pan: X.pan, fichiers: "mort_1.mp3" });
+    son("explosion", { pan: X.pan, vol: 0.5 });
     if (!App.reduit) {
-      flashArene("blanc", 300);
-      eclatsVisage(X, p);
-      // L'armure cède
-      const s = X.dom.sArmure, carte = s.querySelector(".carte, .case-vide");
-      if (carte) {
-        son("armure_brisee", { pan: X.pan, retard: 0.25 });
-        const q = pos(carte);
-        for (const moitie of ["g", "d"]) {
-          const c = carte.cloneNode(true); c.classList.add("moitie", moitie);
-          const e = point("moitie-armure", q.x, q.y, { width: q.w + "px" }); e.append(c);
-          anime(e, [{ transform: T(q.x, q.y), opacity: 1 }, { transform: T(q.x + (moitie === "g" ? -18 : 18), q.y + 40, `rotate(${moitie === "g" ? -14 : 12}deg)`), opacity: 0.9, offset: 0.5 }, { transform: T(q.x + (moitie === "g" ? -30 : 30), q.y + 90, `rotate(${moitie === "g" ? -24 : 22}deg)`), opacity: 0 }], 1300, { retirer: true, retard: 250, ease: "cubic-bezier(.4,0,.8,.6)" });
-        }
-      }
+      geler(170);
+      flashArene("blanc", 460);
+      exploserVisage(X, p);
+      onde(p.x, p.y, "", 3.6, 720); onde(p.x, p.y, "sang", 2.4, 620);
+      particules(p.x, p.y, 26, "debris", p.w * 1.1, 1100, 90); particules(p.x, p.y, 18, "etincelle or", p.w, 800);
+      secouer(scene, 16, 560); zoom(0.05, 620);
     }
-    X.dom.sArmure.dataset.etape = "5";
     X.dom.racine.classList.add("vaincu");
-    X.dom.portrait.append(el("span", { class: "tampon-ko", texte: "K.O." }));
+    await new Promise((ok) => setTimeout(ok, App.reduit ? 100 : 480));
+    const tampon = point("tampon-ko", p.x, p.y, {}); tampon.textContent = "K.O.";
+    const geant = point("ko-geant", z.x, z.y - z.h * 0.04, {}); geant.textContent = "K.O.";
+    son("crit", { vol: 0.8 }); son("explosion_petite", { vol: 0.9 });
+    if (!App.reduit) {
+      anime(tampon, [{ transform: T(p.x, p.y, "rotate(-16deg) scale(2.6)"), opacity: 0 }, { transform: T(p.x, p.y, "rotate(-13deg) scale(.88)"), opacity: 1, offset: 0.6 }, { transform: T(p.x, p.y, "rotate(-15deg) scale(1)"), opacity: 1 }], 420, { ease: "cubic-bezier(.2,.8,.3,1.3)" });
+      anime(geant, [{ transform: T(z.x, z.y - z.h * 0.04, "scale(3.2)"), opacity: 0 }, { transform: T(z.x, z.y - z.h * 0.04, "scale(.92)"), opacity: 1, offset: 0.45 }, { transform: T(z.x, z.y - z.h * 0.04, "scale(1)"), opacity: 1 }], 520, { ease: "cubic-bezier(.2,.8,.3,1.2)" });
+      secouer(scene, 10, 360);
+    } else { tampon.style.transform = T(p.x, p.y, "rotate(-15deg)"); }
     await new Promise((ok) => setTimeout(ok, App.reduit ? 150 : 1100));
+    if (!App.reduit) anime(geant, [{ opacity: 1 }, { opacity: 0 }], 500, { retirer: true, ease: "linear" }); else geant.remove();
   }
-  function eclatsVisage(X, p) {
-    const n0 = 12, cx = 50 + hasard(-12, 12), cy = 45 + hasard(-12, 12);
-    const bord = (a) => { const x = 50 + Math.cos(a) * 80, y = 50 + Math.sin(a) * 80; return [Math.max(0, Math.min(100, x)), Math.max(0, Math.min(100, y))]; };
-    for (let i = 0; i < n0; i++) {
-      const a1 = (i / n0) * Math.PI * 2 + hasard(-0.1, 0.1), a2 = ((i + 1) / n0) * Math.PI * 2;
-      const [x1, y1] = bord(a1), [x2, y2] = bord(a2);
-      const e = point("eclat-visage", p.x, p.y, { width: p.w + "px", height: p.h + "px", fontSize: (p.w * 0.16).toFixed(1) + "px", clipPath: `polygon(${cx}% ${cy}%, ${x1}% ${y1}%, ${x2}% ${y2}%)` });
+  // 6 × 6 éclats du visage : une partie s'envole, le reste retombe en place, brisé et grisé.
+  function exploserVisage(X, p) {
+    const n = 6, rayon = getComputedStyle(X.dom.portrait).borderRadius, pc = (v) => (v * 100 / n).toFixed(2) + "%";
+    for (let li = 0; li < n; li++) for (let co = 0; co < n; co++) {
+      const reste = Math.random() < 0.38;
+      const e = point("eclat-visage", p.x, p.y, { width: p.w + "px", height: p.h + "px", fontSize: (p.w * 0.16).toFixed(1) + "px", borderRadius: rayon,
+        clipPath: `inset(${pc(li)} ${pc(n - co - 1)} ${pc(n - li - 1)} ${pc(co)})`, transformOrigin: `${pc(co + 0.5)} ${pc(li + 0.5)}` });
       e.append(X.dom.vis.cloneNode(true));
-      const am = (a1 + a2) / 2, dist = hasard(40, 120);
-      anime(e, [{ transform: T(p.x, p.y), opacity: 1 }, { transform: T(p.x + Math.cos(am) * dist, p.y + Math.sin(am) * dist + 60, `rotate(${hasard(-70, 70).toFixed(0)}deg) scale(.9)`), opacity: 0 }], hasard(800, 1200), { retirer: true, ease: "cubic-bezier(.3,.6,.6,1)" });
+      const a = Math.atan2((li + 0.5) / n - 0.5, (co + 0.5) / n - 0.5) + hasard(-0.5, 0.5);
+      const dist = reste ? hasard(3, 9) : hasard(p.w * 0.5, p.w * 1.3), rot = reste ? hasard(-14, 14) : hasard(-300, 300);
+      anime(e, [{ transform: T(p.x, p.y), opacity: 1, filter: "brightness(2.2)" },
+        { transform: T(p.x + Math.cos(a) * dist, p.y + Math.sin(a) * dist + (reste ? 2 : p.h * 0.5), `rotate(${rot.toFixed(0)}deg) scale(${reste ? 1 : 0.6})`), opacity: reste ? 0.85 : 0, filter: reste ? "grayscale(1) brightness(.6)" : "brightness(1)" }],
+        reste ? 520 : hasard(900, 1400), { retirer: !reste, ease: reste ? "cubic-bezier(.2,.8,.3,1)" : "cubic-bezier(.15,.7,.35,1)" });
     }
+    X.dom.portrait.classList.add("detruit");
+  }
+  function triomphe(V) {
+    if (App.reduit) return;
+    const p = pos(V.dom.portrait);
+    onde(p.x, p.y, "or", 2.8, 820); onde(p.x, p.y, "or", 1.9, 640);
+    particules(p.x, p.y - p.h * 0.2, 30, "etincelle or", p.w * 1.2, 1400, -90);
   }
 
   function outro(V) {
@@ -1109,12 +1205,20 @@ function arene(main, ctx, opts) {
     else racine.requestFullscreen().catch(() => {});
   }
 
+  // Fichiers de l'ancien site (bruitages choisis par objet, K.O., jingles) chargés avant le premier coup.
+  function prechargerSons() {
+    if (!window.SFX) return;
+    const l = ["mort_1.mp3", "win.mp3", "lose.mp3", R.arme_attaquant_sons, R.arme_defenseur_sons, R.strategeme_attaquant_sons, R.strategeme_defenseur_sons];
+    for (const r of rounds) l.push(r.sons_override, r.sons_parade, r.sons_riposte, r.sons_paralysie, r.soin_sons, r.sons_dernier_souffle_attaquant, r.sons_dernier_souffle_defenseur, r.sons_explosion_saignement_attaquant, r.sons_explosion_saignement_defenseur);
+    SFX.precharger(l.filter(Boolean).join(","));
+  }
+  if (window.SFX) { SFX.musique.arreter(0.3); SFX.musique.preparer(MUSIQUES); }
   return {
-    jouer() { demarrerSon(); derouler(intro(false)); },
+    jouer() { demarrerSon(); prechargerSons(); derouler(intro(false)); },
     porte() {
       const v = intro(true);
       v.bouton.focus({ preventScroll: true });
-      v.bouton.addEventListener("click", () => { demarrerSon(); v.bouton.remove(); derouler(v); }, { once: true });
+      v.bouton.addEventListener("click", () => { demarrerSon(); prechargerSons(); v.bouton.remove(); derouler(v); }, { once: true });
     },
   };
 }
@@ -1150,14 +1254,25 @@ function fissuresPortrait(seed) {
   for (let i = 0; i < 5; i++) g[3].append(svgEl("ellipse", { cx: (15 + rnd() * 70).toFixed(1), cy: (40 + rnd() * 55).toFixed(1), rx: (2 + rnd() * 5).toFixed(1), ry: (1.5 + rnd() * 3).toFixed(1), class: "sang" }));
   return svg;
 }
-function fissuresArmure(seed) {
-  const rnd = alea(seed), svg = svgEl("svg", { class: "fissures-armure", viewBox: "0 0 50 70", preserveAspectRatio: "none", "aria-hidden": "true" });
-  const ix = 18 + rnd() * 14, iy = 26 + rnd() * 16;
-  [1, 2, 3, 4].forEach((e) => {
-    const g = svgEl("g", { "data-e": String(e) }); svg.append(g);
-    for (let i = 0; i < 2 + e; i++) { const a = rnd() * Math.PI * 2; trait(g, fissure(rnd, ix, iy, a, 10 + e * 6 + rnd() * 10, 3 + e), 0.5 + e * 0.12); }
-  });
-  return svg;
+// Calques d'aura des états : le CSS les anime ; seule l'électricité a besoin d'un tracé.
+function auras(seed) {
+  const rnd = alea(seed), d = document.createElement("div");
+  d.className = "auras"; d.setAttribute("aria-hidden", "true");
+  const n = (k, tag = "i") => Array.from({ length: k }, (_, i) => `<${tag} style="--k:${i}"></${tag}>`).join("");
+  d.innerHTML = `<div class="au au-poison">${n(3)}${n(6, "b")}</div><div class="au au-antisoin">${n(3)}${n(4, "b")}</div>` +
+    `<div class="au au-feu">${n(9)}${n(7, "b")}</div><div class="au au-sang">${n(7)}</div>` +
+    `<div class="au au-stun">${[0, 1, 2].map((i) => `<i style="--k:${i}"><b></b></i>`).join("")}</div>` +
+    `<div class="au au-bouclier"></div><div class="au au-marque"><i></i></div><div class="au au-brise"></div>` +
+    `<div class="au au-rage"></div><div class="au au-envol">${n(3)}</div><div class="au au-souffle"></div>`;
+  // Arcs électriques le long du bord du portrait (qui occupe 13 à 87 % du calque).
+  const svg = svgEl("svg", { class: "au au-elec", viewBox: "0 0 100 100", preserveAspectRatio: "none" });
+  for (let i = 0; i < 6; i++) {
+    const a0 = rnd() * Math.PI * 2, span = 0.7 + rnd() * 0.8, pts = [];
+    for (let k = 0; k <= 9; k++) { const a = a0 + (span * k) / 9, r = 37 + rnd() * 11; pts.push((50 + Math.cos(a) * r).toFixed(1) + "," + (50 + Math.sin(a) * r).toFixed(1)); }
+    svg.append(svgEl("polyline", { points: pts.join(" "), style: `--k:${i}` }));
+  }
+  d.append(svg);
+  return d;
 }
 
 // ---------------------------------------------------------------------

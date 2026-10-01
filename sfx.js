@@ -2,16 +2,18 @@
    Stream RPG — moteur de bruitages des combats (Web Audio, sans fichier)
    window.SFX : synthèse en couches (bruits filtrés, balayages, saturation,
    réverbe générée), panoramique gauche/droite par combattant.
-   Remplacement optionnel : si sons/sons.json (liste de fichiers) existe à côté
-   de la page, les noms de sons legacy du replay (ex. "sword_slash_1.mp3") sont
-   joués depuis sons/ ; sinon, synthèse.
+   Fichiers : les noms de sons du replay (ex. "sword_slash_1.mp3", choisis par
+   objet dans le catalogue) sont joués depuis le dossier sons/ de l'ancien site
+   (/rpg/sons/, même domaine) ; un fichier absent retombe sur la synthèse.
+   Musique : SFX.musique enchaîne les pistes de sons/musiques/ en fondu.
    ===================================================================== */
 "use strict";
 (function () {
 let ctx = null, maitre = null, reverb = null, bruitBuf = null, actif = true, volume = 0.8;
 const courbes = new Map();
 const fichiers = new Map(); // nom -> AudioBuffer | Promise
-let manifeste = null; // Set des fichiers présents dans sons/, ou null
+// ponytail: dépend de /rpg/sons/ sur le même domaine ; copier sons/ lors de la migration Cloudflare.
+const BASE = location.pathname.startsWith("/rpg/") ? "sons/" : "/rpg/sons/";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const al = (a, b) => a + Math.random() * (b - a);
@@ -29,7 +31,6 @@ function demarrer() {
     reverb = ctx.createConvolver(); reverb.buffer = impulsion(2.4, 2.8);
     const retour = ctx.createGain(); retour.gain.value = 0.3;
     reverb.connect(retour).connect(maitre);
-    chargerManifeste();
   }
   if (ctx.state === "suspended") ctx.resume();
   return true;
@@ -184,12 +185,10 @@ const SONS = {
   stance(s, t) { bruit(s, t, { type: "highpass", f: 3000, vol: 0.4, d: 0.015, a: 0.001 }); bruit(s, t + 0.09, { type: "highpass", f: 2600, vol: 0.4, d: 0.015, a: 0.001 }); osc(s, t + 0.1, { type: "sawtooth", f: 200, f2: 820, vol: 0.09, d: 0.35, lp: 2200 }); metal(s, t + 0.45, 1250, [1, 1.5, 2.2], 0.4, 0.05); },
   execution(s, t) { osc(s, t, { f: 55, vol: 0.5, a: 0.01, d: 0.35, dist: 4 }); metal(s, t, 1100, [1, 1.19], 0.4, 0.05); },
   fatigue(s, t) { osc(s, t, { type: "square", f: 900, vol: 0.05, d: 0.02 }); osc(s, t + 0.25, { type: "square", f: 620, vol: 0.05, d: 0.02 }); osc(s, t, { f: 55, vol: 0.3, a: 0.05, d: 0.4 }); },
-  // --- Cartes et armure
+  // --- Cartes
   carte(s, t) { bruit(s, t, { type: "highpass", f: 2600, vol: 0.32, a: 0.001, d: 0.035 }); bruit(s, t + 0.04, { type: "bandpass", f: 5200, f2: 1900, q: 1, vol: 0.18, a: 0.01, d: 0.07 }); },
   carte_retour(s, t) { bruit(s, t, { type: "bandpass", f: 3000, f2: 1500, q: 1, vol: 0.14, a: 0.01, d: 0.08 }); },
   carte_brule(s, t) { bruit(s, t, { type: "bandpass", f: 380, f2: 2600, q: 0.8, vol: 0.38, a: 0.3, d: 0.9 }); crepite(s, t + 0.1, 1.1, 26, 0.28); bruit(s, t, { type: "lowpass", f: 180, vol: 0.2, a: 0.2, d: 1 }); },
-  armure(s, t, o) { const n = o.etape || 1; bruit(s, t, { type: "bandpass", f: 2300 + n * 450, q: 5, vol: 0.45, a: 0.001, d: 0.04 }); bruit(s, t + 0.01, { type: "highpass", f: 4200, vol: 0.2, d: 0.02, a: 0.001 }); osc(s, t, { f: 95 - n * 6, vol: 0.28, a: 0.005, d: 0.12 }); if (n >= 3) verre(s, t + 0.03, 0.025, 6); },
-  armure_brisee(s, t) { verre(s, t, 0.05, 18); boum(s, t, 0.4); debris(s, t + 0.1, 12, 0.9, 0.2); },
   ko(s, t) { osc(s, t, { f: 56, f2: 26, vol: 0.95, a: 0.004, d: 1.3, dist: 3 }); bruit(s, t, { type: "lowpass", f: 320, f2: 60, vol: 0.5, a: 0.004, d: 1.3 }); verre(s, t + 0.05, 0.03, 8); },
   // --- Interface
   tic(s, t) { osc(s, t, { type: "square", f: 1250, vol: 0.04, d: 0.03, a: 0.001 }); },
@@ -240,21 +239,70 @@ function profilStrategeme(o) {
 }
 
 // ---------------------------------------------------------------------
-// Fichiers optionnels (sons/sons.json)
+// Fichiers de l'ancien site (sons/) : chargés à la demande, synthèse en attendant
 // ---------------------------------------------------------------------
-function chargerManifeste() {
-  if (window.App && App.DEMO) return; // l'aperçu n'embarque aucun son
-  fetch("sons/sons.json").then((r) => (r.ok ? r.json() : null)).then((l) => { if (Array.isArray(l)) manifeste = new Set(l.map(String)); }).catch(() => {});
-}
+const nomsFichiers = (csv) => String(csv || "").split(",").map((s) => s.trim()).filter((s) => /^[\w.-]+\.mp3$/.test(s));
 function fichierDisponible(csv) {
-  if (!manifeste || !csv) return null;
-  const l = String(csv).split(",").map((s) => s.trim()).filter((s) => /^[\w.-]+\.mp3$/.test(s) && manifeste.has(s));
+  if (window.App && App.DEMO) return null; // l'aperçu n'embarque aucun son
+  const l = nomsFichiers(csv).filter((s) => fichiers.get(s) !== null); // null = absent du dossier
   return l.length ? l[Math.floor(Math.random() * l.length)] : null;
 }
 function tampon(nom) {
-  if (!fichiers.has(nom)) fichiers.set(nom, fetch("sons/" + nom).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)).then((buf) => { fichiers.set(nom, buf); return buf; }).catch(() => { fichiers.set(nom, null); return null; }));
+  if (!fichiers.has(nom)) fichiers.set(nom, fetch(BASE + nom).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .then((b) => ctx.decodeAudioData(b)).then((buf) => { fichiers.set(nom, buf); return buf; }).catch(() => { fichiers.set(nom, null); return null; }));
   return fichiers.get(nom);
 }
+
+// ---------------------------------------------------------------------
+// Musique de combat : une piste tirée au hasard ; quand elle se termine, une
+// autre (jamais la même) prend le relais en fondu enchaîné.
+// ---------------------------------------------------------------------
+const musique = (() => {
+  const VOL = 0.3, FONDU = 1.6;
+  let liste = [], derniere = null, premiere = null, bus = null, voix = [], veille = null, coupee = false, enCours = false;
+  const octets = new Map(), decodes = new Map();
+  const choisir = () => { const l = liste.filter((x) => x !== derniere); return l.length ? l[Math.floor(Math.random() * l.length)] : null; };
+  const telecharger = (nom) => { if (!octets.has(nom)) octets.set(nom, fetch(BASE + "musiques/" + nom).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)); return octets.get(nom); };
+  const decoder = (nom) => {
+    if (!decodes.has(nom)) decodes.set(nom, telecharger(nom).then((b) => (b ? ctx.decodeAudioData(b.slice(0)) : null)).catch(() => null));
+    return decodes.get(nom);
+  };
+  async function lancer(nom) {
+    const buf = await decoder(nom);
+    if (!enCours || !buf) return;
+    if (!bus) { bus = ctx.createGain(); bus.connect(maitre); }
+    bus.gain.value = coupee ? 0 : VOL;
+    const src = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime;
+    src.buffer = buf; src.connect(g).connect(bus);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(1, t + FONDU);
+    src.start(t);
+    const v = { src, g, fin: t + buf.duration };
+    voix.push(v); src.onended = () => { voix = voix.filter((x) => x !== v); };
+    derniere = nom;
+    const suivante = choisir(); if (suivante) decoder(suivante);
+    // L'horloge audio s'arrête quand le combat est en pause : le relais suit le morceau, pas la montre.
+    clearInterval(veille);
+    veille = setInterval(() => {
+      if (!enCours || ctx.currentTime < v.fin - FONDU) return;
+      clearInterval(veille);
+      v.g.gain.setValueAtTime(v.g.gain.value, ctx.currentTime); v.g.gain.linearRampToValueAtTime(0.0001, v.fin);
+      if (suivante) lancer(suivante);
+    }, 250);
+  }
+  return {
+    // Avant le geste : choisit la piste et commence le téléchargement.
+    preparer(l) { liste = l.slice(); if (!premiere) premiere = choisir(); if (premiere) telecharger(premiere); },
+    jouer() { if (enCours || !ctx || !premiere || (window.App && App.DEMO)) return; enCours = true; lancer(premiere); },
+    arreter(fondu = 1.2) {
+      enCours = false; clearInterval(veille); premiere = null;
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      voix.forEach((v) => { v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(Math.max(0.0001, v.g.gain.value), t); v.g.gain.exponentialRampToValueAtTime(0.0001, t + fondu); try { v.src.stop(t + fondu + 0.05); } catch (e) {} });
+    },
+    get coupee() { return coupee; },
+    set coupee(c) { coupee = !!c; if (bus && ctx) bus.gain.setTargetAtTime(coupee ? 0 : VOL, ctx.currentTime, 0.15); },
+  };
+})();
 
 // jouer("slash_katana", { pan, retard (s), fichiers: "a.mp3,b.mp3", vol, envoi })
 function jouer(nom, o = {}) {
@@ -278,7 +326,10 @@ function jouer(nom, o = {}) {
 
 window.SFX = {
   demarrer, jouer, profilArme, profilStrategeme,
-  precharger(csv) { if (!ctx || !manifeste) return; String(csv || "").split(",").map((s) => s.trim()).filter((s) => manifeste.has(s)).forEach(tampon); },
+  precharger(csv) { if (!ctx || (window.App && App.DEMO)) return; nomsFichiers(csv).forEach(tampon); },
+  musique,
+  // Pause du combat : coupe toute l'horloge audio (bruitages et musique).
+  suspendre(oui) { if (ctx && actif) (oui ? ctx.suspend() : ctx.resume()).catch(() => {}); },
   get actif() { return actif; },
   set actif(v) { actif = !!v; if (ctx) (actif ? ctx.resume() : ctx.suspend()).catch(() => {}); },
   get volume() { return volume; },
