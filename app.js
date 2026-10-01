@@ -368,9 +368,9 @@ App.fiche = (o, { niveau = 0, possede = null, curseur = true } = {}) => {
       el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom }),
       el("span", { class: "pilule", texte: sousTitre(o) }),
       o.set ? el("span", { class: "pilule", style: { "--c": "#e2483d" }, texte: "Set " + o.set }) : null),
-    el("p", {}, App.anim(o.data) ? App.anim(o.data) + ". " : "", "Niveau maximum : ", el("b", { texte: String(max) }), " (", String(max), " doublons).",
+    el("p", {}, App.anim(o.data) ? App.anim(o.data) + ". " : "", "Améliorations max : ", el("b", { texte: "+" + max }), " (", String(max), " doublons).",
       o.contributeur ? el("span", {}, " Imaginé par ", el("b", { texte: o.contributeur }), ".") : null),
-    possede !== null ? el("p", {}, possede ? el("b", { texte: "Dans ta collection · niveau " + niveau + " / " + max }) : "Pas encore dans ta collection.") : null);
+    possede !== null ? el("p", {}, possede ? el("b", { texte: "Dans ta collection · " + (niveau >= max ? "amélioration MAX" : "+" + niveau + " / +" + max) }) : "Pas encore dans ta collection.") : null);
   const corps = el("div", { class: "fiche-details", style: { display: "grid", gap: "22px" } });
   racine.append(el("div", { class: "fiche-haut" }, zoneCarte, titre), corps);
 
@@ -391,7 +391,7 @@ App.fiche = (o, { niveau = 0, possede = null, curseur = true } = {}) => {
     const us = App.usage(o, niv);
     if (us.length) blocs.push(bloc("Utilisation", lignes(us)));
     const pa = App.passifs(o, niv);
-    if (pa.length) blocs.push(bloc("Effets", el("div", {}, pa.map((p) => el("div", { class: "passif", html: p.long + (p.parNiveau ? `<small>Monte de ${nombre(p.parNiveau)} par niveau</small>` : (p.principal ? "<small>Valeur fixe, ne monte pas avec les niveaux</small>" : "")) })))));
+    if (pa.length) blocs.push(bloc("Effets", el("div", {}, pa.map((p) => el("div", { class: "passif", html: p.long + (p.parNiveau ? `<small>Monte de ${nombre(p.parNiveau)} par amélioration</small>` : (p.principal ? "<small>Valeur fixe, ne monte pas avec les améliorations</small>" : "")) })))));
     if (d.dureeStance > 0) {
       const sc2 = App.scalingsDe(d, true);
       blocs.push(bloc("Deuxième forme", el("div", { class: "passif", html:
@@ -411,13 +411,13 @@ App.fiche = (o, { niveau = 0, possede = null, curseur = true } = {}) => {
   function bloc(t, contenu) { return el("section", { class: "bloc-fiche" }, el("h4", { texte: t }), contenu); }
   function lignes(l) {
     return el("div", { class: "lignes" }, l.map(([n, v, inc, neg]) => el("div", { class: "ligne" }, el("span", { texte: n }),
-      el("b", { class: neg ? "negatif" : null }, String(v), inc ? el("span", { class: "gain", texte: "+" + nombre(inc) + "/niv" }) : null))));
+      el("b", { class: neg ? "negatif" : null }, String(v), inc ? el("span", { class: "gain", texte: "+" + nombre(inc) + " par amélioration" }) : null))));
   }
   if (curseur && max > 0) {
-    const out = el("output", { texte: "Niveau " + niv });
-    const range = el("input", { type: "range", min: 0, max, value: niv, "aria-label": "Voir l'objet à un autre niveau",
-      oninput: (e) => { niv = Number(e.target.value); out.textContent = niv >= max ? "Niveau max" : "Niveau " + niv; rendre(); } });
-    racine.append(el("section", { class: "bloc-fiche" }, el("h4", { texte: "Aperçu par niveau" }), el("div", { class: "curseur-niveau" }, range, out)));
+    const out = el("output", { texte: niv >= max ? "MAX" : "+" + niv });
+    const range = el("input", { type: "range", min: 0, max, value: niv, "aria-label": "Voir l'objet avec plus ou moins d'améliorations",
+      oninput: (e) => { niv = Number(e.target.value); out.textContent = niv >= max ? "MAX" : "+" + niv; rendre(); } });
+    racine.append(el("section", { class: "bloc-fiche" }, el("h4", { texte: "Aperçu par amélioration" }), el("div", { class: "curseur-niveau" }, range, out)));
   }
   rendre();
   return racine;

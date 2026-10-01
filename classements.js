@@ -13,7 +13,7 @@
     { id: "serie", titre: "Série record", note: "La plus longue série de victoires d'affilée.", valeur: (p) => p.serie_record, sec: (p) => (p.serie_actuelle > 0 ? "En cours : " + fmt(p.serie_actuelle) : "") },
     { id: "coup", titre: "Plus gros coup", note: "Les dégâts du coup le plus violent jamais porté en duel.", valeur: (p) => p.plus_gros_coup, sec: (p) => fmt(p.degats_infliges) + " dégâts au total" },
     { id: "degats", titre: "Dégâts infligés", note: "Le total des dégâts infligés en duel.", valeur: (p) => p.degats_infliges, sec: (p) => fmt(p.degats_subis) + " subis" },
-    { id: "collection", titre: "Collection", note: "Objets différents possédés. À égalité, les niveaux cumulés départagent.", valeur: (p) => p._distincts, departage: (p) => p._niveaux, sec: (p) => "Niveaux cumulés : " + fmt(p._niveaux) },
+    { id: "collection", titre: "Collection", note: "Objets différents possédés. À égalité, le total des améliorations départage.", valeur: (p) => p._distincts, departage: (p) => p._niveaux, sec: (p) => "Améliorations cumulées : " + fmt(p._niveaux) },
     { id: "lootbox", titre: "Lootbox ouvertes", note: "Lootbox ouvertes sur le site, légendaires comprises.", valeur: (p) => (p.lootbox_ouvertes || 0) + (p.lootbox_leg_ouvertes || 0), sec: (p) => (p.lootbox_leg_ouvertes ? "dont " + pluriel(p.lootbox_leg_ouvertes, "légendaire") : "") },
     { id: "medailles", titre: "Médailles", note: "Les médailles en poche en ce moment.", valeur: (p) => p.medailles, sec: () => "" },
     { id: "succes", titre: "Succès", note: "Nombre de succès débloqués.", valeur: (p) => p._succes, sec: (p) => p._paliers },

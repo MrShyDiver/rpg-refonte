@@ -64,13 +64,13 @@ App.demarrer("arsenal", async (main, ctx) => {
       return el("div", { class: "chiffre" }, el("b", { class: "num", texte: l.length }), el("span", { texte: s.pluriel }),
         el("small", { class: "repartition" }, parRarete(l).map(([r, n]) => el("span", { style: { "--c": `var(--${r})` }, title: RARETES[r].nom }, el("i", { texte: RARETES[r].lettre }), String(n)))));
     })),
-    el("p", { class: "plafonds" }, "Chaque doublon fait monter un objet d'un niveau, jusqu'à un plafond : ",
-      ORDRE_RARETE.flatMap((r, i) => [i ? " · " : "", el("span", { style: { "--c": `var(--${r})` }, texte: `${RARETES[r].nom} ${RARETES[r].max}` })]), "."));
+    el("p", { class: "plafonds" }, "Chaque doublon ajoute une amélioration (+1) à un objet, jusqu'à un plafond : ",
+      ORDRE_RARETE.flatMap((r, i) => [i ? " · " : "", el("span", { style: { "--c": `var(--${r})` }, texte: `${RARETES[r].nom} +${RARETES[r].max}` })]), "."));
 
   // ---------- Barre d'outils ----------
   const bouton = (v, nom, surClic) => el("button", { type: "button", "data-v": v, onclick: surClic }, nom);
   const btnVue = [["cartes", "Cartes"], ["tableau", "Tableau"]].map(([v, n]) => bouton(v, n, () => { f.vue = v; rendre(); }));
-  const btnNiv = [["base", "Base"], ["max", "Niveau max"]].map(([v, n]) => bouton(v, n, () => { f.niv = v; rendre(); }));
+  const btnNiv = [["base", "Base"], ["max", "Amélioré au max"]].map(([v, n]) => bouton(v, n, () => { f.niv = v; rendre(); }));
   const TABS = [["tout", "Tout"], ...Object.entries(SLOTS).map(([k, s]) => [k, s.pluriel])];
   const btnSlots = TABS.map(([k, nom]) => el("button", { type: "button", "data-v": k, onclick: () => { f.slot = k; rendre(); } }, nom, el("span", { class: "n num" })));
   const btnRar = ORDRE_RARETE.map((r) => el("button", { type: "button", class: "etiquette", "data-v": r, style: { "--c": `var(--${r})` }, onclick: () => { basculer(f.raretes, r); rendre(); } },
@@ -88,7 +88,7 @@ App.demarrer("arsenal", async (main, ctx) => {
   outils.append(
     el("div", { class: "rangee repliable" },
       el("div", { class: "onglets-b", role: "group", "aria-label": "Affichage" }, btnVue),
-      el("div", { class: "onglets-b", role: "group", "aria-label": "Niveau d'aperçu des valeurs" }, btnNiv)),
+      el("div", { class: "onglets-b", role: "group", "aria-label": "Valeurs affichées" }, btnNiv)),
     el("div", { class: "onglets-b defile repliable", role: "group", "aria-label": "Emplacement" }, btnSlots),
     el("div", { class: "puces repliable", role: "group", "aria-label": "Rareté" }, btnRar),
     el("div", { class: "puces repliable", role: "group", "aria-label": "Effets et set" }, btnEff),
@@ -153,7 +153,7 @@ App.demarrer("arsenal", async (main, ctx) => {
     zone.replaceChildren(f.vue === "tableau" ? tableau(vis) : el("div", { class: "grille-cartes" }, vis.map(caseCarte)));
   }
 
-  const marque = (o) => (possede(o) ? el("span", { class: "possede" }, icone("i-coche"), "Possédé · niv. " + (nivPossede(o) >= max(o) ? "MAX" : nivPossede(o))) : null);
+  const marque = (o) => (possede(o) ? el("span", { class: "possede" }, icone("i-coche"), "Possédé · " + (nivPossede(o) >= max(o) ? "MAX" : "+" + nivPossede(o))) : null);
 
   function caseCarte(o) {
     return el("div", { class: "case-carte" },
@@ -246,7 +246,7 @@ App.demarrer("arsenal", async (main, ctx) => {
     return [
       lig("Joueurs qui l'ont", det.length ? `${fmt(det.length)}${joueurs ? " · " + Math.round((det.length / joueurs) * 100) + " %" : ""}` : "Personne pour l'instant"),
       lig("L'ont équipé", fmt(equipent)),
-      lig("Plus haut niveau", meilleur < 0 ? "—" : meilleur >= max(o) ? "MAX" : "Niveau " + meilleur),
+      lig("Meilleure amélioration", meilleur < 0 ? "—" : meilleur >= max(o) ? "MAX" : "+" + meilleur),
     ];
   }
 

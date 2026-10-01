@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Sécurité : mêmes règles que jeu.html. Si tu modifies le script en bas de page, son empreinte
      sha256 change : regénère-la (sinon le navigateur refuse de l'exécuter). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js 'sha256-HKk1CTCjxh2E9uW/b4MMM8ABFhnsN6w8LRJ4Uvvvy3I='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js 'sha256-pa31YY/AIqGZLsqPBgv2Xrr6hHs4ys8bHmahl5ypo2c='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Stream RPG</title>
 <meta name="description" content="Le jeu de rôle de la chaîne MrShyDiver : gagne des lootbox en live, ouvre-les ici, équipe ton personnage et affronte le chat en duel.">
@@ -805,7 +805,7 @@ body { overflow-x: clip; }
       <section class="section" id="amelioration" aria-labelledby="t-amelio">
         <div class="colonne">
           <h2 id="t-amelio">Fais monter tes objets</h2>
-          <p class="chapeau">Chaque doublon ajoute un niveau à ton objet : ses dégâts, ses stats et son effet principal grimpent avec lui.</p>
+          <p class="chapeau">Chaque doublon ajoute une amélioration (+1) à ton objet : ses dégâts, ses stats et son effet principal grimpent avec lui.</p>
 
           <div class="atelier">
             <div id="carte-atelier"></div>
@@ -821,7 +821,7 @@ body { overflow-x: clip; }
           </div>
 
           <div class="plafonds" id="plafonds">
-            <p>Le niveau maximum dépend de la rareté :</p>
+            <p>Le nombre d'améliorations dépend de la rareté :</p>
           </div>
         </div>
       </section>
@@ -1391,8 +1391,8 @@ function poserBadge(d, t, silencieux) {
   const b = document.createElement("span");
   if (t.nouveau) { b.className = "badge-tirage nouveau"; b.textContent = "Nouveau !"; if (!silencieux) scintille(); }
   else if (t.niveau > t.max) { b.className = "badge-tirage max"; b.textContent = "Max · doublon en plus"; }
-  else if (t.niveau === t.max) { b.className = "badge-tirage max"; b.textContent = "Niveau MAX !"; if (!silencieux) accordMax(); }
-  else { b.className = "badge-tirage niveau"; b.textContent = "+1 · niv. " + t.niveau; if (!silencieux) cloche(t.niveau); }
+  else if (t.niveau === t.max) { b.className = "badge-tirage max"; b.textContent = "MAX !"; if (!silencieux) accordMax(); }
+  else { b.className = "badge-tirage niveau"; b.textContent = "Amélioration +" + t.niveau; if (!silencieux) cloche(t.niveau); }
   d.append(b);
 }
 function puce(texte, c) {
@@ -1410,7 +1410,7 @@ function recap(tirage) {
   });
   const nouveaux = tirage.filter((t) => t.nouveau).length, niveaux = tirage.filter((t) => !t.nouveau && t.niveau <= t.max).length;
   if (nouveaux) puce(nouveaux + " nouveau" + (nouveaux > 1 ? "x" : ""), "var(--legendaire)");
-  if (niveaux) puce("+" + niveaux + " niveau" + (niveaux > 1 ? "x" : ""), "var(--encre)");
+  if (niveaux) puce(niveaux + " amélioration" + (niveaux > 1 ? "s" : ""), "var(--encre)");
   const m = document.createElement("span");
   m.textContent = "Meilleur objet : " + tirage[tirage.length - 1].o.nom;
   $("recap").append(m);
@@ -1643,7 +1643,7 @@ remettreCoffre();
 
   function rendu(anime) {
     poserNiveau(c, niveau, max);
-    $("atelier-niveau").textContent = "Niveau " + niveau + " / " + max;
+    $("atelier-niveau").textContent = (niveau >= max ? "MAX" : "+" + niveau) + " / +" + max;
     [...$("jauge-niveau").children].forEach((p, i) => p.classList.toggle("plein", i < niveau));
     STATS.forEach((s, i) => {
       $("val-" + i).textContent = s.val(niveau);
@@ -1653,7 +1653,7 @@ remettreCoffre();
       if (anime && s.gain) { void g.offsetWidth; g.classList.add("vu"); }
     });
     $("btn-doublon").disabled = niveau >= max;
-    $("btn-doublon").textContent = niveau >= max ? "Niveau maximum atteint" : "Ajouter un doublon";
+    $("btn-doublon").textContent = niveau >= max ? "Améliorations au maximum" : "Ajouter un doublon";
   }
   $("btn-doublon").addEventListener("click", () => {
     if (niveau >= max) return;
@@ -1668,7 +1668,7 @@ remettreCoffre();
     const s = document.createElement("span");
     s.className = "plafond";
     s.style.setProperty("--c", "var(--" + r + ")");
-    s.innerHTML = "<i></i>" + RARETES[r].nom + " <b>niv. " + RARETES[r].max + "</b>";
+    s.innerHTML = "<i></i>" + RARETES[r].nom + " <b>+" + RARETES[r].max + "</b>";
     $("plafonds").append(s);
   });
 })();

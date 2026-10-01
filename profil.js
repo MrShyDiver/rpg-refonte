@@ -525,7 +525,7 @@
     // ---------- Outils ----------
     function autrui(o) { return proprio ? {} : { equipe: ["arme", "offhand", "armure", "strategeme"].some((k) => s.loadout && s.loadout[k] === o.numero) }; }
     function niveauEffectif(n) { const o = App.objet(n); return o ? Math.min(s.niv.get(n) || 0, App.niveauMax(o.rarete)) : 0; }
-    function libNiveau(o, niv) { const max = App.niveauMax(o.rarete); return niv >= max ? "Niveau MAX" : "Niv. " + niv + " / " + max; }
+    function libNiveau(o, niv) { const max = App.niveauMax(o.rarete); return niv >= max ? "MAX" : "+" + niv + " / +" + max; }
     function surplus(o, n) { const trop = (s.niv.get(n) || 0) - App.niveauMax(o.rarete); return proprio && trop > 0 ? " · +" + trop + " en trop" : ""; }
     function ficheObjet(o) {
       const possede = s.niv.has(o.numero);

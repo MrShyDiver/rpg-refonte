@@ -22,7 +22,7 @@ App.demarrer("aide", async (main) => {
   // ---------- La boucle ----------
   const ETAPES = [
     ["i-live", "En live", "Tes points de chaîne se changent en lootbox, en points de stats et en duels.", "#live", "Ce qui se gagne en live"],
-    ["i-coffre-ligne", "Lootbox", "Une lootbox, un objet. Les doublons font monter tes objets de niveau.", "lootbox.html", "Ouvrir mes lootbox"],
+    ["i-coffre-ligne", "Lootbox", "Une lootbox, un objet. Chaque doublon améliore ton objet de +1.", "lootbox.html", "Ouvrir mes lootbox"],
     ["i-bouclier", "Équipe-toi", "Une arme, une main gauche, une armure, un stratagème : c'est ton build.", "collection.html", "Ma collection"],
     ["i-epees", "Duels", "Défie qui tu veux, même hors ligne : ton build contre le sien.", "duels.html", "Choisir un adversaire"],
     ["i-medaille", "Médailles", "Chaque duel classé en rapporte, surtout si tu vises plus fort que toi.", "#medailles", "Comment en gagner"],
@@ -74,7 +74,7 @@ App.demarrer("aide", async (main) => {
   main.append(section("taux", "Lootbox et taux", "Les taux affichés ici sont ceux du serveur, lus en direct.", zoneTaux, zonePrix));
 
   // ---------- Lexique ----------
-  const plafonds = ORDRE_RARETE.map((r) => `${RARETES[r].nom} ${RARETES[r].max}`).join(" · ");
+  const plafonds = ORDRE_RARETE.map((r) => `${RARETES[r].nom} +${RARETES[r].max}`).join(" · ");
   const TERMES = [
     ["lootbox", "Lootbox", "Un coffre qui contient un objet tiré au hasard. Se gagne en live avec tes points de chaîne, ou s'achète en médailles à la boutique.", ["lootbox.html", "Ouvrir mes lootbox"]],
     ["lootbox-legendaire", "Lootbox légendaire", "Jamais de Commun, et bien plus de chances d'Épique et de Légendaire. Elles tombent quand la communauté abat le boss.", ["lootbox.html?type=legendaire", "Mes lootbox légendaires"]],
@@ -83,9 +83,9 @@ App.demarrer("aide", async (main) => {
     ["points", "Points", "Des points de classement gagnés en duel classé, selon l'issue et la catégorie du combat (jusqu'à 2 250 pour une victoire valeureuse). Ils servent aux classements.", ["classements.html", "Les classements"]],
     ["credits-reset", "Crédits de reset", "Tes points de stats rendus par un ticket de reset, en attente d'être replacés. Place-les sur ton profil : tant qu'ils attendent, ta puissance est au plus bas.", ["profil.html#points", "Placer mes points"]],
     ["ticket-reset", "Ticket de reset", "S'achète en médailles à la boutique. Il retire tous tes points de stats (Attaque, Défense, PV, Vitesse, Chance) et te les rend en crédits, pour les répartir autrement.", ["boutique.html", "La boutique"]],
-    ["puissance", "Puissance", "Une estimation de la force de ton build : tes stats, ton équipement et ses niveaux, simulés contre un mannequin standard. Elle sert à classer les joueurs et à définir les tranches des duels. C'est une tendance, pas une promesse : la chance et les effets font le reste.", ["profil.html", "Ma puissance"]],
-    ["doublons", "Doublons", "Tirer un objet que tu as déjà le fait monter d'un niveau. Une fois l'objet au niveau maximum, les exemplaires suivants sont « en trop » : revends-les ou troque-les.", ["collection.html", "Ma collection"]],
-    ["niveaux", "Niveaux", `Chaque niveau renforce les valeurs d'un objet (dégâts, stats, effets), jusqu'à un plafond qui dépend de sa rareté : ${plafonds}.`, ["arsenal.html", "Tous les objets"]],
+    ["puissance", "Puissance", "Une estimation de la force de ton build : tes stats, ton équipement et ses améliorations, simulés contre un mannequin standard. Elle sert à classer les joueurs et à définir les tranches des duels. C'est une tendance, pas une promesse : la chance et les effets font le reste.", ["profil.html", "Ma puissance"]],
+    ["doublons", "Doublons", "Tirer un objet que tu as déjà lui ajoute une amélioration (+1). Une fois l'objet au maximum (MAX), les exemplaires suivants sont « en trop » : revends-les ou troque-les.", ["collection.html", "Ma collection"]],
+    ["niveaux", "Améliorations", `Ton premier exemplaire est l'objet de base (+0). Chaque amélioration renforce ses valeurs (dégâts, stats, effets), jusqu'à un plafond qui dépend de sa rareté : ${plafonds}.`, ["arsenal.html", "Tous les objets"]],
     ["tranches", "Tranches de puissance", "On compare ta puissance à celle de ta cible. À 30 % d'écart ou moins, le combat est équitable. Au-delà, ta cible est plus forte (valeureux) ou plus faible (déshonorant).", ["#duels", "Les règles des duels"]],
     ["categories", "Catégories de combat", "Valeureuse : face à plus fort. Équitable : dans ta tranche. Déshonorable : face à plus faible. Elles décident des médailles et des points, et s'affichent dans ta carrière.", ["#duels", "Le barème"]],
     ["entrainement", "Entraînement", "Un duel gratuit réservé aux abonnés de la chaîne : aucun ticket, aucune récompense, aucun effet sur ton bilan. Idéal pour tester un build.", ["duels.html", "S'entraîner"]],
@@ -100,7 +100,7 @@ App.demarrer("aide", async (main) => {
   // ---------- FAQ ----------
   const FAQ = [
     ["Pourquoi ma victoire ne compte pas dans mon bilan ?", ["Deux cas. Un ", el("b", { texte: "entraînement" }), " ne compte jamais : c'est fait pour tester sans risque. Et les ", el("b", { texte: "comptes hors classement" }), " (le streamer et les comptes de test) jouent sans bilan ni stats : l'historique affiche le résultat, mais rien n'est compté."]],
-    ["Que deviennent mes doublons au-delà du niveau max ?", ["L'objet reste au niveau max, et chaque exemplaire en plus s'affiche « +N en trop ». Revends-les contre des médailles à la boutique, ou ", lien("#troc", "troque-les"), " par 10 contre un objet de rareté supérieure."]],
+    ["Que deviennent mes doublons une fois l'objet au MAX ?", ["L'objet reste MAX, et chaque exemplaire en plus s'affiche « +N en trop ». Revends-les contre des médailles à la boutique, ou ", lien("#troc", "troque-les"), " par 10 contre un objet de rareté supérieure."]],
     ["Est-ce que je peux perdre des objets ?", ["Pas en jouant : un duel ne te prend jamais d'objet ni de médaille, même perdu. Un objet ne quitte ta collection que si tu le vends ou le troques toi-même. Vendre ta dernière copie le retire aussi de ton équipement et de ta vitrine."]],
     ["Comment supprimer mon compte ?", ["Dans ", lien("parametres.html#suppression", "Paramètres, Zone dangereuse"), " : tape ton pseudo Twitch pour confirmer. C'est immédiat et définitif. Les duels déjà joués restent dans l'historique public. Tu peux d'abord ", lien("parametres.html#compte", "exporter tes données"), "."]],
     ["Je n'ai plus de lootbox, je fais comment ?", ["Passe en live : les récompenses de points de chaîne en donnent. Tu peux aussi en acheter en médailles à la ", lien("boutique.html", "boutique"), "."]],
@@ -125,10 +125,10 @@ App.demarrer("aide", async (main) => {
     const pc = (v) => (v ? nombre(Math.round(v * 10) / 10) + " %" : "—");
     zoneTaux.replaceChildren(el("div", { class: "aide-table-zone", tabindex: "0", role: "region", "aria-label": "Taux de rareté des lootbox" },
       el("table", { class: "aide-table" },
-        el("thead", {}, el("tr", {}, el("th", { scope: "col", texte: "Rareté" }), el("th", { scope: "col", texte: "Lootbox" }), el("th", { scope: "col", texte: "Lootbox légendaire" }), el("th", { scope: "col", texte: "Niveau max" }))),
+        el("thead", {}, el("tr", {}, el("th", { scope: "col", texte: "Rareté" }), el("th", { scope: "col", texte: "Lootbox" }), el("th", { scope: "col", texte: "Lootbox légendaire" }), el("th", { scope: "col", texte: "Améliorations max" }))),
         el("tbody", {}, ORDRE_RARETE.map((r) => el("tr", { style: { "--c": `var(--${r})` } },
           el("th", { scope: "row" }, el("span", { class: "pilule " + r, texte: RARETES[r].nom })),
-          el("td", { class: "num", texte: pc(std(r)) }), el("td", { class: "num", texte: pc(leg(r)) }), el("td", { class: "num", texte: String(RARETES[r].max) })))))),
+          el("td", { class: "num", texte: pc(std(r)) }), el("td", { class: "num", texte: pc(leg(r)) }), el("td", { class: "num", texte: "+" + RARETES[r].max })))))),
       actifs.some((o) => o.set === "Sekiro") ? el("p", { class: "mention", texte: "Set Sekiro : dans sa rareté, chaque objet du set a 3 fois plus de chances de tomber qu'un autre." }) : "");
     const val = (cle) => (reglages.find((x) => x.cle === cle) || {}).valeur;
     const morceaux = [["prix_lootbox", (v) => `une lootbox coûte ${fmt(v)} médailles à la boutique`], ["prix_ticket_reset", (v) => `un ticket de reset ${fmt(v)} médailles`], ["troc_cout", (v) => `un troc demande ${fmt(v)} doublons en trop`]]

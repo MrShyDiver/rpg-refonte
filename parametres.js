@@ -140,7 +140,7 @@
     function ouvrirSuppression() {
       const nbObjets = ctx.inventaire.size;
       const efface = [
-        ["Ta collection", nbObjets ? fmt(nbObjets) + " objet" + (nbObjets > 1 ? "s" : "") + " et tous leurs niveaux" : "tous tes objets et leurs niveaux"],
+        ["Ta collection", nbObjets ? fmt(nbObjets) + " objet" + (nbObjets > 1 ? "s" : "") + " et toutes leurs améliorations" : "tous tes objets et leurs améliorations"],
         ["Ton équipement", "arme, main gauche, armure et stratagème"],
         ["Ta vitrine", "les cartes exposées sur ton profil"],
         ["Tes succès", "toutes tes médailles et leurs dates"],

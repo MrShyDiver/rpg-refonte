@@ -185,7 +185,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     const notes = el("ul", { class: "lb-notes" },
       el("li", { texte: type === "legendaire" ? "Jamais de Commun dans une lootbox légendaire." : "La lootbox standard ne donne pas de Légendaire : ça, c'est le boss." }),
       actifs.some((o) => o.set === "Sekiro") ? el("li", { texte: "Set Sekiro : chances triplées dans sa rareté." }) : null,
-      el("li", { texte: "Un doublon fait monter l'objet d'un niveau, jusqu'à son plafond." }));
+      el("li", { texte: "Un doublon ajoute une amélioration (+1) à l'objet, jusqu'à son plafond." }));
     zoneTaux.replaceChildren(barre, liste, notes);
   }
 
@@ -332,9 +332,9 @@ App.demarrer("lootbox", async (main, ctx) => {
   }
   function resultat(t, max) {
     if (t.nouveau) return { cls: "nouveau", titre: "Nouveau !", texte: "nouveau dans ta collection" };
-    if (t.niveau < max) return { cls: "monte", titre: "Niv. " + (t.niveau - 1) + " → " + t.niveau, texte: "niveau " + (t.niveau - 1) + " vers " + t.niveau + " sur " + max, jauge: t.niveau / max };
-    if (t.niveau === max) return { cls: "max", titre: "Niveau MAX !", texte: "niveau maximum atteint", jauge: 1 };
-    return { cls: "trop", titre: "Doublon en trop", sous: "MAX · à revendre", texte: "déjà au niveau maximum, doublon en trop à revendre" };
+    if (t.niveau < max) return { cls: "monte", titre: "+" + (t.niveau - 1) + " → +" + t.niveau, texte: "amélioration +" + (t.niveau - 1) + " vers +" + t.niveau + " sur +" + max, jauge: t.niveau / max };
+    if (t.niveau === max) return { cls: "max", titre: "MAX !", texte: "améliorations au maximum", jauge: 1 };
+    return { cls: "trop", titre: "Doublon en trop", sous: "MAX · à revendre", texte: "déjà amélioré au maximum, doublon en trop à revendre" };
   }
   function creerCarteTable(t) {
     const o = App.objet(t.numero) || { numero: t.numero, nom: t.nom, rarete: t.rarete, slot: "", set: "", actif: true, data: { rarete: t.rarete }, image: t.image || "", contributeur: "" };
@@ -503,7 +503,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     bilan.replaceChildren(...[
       el("b", { texte: pluriel(tirages.length, "objet") }),
       nouveaux ? el("span", { class: "lb-bilan-nouveau", texte: pluriel(nouveaux, "nouveau", "nouveaux") }) : null,
-      montees ? el("span", { texte: pluriel(montees, "montée", "montées") + " de niveau" }) : null,
+      montees ? el("span", { texte: pluriel(montees, "amélioration", "améliorations") }) : null,
       trop ? el("span", { texte: pluriel(trop, "doublon") + " en trop" }) : null,
       el("span", {}, "meilleur : ", el("b", { style: { color: cMax }, texte: RARETES[ORDRE_RARETE[rangMax]].nom }))].filter(Boolean));
     histo = [...tirages.map((t) => ({ numero: t.numero, niveau: t.niveau, nouveau: !!t.nouveau })).reverse(), ...histo].slice(0, 40);

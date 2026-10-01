@@ -3,7 +3,7 @@
 (function () {
 const { el, icone, fmt, date, RARETES, ORDRE_RARETE, SLOTS, EFFETS, rangRarete } = App;
 const COLS = ["arme", "offhand", "armure", "strategeme"];
-const TRIS = [["rarete", "Rareté"], ["niveau", "Niveau"], ["numero", "Numéro"], ["recent", "Récemment obtenu"]];
+const TRIS = [["rarete", "Rareté"], ["niveau", "Amélioration"], ["numero", "Numéro"], ["recent", "Récemment obtenu"]];
 const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const basculer = (set, v) => (set.has(v) ? set.delete(v) : set.add(v));
 const lienAide = (ancre, sujet) => el("a", { class: "lien-aide", href: "aide.html#" + ancre, "aria-label": "Aide : " + sujet, title: "Aide : " + sujet, texte: "?" });
@@ -48,13 +48,13 @@ App.demarrer("collection", async (main, ctx) => {
     el("header", { class: "entete-page entete-objets" },
       el("div", {},
         el("h1", { texte: "Ma collection" }),
-        el("p", {}, `${nbActifs} objets différents sur ${actifs.length}. Chaque doublon fait monter un objet d'un niveau, jusqu'à son plafond.`, lienAide("doublons", "doublons et niveaux"))),
+        el("p", {}, `${nbActifs} objets différents sur ${actifs.length}. Chaque doublon ajoute une amélioration (+1) à un objet, jusqu'à son plafond.`, lienAide("doublons", "doublons et améliorations"))),
       el("div", { class: "actions" }, el("a", { class: "btn-second", href: "arsenal.html" }, icone("i-livre"), "Tout l'arsenal"))),
     resume, stats);
   stats.append(
     el("div", { class: "grille-chiffres" },
       el("div", { class: "chiffre" }, el("b", { class: "num", texte: `${nbActifs} / ${actifs.length}` }), el("span", { texte: "Objets différents" }), el("small", { texte: `${pct} % du jeu` })),
-      el("div", { class: "chiffre" }, el("b", { class: "num", texte: fmt(auMax) }), el("span", { texte: "Au niveau max" })),
+      el("div", { class: "chiffre" }, el("b", { class: "num", texte: fmt(auMax) }), el("span", { texte: "Améliorés au max" })),
       el("div", { class: "chiffre" }, el("b", { class: "num", texte: fmt(copies) }), el("span", { texte: "Exemplaires en tout" })),
       el("a", { class: "chiffre chiffre-lien", href: "boutique.html#vendre" }, el("b", { class: "num", texte: fmt(trop) }), el("span", { texte: "Doublons à revendre" }),
         el("small", { texte: trop ? "Vendre ou troquer" : "Rien en trop pour l'instant" }))),
@@ -150,7 +150,7 @@ App.demarrer("collection", async (main, ctx) => {
       grille.replaceChildren(el("div", { class: "vide vide-large" },
         icone("i-coffre", "coffre-vide"),
         el("b", { texte: "Ta collection est vide" }),
-        "Ouvre ta première lootbox : chaque objet tiré atterrit ici, et ses doublons le font monter de niveau.",
+        "Ouvre ta première lootbox : chaque objet tiré atterrit ici, et chacun de ses doublons l'améliore de +1.",
         el("div", { class: "actions" },
           el("a", { class: "btn-principal", href: "lootbox.html" }, icone("i-coffre-ligne"), "Ouvrir une lootbox"),
           el("button", { type: "button", class: "btn-second", onclick: () => { f.manquants = true; rendre(); } }, "Voir tout ce qui existe"))));
@@ -173,7 +173,7 @@ App.demarrer("collection", async (main, ctx) => {
       zone(App.carte(o, { niveau: n, equipe: eq.has(o.numero) })),
       el("div", { class: "jauge-niv", "aria-hidden": "true" }, el("i", { style: { width: (n / m) * 100 + "%" } })),
       el("div", { class: "meta-carte" },
-        el("span", { class: "num" + (n >= m ? " est-max" : ""), texte: n >= m ? "MAX" : `Niv. ${n} / ${m}` }),
+        el("span", { class: "num" + (n >= m ? " est-max" : ""), texte: n >= m ? "MAX" : `+${n} / +${m}` }),
         t ? el("span", { class: "trop num", texte: `+${t} en trop` }) : null));
   }
 
@@ -189,7 +189,7 @@ App.demarrer("collection", async (main, ctx) => {
       contenu.push(el("section", { class: "bloc-fiche" }, el("h4", { texte: "Tes exemplaires" }),
         el("div", { class: "lignes" },
           lig("Exemplaires possédés", fmt(l.niveau + 1)),
-          lig("Niveau", eff(o) >= max(o) ? `MAX (${max(o)})` : `${eff(o)} / ${max(o)}`),
+          lig("Amélioration", eff(o) >= max(o) ? `MAX (+${max(o)})` : `+${eff(o)} / +${max(o)}`),
           t ? lig("En trop, à revendre", "+" + fmt(t)) : null,
           l.obtenu_le ? lig("Obtenu le", date(l.obtenu_le)) : null)));
       pied = piedEquiper(o);

@@ -43,7 +43,7 @@ App.demarrer("boutique", async (main, ctx) => {
 
   // ---------- Petits composants ----------
   const medailles = (n, cls) => el("span", { class: "prix-med" + (cls ? " " + cls : "") }, icone("i-medaille"), el("b", { class: "num", texte: fmt(n) }));
-  const niveauTexte = (eff, max) => (eff >= max ? "MAX" : "niv. " + eff);
+  const niveauTexte = (eff, max) => (eff >= max ? "MAX" : "+" + eff);
 
   function stepper({ min = 1, max, valeur, libelle, surChange }) {
     let v = valeur, borne = max;
@@ -104,7 +104,7 @@ App.demarrer("boutique", async (main, ctx) => {
     el("a", { class: "source", href: "duels.html" }, icone("i-epees"),
       el("div", {}, el("b", { texte: "Gagne des duels" }), el("span", { texte: "Chaque victoire remplit ta bourse. " }), el("small", {}, cumulDuel, " médailles gagnées en duel"))),
     el("a", { class: "source", href: "#vendre" }, icone("i-cartes"),
-      el("div", {}, el("b", { texte: "Revends tes doublons" }), el("span", { texte: "Au-delà du niveau max, chaque copie est du bénéfice pur. " }), el("small", {}, cumulRevente, " médailles gagnées en revente"))));
+      el("div", {}, el("b", { texte: "Revends tes doublons" }), el("span", { texte: "Au-delà des améliorations max, chaque copie est du bénéfice pur. " }), el("small", {}, cumulRevente, " médailles gagnées en revente"))));
 
   // ---------- Onglets ----------
   const liste = el("div", { class: "onglets-b onglets-boutique", role: "tablist", "aria-label": "Rayons de la boutique" },
@@ -178,8 +178,8 @@ App.demarrer("boutique", async (main, ctx) => {
     legende.replaceChildren(
       el("p", { class: "legende-titre" }, res.nouveau ? el("span", { class: "badge-nouveau", texte: "Nouveau" }) : null, el("b", { texte: o.nom })),
       el("p", { texte: res.nouveau ? "rejoint ta collection. Équipe-le depuis ton arsenal."
-        : trop > 0 ? `était déjà au niveau max : ce doublon part dans tes « en trop » (+${trop}), revends-le ou troque-le.`
-        : `passe ${res.niveau >= max ? "au niveau max" : "au niveau " + res.niveau} dans ta collection.` }));
+        : trop > 0 ? `était déjà amélioré au max : ce doublon part dans tes « en trop » (+${trop}), revends-le ou troque-le.`
+        : `passe ${res.niveau >= max ? "à MAX" : "à +" + res.niveau} dans ta collection.` }));
     pied.replaceChildren(...actions);
     if (actions[0]) actions[0].focus();
   }
@@ -224,7 +224,7 @@ App.demarrer("boutique", async (main, ctx) => {
     const p = panneaux.etal;
     const tete = el("div", { class: "tete-rayon" },
       el("div", {}, el("h2", { texte: "Étal du moment" }),
-        el("p", { class: "sous", texte: "Le même pour tout le monde, renouvelé à chaque heure pile. Un objet acheté arrive comme un tirage : nouveau pour ta collection, ou +1 niveau s'il y est déjà." })),
+        el("p", { class: "sous", texte: "Le même pour tout le monde, renouvelé à chaque heure pile. Un objet acheté arrive comme un tirage : nouveau pour ta collection, ou une amélioration (+1) s'il y est déjà." })),
       blocRebours);
     if (etalErreur) return p.replaceChildren(tete, etatErreur("Impossible de charger l'étal.", () => { p.replaceChildren(tete, chargement()); chargerEtal(); }));
     if (!etal) return p.replaceChildren(tete, chargement("Le marchand déballe sa marchandise…"));
@@ -234,7 +234,7 @@ App.demarrer("boutique", async (main, ctx) => {
     const grille = el("div", { class: "grille-cartes grille-etal" }, offres.map(({ e, o }) => {
       const l = ctx.inventaire.get(o.numero), max = maxDe(o);
       const auMax = !!l && l.niveau >= max, manque = e.prix - solde();
-      const raison = auMax ? "Déjà au niveau max" : manque > 0 ? `Il te manque ${fmt(manque)} médailles` : null;
+      const raison = auMax ? "Déjà amélioré au max" : manque > 0 ? `Il te manque ${fmt(manque)} médailles` : null;
       return el("article", { class: "case-carte offre", style: { "--c": `var(--${o.rarete})` } },
         el("button", { type: "button", class: "zone", "aria-label": "Voir la fiche : " + o.nom, onclick: () => ficheAchat(e) }, App.carte(o, { niveau: l ? Math.min(l.niveau, max) : null })),
         el("div", { class: "infos-offre" },
@@ -250,7 +250,7 @@ App.demarrer("boutique", async (main, ctx) => {
   function ficheAchat(e) {
     const o = App.objet(e.numero), l = ctx.inventaire.get(o.numero), max = maxDe(o);
     const auMax = !!l && l.niveau >= max, apres = solde() - e.prix;
-    const effet = !l ? "Nouvel objet pour ta collection" : auMax ? "Déjà au niveau max" : `Niveau ${l.niveau} → ${l.niveau + 1 >= max ? "MAX" : l.niveau + 1}`;
+    const effet = !l ? "Nouvel objet pour ta collection" : auMax ? "Déjà amélioré au max" : `+${l.niveau} → ${l.niveau + 1 >= max ? "MAX" : "+" + (l.niveau + 1)}`;
     const recap = el("div", { class: "lignes recap" },
       el("div", { class: "ligne" }, el("span", { texte: "Prix" }), el("b", {}, medailles(e.prix))),
       el("div", { class: "ligne" }, el("span", { texte: "Ta bourse après l'achat" }), el("b", { class: apres < 0 ? "negatif" : null }, medailles(apres))),
@@ -375,16 +375,16 @@ App.demarrer("boutique", async (main, ctx) => {
   const qteVente = new Map();
 
   function consequence(x, q) {
-    if (q <= x.trop) return { cls: "ok", texte: `Bénéfice pur : ${q > 1 ? "ces copies sont" : "cette copie est"} au-delà du niveau max, ton niveau reste MAX.` };
+    if (q <= x.trop) return { cls: "ok", texte: `Bénéfice pur : ${q > 1 ? "ces copies sont" : "cette copie est"} au-delà des améliorations max, ton objet reste MAX.` };
     if (q >= x.copies) return { cls: "danger", texte: `Dernier exemplaire : l'objet quitte ta collection${equipe(x.o.numero) ? ", il sera déséquipé" : ""}${vitrine.has(x.o.numero) ? " et retiré de ta vitrine" : ""}.` };
     const nouv = Math.min(x.l.niveau - q, x.max);
-    return { cls: "attention", texte: `Ton niveau passera de ${niveauTexte(x.eff, x.max)} à niv. ${nouv}.` };
+    return { cls: "attention", texte: `Ton objet passera de ${niveauTexte(x.eff, x.max)} à +${nouv}.` };
   }
 
   function rendreVendre() {
     const p = panneaux.vendre;
     const tete = el("div", { class: "tete-rayon" }, el("div", {}, el("h2", { texte: "Vendre" }),
-      el("p", { class: "sous", texte: "Tu possèdes niveau + 1 exemplaires de chaque objet. Les copies au-delà du niveau max ne servent plus à rien : c'est là que se cache ton argent de poche." })));
+      el("p", { class: "sous", texte: "Pour un objet en +N, tu possèdes N + 1 exemplaires. Les copies au-delà des améliorations max ne servent plus à rien : c'est là que se cache ton argent de poche." })));
     if (baseErreur) return p.replaceChildren(tete, etatErreur("Impossible de lire les prix de rachat.", chargerBase));
     if (!prix) return p.replaceChildren(tete, chargement());
     const tout = possessions();
@@ -397,7 +397,7 @@ App.demarrer("boutique", async (main, ctx) => {
     const recolte = el("div", { class: "panneau-b recolte" + (nbTrop ? " a-vendre" : "") },
       el("div", { class: "recolte-texte" },
         nbTrop ? el("b", {}, el("span", { class: "num", texte: fmt(nbTrop) }), ` ${pluriel(nbTrop, "doublon")} en trop sur ${enTrop.length} ${pluriel(enTrop.length, "objet")}`) : el("b", { texte: "Aucun doublon en trop pour l'instant" }),
-        el("span", { texte: nbTrop ? "Ils sont au-delà du niveau max : les vendre ne change rien à ta puissance." : "Ils apparaissent quand un objet déjà au niveau max retombe d'une lootbox ou de l'étal." })),
+        el("span", { texte: nbTrop ? "Ils sont au-delà des améliorations max : les vendre ne change rien à ta puissance." : "Ils apparaissent quand un objet déjà amélioré au max retombe d'une lootbox ou de l'étal." })),
       nbTrop ? el("div", { class: "recolte-action" }, medailles(valeurTrop, "grand gain"),
         el("button", { type: "button", class: "btn-principal", onclick: () => venteGroupee(enTrop) }, "Vendre tous les doublons en trop")) : null);
 
@@ -447,7 +447,7 @@ App.demarrer("boutique", async (main, ctx) => {
         el("b", { class: "nom", texte: x.o.nom }),
         el("div", { class: "pilules" },
           el("span", { class: "pilule " + x.o.rarete, texte: RARETES[x.o.rarete].nom }),
-          el("span", { class: "pilule num", texte: niveauTexte(x.eff, x.max) + (x.eff >= x.max ? "" : " / " + x.max) }),
+          el("span", { class: "pilule num", texte: niveauTexte(x.eff, x.max) + (x.eff >= x.max ? "" : " / +" + x.max) }),
           x.trop ? el("span", { class: "pilule trop num", texte: "+" + x.trop + " en trop" }) : null),
         el("span", { class: "mention" }, el("span", { class: "num", texte: fmt(x.copies) }), ` ${pluriel(x.copies, "exemplaire")} · `, el("span", { class: "num", texte: fmt(unit) }), " l'unité")),
       el("div", { class: "controles" }, pas.el, gain, btn),
@@ -493,7 +493,7 @@ App.demarrer("boutique", async (main, ctx) => {
     const go = el("button", { type: "button", class: "btn-principal" }, "Tout vendre pour ", el("span", { class: "num", texte: fmt(total) }));
     const annuler = el("button", { type: "button", class: "btn-second", onclick: () => App.fermerTiroir() }, "Annuler");
     App.tiroir({ titre: "Vendre les doublons en trop", contenu: el("div", { class: "pile" },
-      el("p", {}, "Tu vends ", el("b", { class: "num", texte: fmt(nb) }), ` ${pluriel(nb, "exemplaire")} au-delà du niveau max. Tes objets restent tous au niveau MAX.`), liste, progres),
+      el("p", {}, "Tu vends ", el("b", { class: "num", texte: fmt(nb) }), ` ${pluriel(nb, "exemplaire")} au-delà des améliorations max. Tes objets restent tous MAX.`), liste, progres),
     pied: el("div", { class: "pied-actions" }, annuler, go) });
     go.addEventListener("click", async () => {
       go.disabled = true; annuler.disabled = true; progres.hidden = false;
@@ -564,7 +564,7 @@ App.demarrer("boutique", async (main, ctx) => {
       const touches = elig.filter((x) => { const c = troc.choix.get(x.o.numero) || 0; return c > x.trop; });
       baisses.className = "consequence " + (touches.length ? "attention" : s ? "ok" : "");
       baisses.textContent = !s ? "Choisis tes doublons ci-dessous, ou laisse le marchand remplir pour toi." : touches.length
-        ? `Niveau en baisse pour ${touches.map((x) => x.o.nom).join(", ")}.` : "Que des doublons en trop : aucun de tes niveaux ne bouge.";
+        ? `Améliorations en baisse pour ${touches.map((x) => x.o.nom).join(", ")}.` : "Que des doublons en trop : aucune de tes améliorations ne bouge.";
       btnTroc.disabled = s !== cout;
       btnTroc.replaceChildren(s === cout ? `Troquer contre 1 ${RARETES[cible].nom}` : `Encore ${cout - s} à choisir`);
     }
@@ -616,7 +616,7 @@ App.demarrer("boutique", async (main, ctx) => {
     const resume = el("div", { class: "lignes" }, [...troc.choix].map(([n, c]) => {
       const o = App.objet(n), l = ctx.inventaire.get(n), max = maxDe(o), avant = Math.min(l.niveau, max), apres = Math.min(l.niveau - c, max);
       return el("div", { class: "ligne" }, el("span", {}, o.nom, " ", el("span", { class: "num mention", texte: "× " + c })),
-        el("b", { class: "num" + (apres < avant ? " negatif" : "") , texte: apres < avant ? `niv. ${avant} → ${apres}` : niveauTexte(avant, max) }));
+        el("b", { class: "num" + (apres < avant ? " negatif" : "") , texte: apres < avant ? `+${avant} → +${apres}` : niveauTexte(avant, max) }));
     }));
     const lancer = el("button", { type: "button", class: "btn-principal" }, "Lancer le troc");
     const t = App.tiroir({ titre: "Troc", contenu: el("div", { class: "pile" },
