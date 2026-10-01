@@ -417,7 +417,7 @@ App.demarrer("duels", async (main, ctx) => {
       return el("div", { class: "build" }, el("h4", { texte: nom(R[suffixe]) }),
         el("div", { class: "build-cartes" }, [["arme", "Arme"], ["offhand", "Main gauche"], ["torso", "Armure"], ["strategeme", "Stratagème"]].map(([k, lib]) => {
           const x = b[k] || {}, o = x.nom ? parNom.get(sansAccent(x.nom)) : null;
-          if (o) return App.carte(o, { niveau: Math.min(x.niveau || 0, App.niveauMax(o.rarete)), exemplaires: 0, equipe: false });
+          if (o) return App.carte(o, { niveau: Math.min(x.niveau || 0, App.niveauMax(o.rarete)), equipe: false });
           return el("div", { class: "case-vide" }, el("span", { texte: x.nom || lib }), el("small", { texte: x.nom ? "Objet retiré" : "Vide" }));
         })));
     };

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Sécurité : mêmes règles que jeu.html. Si tu modifies le script en bas de page, son empreinte
      sha256 change : regénère-la (sinon le navigateur refuse de l'exécuter). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js 'sha256-x607lAiqTIOdomLsvI0x3UsQ+Iq3TGh4RSNpa7amf3E='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js 'sha256-HKk1CTCjxh2E9uW/b4MMM8ABFhnsN6w8LRJ4Uvvvy3I='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Stream RPG</title>
 <meta name="description" content="Le jeu de rôle de la chaîne MrShyDiver : gagne des lootbox en live, ouvre-les ici, équipe ton personnage et affronte le chat en duel.">
@@ -91,11 +91,12 @@ body { overflow-x: clip; }
   font-family: var(--titre); font-weight: 800; font-size: 6cqi; line-height: 1; letter-spacing: .01em; white-space: nowrap;
   color: #101116; background: var(--c); border-radius: 3cqi; padding: 2.2cqi 3.2cqi 2.4cqi;
 }
-/* Exemplaires possédés, en haut à droite */
-.exemplaires {
+/* Améliorations (+N, puis MAX au plafond), en haut à droite, dès le premier doublon */
+.niveau-tag {
   font-family: var(--titre); font-weight: 800; font-size: 6.6cqi; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap;
-  color: var(--encre); background: rgba(12,13,18,.6); border: 1px solid color-mix(in oklab, var(--c) 45%, transparent); border-radius: 3cqi; padding: 2cqi 2.8cqi 2.3cqi;
+  color: #101116; background: var(--encre); border-radius: 3cqi; padding: 2.2cqi 2.8cqi 2.4cqi;
 }
+.niveau-tag.max { background: var(--c); }
 .carte-art { flex: 1; min-height: 0; position: relative; }
 .carte-art img { position: absolute; inset: 2cqi 10cqi; width: calc(100% - 20cqi); height: calc(100% - 4cqi); object-fit: contain; object-position: center; filter: drop-shadow(0 4cqi 5cqi rgba(0,0,0,.55)); }
 /* Nom puis emplacement, centrés ; le bas reste libre pour le label « Équipé » */
@@ -1018,16 +1019,24 @@ function sousTitre(o) {
   return EMPLACEMENTS[o.slot].seul;
 }
 
+// Tag +N (dès le premier doublon), MAX au plafond ; rien pour un objet de base.
+function poserNiveau(c, niveau, max) {
+  const t = c.querySelector(".niveau-tag");
+  t.textContent = niveau >= max ? "MAX" : "+" + niveau;
+  t.classList.toggle("max", niveau >= max);
+  t.hidden = niveau <= 0;
+  c.classList.toggle("brillante", niveau >= max);
+}
 // Construit une carte d'objet. Le contenu vient uniquement des données ci-dessus.
-function carte(o, { exemplaires = 0 } = {}) {
+function carte(o, { niveau = 0 } = {}) {
   const r = RARETES[o.rarete];
   const el = document.createElement("div");
   el.className = "carte " + o.rarete;
   el.innerHTML =
-    '<div class="carte-haut"><span class="pastille-rarete">' + r.nom + '</span><span class="exemplaires" hidden></span></div>' +
+    '<div class="carte-haut"><span class="pastille-rarete">' + r.nom + '</span><span class="niveau-tag" hidden></span></div>' +
     '<div class="carte-art"><img src="' + image(o.image) + '" alt="" loading="lazy" decoding="async"></div>' +
     '<div class="carte-texte"><div class="carte-nom">' + o.nom + '</div><div class="carte-sous">' + sousTitre(o) + '</div></div>';
-  if (exemplaires) { const x = el.querySelector(".exemplaires"); x.textContent = "×" + exemplaires; x.hidden = false; }
+  poserNiveau(el, niveau, r.max);
   el.setAttribute("role", "img");
   el.setAttribute("aria-label", o.nom + ", " + r.nom + ", " + sousTitre(o));
   return el;
@@ -1625,7 +1634,7 @@ remettreCoffre();
     { nom: "Parade", val: () => "10 %", jauge: () => 1, gain: "" },
   ];
   let niveau = 0;
-  const c = carte(o, { exemplaires: 1 });
+  const c = carte(o);
   $("carte-atelier").append(c);
   $("atelier-nom").textContent = o.nom;
   for (let i = 0; i < max; i++) $("jauge-niveau").append(document.createElement("i"));
@@ -1633,8 +1642,7 @@ remettreCoffre();
     '<div class="ligne-stat"><span class="nom-stat">' + s.nom + '</span><span class="barre"><i id="barre-' + i + '"></i></span><span class="val"><span id="val-' + i + '"></span><span class="gain" id="gain-' + i + '">' + s.gain + "</span></span></div>").join("");
 
   function rendu(anime) {
-    c.querySelector(".exemplaires").textContent = "×" + (niveau + 1);
-    c.classList.toggle("brillante", niveau >= max);
+    poserNiveau(c, niveau, max);
     $("atelier-niveau").textContent = "Niveau " + niveau + " / " + max;
     [...$("jauge-niveau").children].forEach((p, i) => p.classList.toggle("plein", i < niveau));
     STATS.forEach((s, i) => {

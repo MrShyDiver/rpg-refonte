@@ -158,7 +158,7 @@ App.demarrer("boutique", async (main, ctx) => {
     const charge = suspense ? 700 + rang * 420 : 380 + rang * 120;
     const dc = el("div", { class: "dcarte", style: { "--c": `var(--${o.rarete})`, "--vib": charge + "ms" } },
       el("div", { class: "eclat" }),
-      el("div", { class: "dcarte-in" }, el("div", { class: "dos" }, icone("i-marque")), el("div", { class: "face" }, App.carte(o, { niveau: Math.min(res.niveau, max), exemplaires: (res.niveau || 0) + 1 }))),
+      el("div", { class: "dcarte-in" }, el("div", { class: "dos" }, icone("i-marque")), el("div", { class: "face" }, App.carte(o, { niveau: Math.min(res.niveau, max) }))),
       el("div", { class: "libelle-rarete", texte: RARETES[o.rarete].nom }));
     const scene = el("div", { class: "scene-revelation", style: { "--c": `var(--${o.rarete})` } }, dc);
     const legende = el("div", { class: "legende-revelation", "aria-live": "polite" });

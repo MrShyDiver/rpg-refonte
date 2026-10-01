@@ -424,21 +424,22 @@ App.fiche = (o, { niveau = 0, possede = null, curseur = true } = {}) => {
 };
 
 // ---------------------------------------------------------------------
-// Carte d'objet : rareté en toutes lettres (haut gauche), exemplaires possédés (haut droite),
-// image centrée, nom puis emplacement centrés, « Équipé » en bas à gauche.
-// Par défaut, exemplaires et équipement sont ceux du joueur connecté ; les pages qui montrent
-// les objets d'un autre joueur passent { exemplaires, equipe } explicitement.
+// Carte d'objet : rareté en toutes lettres (haut gauche), améliorations +N / MAX (haut droite,
+// dès le premier doublon), image centrée, nom puis emplacement centrés, « Équipé » en bas à gauche.
+// Sans niveau ni equipe fournis, ce sont ceux du joueur connecté ; les pages qui montrent les
+// objets d'un autre joueur (profil, duel, combat) les passent explicitement.
 // ---------------------------------------------------------------------
 const EMPLACEMENTS_LOADOUT = ["arme", "offhand", "armure", "strategeme"];
-App.carte = (o, { niveau = null, verrouille = false, equipe, exemplaires } = {}) => {
+App.carte = (o, { niveau = null, verrouille = false, equipe } = {}) => {
   const r = RARETES[o.rarete], ctx = App.ctx || {};
   const ligne = ctx.inventaire && ctx.inventaire.get(o.numero);
-  const nb = verrouille ? 0 : exemplaires !== undefined ? exemplaires : ligne ? (ligne.niveau || 0) + 1 : 0;
+  const niv = verrouille ? 0 : Math.min(niveau !== null && niveau !== undefined ? niveau : ligne ? ligne.niveau || 0 : 0, r.max);
   const eq = !verrouille && (equipe !== undefined ? !!equipe : !!(ctx.loadout && EMPLACEMENTS_LOADOUT.some((k) => ctx.loadout[k] === o.numero)));
-  const c = el("div", { class: "carte " + o.rarete + (verrouille ? " verrouillee" : "") + (niveau !== null && niveau >= r.max ? " brillante" : ""), role: "img",
-    "aria-label": o.nom + ", " + r.nom + ", " + sousTitre(o) + (nb ? ", " + nb + " exemplaire" + (nb > 1 ? "s" : "") : "") + (eq ? ", équipé" : "") + (verrouille ? ", pas encore obtenu" : "") });
+  const tag = niv >= r.max ? "MAX" : niv > 0 ? "+" + niv : "";
+  const c = el("div", { class: "carte " + o.rarete + (verrouille ? " verrouillee" : "") + (niv >= r.max ? " brillante" : ""), role: "img",
+    "aria-label": o.nom + ", " + r.nom + ", " + sousTitre(o) + (tag ? ", amélioration " + tag : "") + (eq ? ", équipé" : "") + (verrouille ? ", pas encore obtenu" : "") });
   c.innerHTML =
-    '<div class="carte-haut"><span class="pastille-rarete">' + echapper(r.nom) + "</span>" + (nb ? '<span class="exemplaires">×' + nb + "</span>" : "") + "</div>" +
+    '<div class="carte-haut"><span class="pastille-rarete">' + echapper(r.nom) + "</span>" + (tag ? '<span class="niveau-tag' + (niv >= r.max ? " max" : "") + '">' + tag + "</span>" : "") + "</div>" +
     '<div class="carte-art"><img src="' + echapper(App.image(o.image)) + '" alt="" loading="lazy" decoding="async"></div>' +
     '<div class="carte-texte"><div class="carte-nom">' + echapper(o.nom) + '</div><div class="carte-sous">' + echapper(sousTitre(o)) + "</div></div>";
   if (eq) c.append(el("span", { class: "equipe-tag", texte: "Équipé" }));

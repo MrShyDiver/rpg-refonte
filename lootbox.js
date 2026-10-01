@@ -221,7 +221,7 @@ App.demarrer("lootbox", async (main, ctx) => {
       if (!o) return null;
       const max = App.niveauMax(o.rarete);
       return el("button", { type: "button", class: "zone", "aria-label": o.nom + ", " + RARETES[o.rarete].nom + (t.nouveau ? ", nouveau" : ""), onclick: () => ficheObjet(t.numero) },
-        App.carte(o, { niveau: Math.min(t.niveau, max), exemplaires: (t.niveau || 0) + 1 }), t.nouveau ? el("span", { class: "lb-mini-nouveau", texte: "Nouveau" }) : null);
+        App.carte(o, { niveau: Math.min(t.niveau, max) }), t.nouveau ? el("span", { class: "lb-mini-nouveau", texte: "Nouveau" }) : null);
     }).filter(Boolean));
   }
 
@@ -341,7 +341,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     const max = t.niveau_max || App.niveauMax(o.rarete), r = resultat(t, max);
     const d = el("div", { class: "dcarte", style: { "--c": "var(--" + o.rarete + ")" } });
     d.innerHTML = '<span class="eclat"></span><div class="dcarte-in"><div class="dos"><svg viewBox="0 0 40 40" aria-hidden="true"><use href="#i-marque"/></svg></div></div>';
-    const face = App.carte(o, { niveau: Math.min(t.niveau, max), exemplaires: (t.niveau || 0) + 1 });
+    const face = App.carte(o, { niveau: Math.min(t.niveau, max) });
     face.classList.add("face");
     face.removeAttribute("role");
     $(".dcarte-in", d).append(face);
