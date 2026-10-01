@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Sécurité : mêmes règles que jeu.html. Si tu modifies le script en bas de page, son empreinte
      sha256 change : regénère-la (sinon le navigateur refuse de l'exécuter). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js 'sha256-e4zNy7qN7nGuS2L0GZBcNcKUh5gNfKL0SSKH6ZmfIS8='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js 'sha256-x607lAiqTIOdomLsvI0x3UsQ+Iq3TGh4RSNpa7amf3E='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Stream RPG</title>
 <meta name="description" content="Le jeu de rôle de la chaîne MrShyDiver : gagne des lootbox en live, ouvre-les ici, équipe ton personnage et affronte le chat en duel.">
@@ -85,27 +85,23 @@ body { overflow-x: clip; }
 }
 .carte.normal { --c: var(--normal); } .carte.rare { --c: var(--rare); }
 .carte.epique { --c: var(--epique); } .carte.legendaire { --c: var(--legendaire); }
-.carte-haut { display: flex; justify-content: space-between; align-items: center; padding: 6cqi 7cqi 0; }
+.carte-haut { display: flex; justify-content: space-between; align-items: center; gap: 2cqi; padding: 6cqi 6cqi 0; min-height: 17cqi; }
+/* Rareté en toutes lettres, en haut à gauche */
 .pastille-rarete {
-  font-family: var(--titre); font-weight: 800; font-size: 7.5cqi; line-height: 1;
-  color: #101116; background: var(--c); border-radius: 3cqi; padding: 2.2cqi 3cqi 2.4cqi; min-width: 11cqi; text-align: center;
+  font-family: var(--titre); font-weight: 800; font-size: 6cqi; line-height: 1; letter-spacing: .01em; white-space: nowrap;
+  color: #101116; background: var(--c); border-radius: 3cqi; padding: 2.2cqi 3.2cqi 2.4cqi;
 }
-.numero { font-family: var(--texte); font-weight: 600; font-size: 7cqi; font-variant-numeric: tabular-nums; color: color-mix(in oklab, var(--c) 60%, var(--encre-2)); }
+/* Exemplaires possédés, en haut à droite */
+.exemplaires {
+  font-family: var(--titre); font-weight: 800; font-size: 6.6cqi; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: var(--encre); background: rgba(12,13,18,.6); border: 1px solid color-mix(in oklab, var(--c) 45%, transparent); border-radius: 3cqi; padding: 2cqi 2.8cqi 2.3cqi;
+}
 .carte-art { flex: 1; min-height: 0; position: relative; }
-.carte-art img { position: absolute; inset: 2cqi 10cqi; width: calc(100% - 20cqi); height: calc(100% - 4cqi); object-fit: contain; filter: drop-shadow(0 4cqi 5cqi rgba(0,0,0,.55)); }
-.carte-texte { padding: 0 7cqi 7cqi; }
-.carte-nom { font-weight: 600; font-size: 9.6cqi; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.3em; }
+.carte-art img { position: absolute; inset: 2cqi 10cqi; width: calc(100% - 20cqi); height: calc(100% - 4cqi); object-fit: contain; object-position: center; filter: drop-shadow(0 4cqi 5cqi rgba(0,0,0,.55)); }
+/* Nom puis emplacement, centrés ; le bas reste libre pour le label « Équipé » */
+.carte-texte { padding: 1cqi 7cqi 14cqi; text-align: center; }
+.carte-nom { font-weight: 600; font-size: 9.6cqi; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.3em; text-wrap: balance; }
 .carte-sous { color: var(--encre-3); font-size: 7cqi; margin-top: 1.2cqi; }
-.carte-fait {
-  margin-top: 3.4cqi; padding-top: 3.2cqi; border-top: 1px solid var(--trait);
-  font-size: 7.4cqi; font-weight: 600; color: color-mix(in oklab, var(--c) 55%, var(--encre)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.niveau-tag {
-  position: absolute; top: 5cqi; right: 6cqi; z-index: 2;
-  font-family: var(--titre); font-weight: 800; font-size: 8cqi; line-height: 1;
-  color: #101116; background: var(--encre); border-radius: 3cqi; padding: 2cqi 3cqi 2.4cqi;
-}
-.niveau-tag.max { background: var(--c); }
 /* Reflet holographique des légendaires : une bande de lumière qui balaie la carte. */
 .carte.legendaire::after, .carte.brillante::after {
   content: ""; position: absolute; inset: -40%; z-index: 3; pointer-events: none;
@@ -1023,21 +1019,17 @@ function sousTitre(o) {
 }
 
 // Construit une carte d'objet. Le contenu vient uniquement des données ci-dessus.
-function carte(o, { niveau = null } = {}) {
+function carte(o, { exemplaires = 0 } = {}) {
   const r = RARETES[o.rarete];
   const el = document.createElement("div");
   el.className = "carte " + o.rarete;
   el.innerHTML =
-    '<div class="carte-haut"><span class="pastille-rarete">' + r.lettre + '</span><span class="numero">N°' + o.numero + '</span></div>' +
+    '<div class="carte-haut"><span class="pastille-rarete">' + r.nom + '</span><span class="exemplaires" hidden></span></div>' +
     '<div class="carte-art"><img src="' + image(o.image) + '" alt="" loading="lazy" decoding="async"></div>' +
-    '<div class="carte-texte"><div class="carte-nom">' + o.nom + '</div><div class="carte-sous">' + sousTitre(o) + '</div><div class="carte-fait">' + o.fait + '</div></div>';
-  if (niveau !== null) {
-    const t = document.createElement("span");
-    t.className = "niveau-tag";
-    el.append(t);
-  }
+    '<div class="carte-texte"><div class="carte-nom">' + o.nom + '</div><div class="carte-sous">' + sousTitre(o) + '</div></div>';
+  if (exemplaires) { const x = el.querySelector(".exemplaires"); x.textContent = "×" + exemplaires; x.hidden = false; }
   el.setAttribute("role", "img");
-  el.setAttribute("aria-label", o.nom + ", " + r.nom + ", " + o.fait);
+  el.setAttribute("aria-label", o.nom + ", " + r.nom + ", " + sousTitre(o));
   return el;
 }
 
@@ -1633,7 +1625,7 @@ remettreCoffre();
     { nom: "Parade", val: () => "10 %", jauge: () => 1, gain: "" },
   ];
   let niveau = 0;
-  const c = carte(o, { niveau: 0 });
+  const c = carte(o, { exemplaires: 1 });
   $("carte-atelier").append(c);
   $("atelier-nom").textContent = o.nom;
   for (let i = 0; i < max; i++) $("jauge-niveau").append(document.createElement("i"));
@@ -1641,10 +1633,7 @@ remettreCoffre();
     '<div class="ligne-stat"><span class="nom-stat">' + s.nom + '</span><span class="barre"><i id="barre-' + i + '"></i></span><span class="val"><span id="val-' + i + '"></span><span class="gain" id="gain-' + i + '">' + s.gain + "</span></span></div>").join("");
 
   function rendu(anime) {
-    const tag = c.querySelector(".niveau-tag");
-    tag.textContent = niveau >= max ? "MAX" : "+" + niveau;
-    tag.classList.toggle("max", niveau >= max);
-    tag.hidden = niveau === 0;
+    c.querySelector(".exemplaires").textContent = "×" + (niveau + 1);
     c.classList.toggle("brillante", niveau >= max);
     $("atelier-niveau").textContent = "Niveau " + niveau + " / " + max;
     [...$("jauge-niveau").children].forEach((p, i) => p.classList.toggle("plein", i < niveau));

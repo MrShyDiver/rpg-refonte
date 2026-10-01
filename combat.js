@@ -57,7 +57,7 @@ function objetDe(x, slot, index) {
   return { o, niveau: Math.min(Number(x.niveau) || 0, App.niveauMax(o.rarete)) };
 }
 function carteOuVide(it, libelle) {
-  return it ? App.carte(it.o, { niveau: it.niveau }) : el("div", { class: "case-vide" }, el("span", { texte: libelle }), el("small", { texte: "Vide" }));
+  return it ? App.carte(it.o, { niveau: it.niveau, exemplaires: 0, equipe: false }) : el("div", { class: "case-vide" }, el("span", { texte: libelle }), el("small", { texte: "Vide" }));
 }
 
 // ---------------------------------------------------------------------
@@ -616,7 +616,7 @@ function arene(main, ctx, opts) {
     const echelle = grand / w;
     const cible = { x: zone.x, y: zone.y - zone.h * 0.04 };
     const carte = el("div", { class: "f carte-vol", style: { width: w + "px" } },
-      el("div", { class: "dos" }, symboleDos()), el("div", { class: "cv-face" }, App.carte(X.it.strategeme.o, { niveau: X.it.strategeme.niveau })));
+      el("div", { class: "dos" }, symboleDos()), el("div", { class: "cv-face" }, App.carte(X.it.strategeme.o, { niveau: X.it.strategeme.niveau, exemplaires: 0, equipe: false })));
     carte.style.transform = T(d.x, d.y);
     fx.append(carte);
     son("carte", { pan: X.pan });

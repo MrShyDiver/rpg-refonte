@@ -157,7 +157,7 @@ App.demarrer("arsenal", async (main, ctx) => {
 
   function caseCarte(o) {
     return el("div", { class: "case-carte" },
-      el("button", { type: "button", class: "zone", onclick: () => ouvrir(o) }, App.carte(o, { niveau: null, fait: App.faitMarquant(o, lvl(o)) })),
+      el("button", { type: "button", class: "zone", onclick: () => ouvrir(o) }, App.carte(o)),
       el("div", { class: "meta-carte" }, marque(o) || el("span", { texte: RARETES[o.rarete].nom })));
   }
 
@@ -171,7 +171,7 @@ App.demarrer("arsenal", async (main, ctx) => {
           const stats = App.lignesStats(o, n), pa = App.passifs(o, n), sc = App.scalingsDe(d);
           return el("tr", { style: { "--c": `var(--${o.rarete})` }, onclick: () => ouvrir(o) },
             el("th", { scope: "row" },
-              el("button", { type: "button", class: "nom-objet" }, el("span", { class: "num-objet num", texte: "N°" + o.numero }), el("span", { texte: o.nom })),
+              el("button", { type: "button", class: "nom-objet" }, el("span", { texte: o.nom })),
               el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom }), marque(o)),
             el("td", { texte: App.sousTitre(o) }),
             el("td", { class: "num nowrap", texte: texteDegats(degats(o, n)) }),

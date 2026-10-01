@@ -151,7 +151,7 @@
       s.vitrine.forEach((n, i) => {
         const o = App.objet(n), niv = niveauEffectif(n);
         cases.push(el("li", { class: "pf-vcase", style: { "--c": `var(--${o.rarete})`, "--i": i } },
-          el("button", { class: "zone", type: "button", "data-f": "v" + n, "aria-label": "Voir la fiche : " + o.nom, onclick: () => ficheObjet(o) }, App.carte(o, { niveau: niv })),
+          el("button", { class: "zone", type: "button", "data-f": "v" + n, "aria-label": "Voir la fiche : " + o.nom, onclick: () => ficheObjet(o) }, App.carte(o, { niveau: niv, ...autrui(o) })),
           el("div", { class: "pf-socle" }, el("span", { class: "pf-plaque" }, el("span", { class: "pf-pt", texte: RARETES[o.rarete].nom }), el("span", { class: "num", texte: libNiveau(o, niv) })))));
       });
       if (proprio) for (let i = s.vitrine.length; i < 8; i++) {
@@ -253,7 +253,7 @@
               el("span", { texte: "Occupée par l'arme à deux mains" })))));
           continue;
         }
-        const contenu = o ? App.carte(o, { niveau: niveauEffectif(n) })
+        const contenu = o ? App.carte(o, { niveau: niveauEffectif(n), ...autrui(o) })
           : el("div", { class: "pf-slot-vide" }, el("span", { class: "pf-plus", "aria-hidden": "true", texte: proprio ? "+" : "—" }), el("span", { texte: proprio ? "Choisir" : "Rien d'équipé" }));
         const zone = proprio || o
           ? el("button", { class: "zone", type: "button", "data-f": "slot-" + def.col, "aria-label": proprio ? def.nom + " : " + (o ? o.nom + ", changer" : "vide, choisir un objet") : "Voir la fiche : " + o.nom, onclick: () => (proprio ? tiroirEquiper(slot) : ficheObjet(o)) }, contenu)
@@ -506,7 +506,7 @@
       const fetiches = Object.entries(SLOTS).map(([, def]) => [def, App.objet((cd.equipementPrefere || {})[def.col])]).filter(([, o]) => o);
       if (fetiches.length) cote.append(el("div", { class: "panneau-b pf-fetiches" },
         el("h3", { class: "pf-h3", texte: "Objets fétiches" }),
-        el("div", { class: "pf-fetiches-grille" }, fetiches.map(([def, o]) => el("button", { class: "zone", type: "button", "aria-label": def.nom + " préférée : " + o.nom, onclick: () => ficheObjet(o) }, App.carte(o, { niveau: s.niv.has(o.numero) ? niveauEffectif(o.numero) : null, verrouille: !s.niv.has(o.numero) })))),
+        el("div", { class: "pf-fetiches-grille" }, fetiches.map(([def, o]) => el("button", { class: "zone", type: "button", "aria-label": def.nom + " préférée : " + o.nom, onclick: () => ficheObjet(o) }, App.carte(o, { niveau: s.niv.has(o.numero) ? niveauEffectif(o.numero) : null, verrouille: !s.niv.has(o.numero), ...autrui(o) })))),
         el("p", { class: "mention", texte: "Les objets les plus utilisés en duel, par emplacement." })));
       if (autres.length) cote.append(el("div", { class: "panneau-b" }, el("h3", { class: "pf-h3", texte: "Autres compteurs" }),
         el("div", { class: "lignes" }, autres.map(([k, val]) => el("div", { class: "ligne" }, el("span", { texte: humaniser(k) }), el("b", { class: "num", texte: fmt(val) }))))));
@@ -523,6 +523,7 @@
     }
 
     // ---------- Outils ----------
+    function autrui(o) { return proprio ? {} : { exemplaires: s.niv.has(o.numero) ? s.niv.get(o.numero) + 1 : 0, equipe: ["arme", "offhand", "armure", "strategeme"].some((k) => s.loadout && s.loadout[k] === o.numero) }; }
     function niveauEffectif(n) { const o = App.objet(n); return o ? Math.min(s.niv.get(n) || 0, App.niveauMax(o.rarete)) : 0; }
     function libNiveau(o, niv) { const max = App.niveauMax(o.rarete); return niv >= max ? "Niveau MAX" : "Niv. " + niv + " / " + max; }
     function surplus(o, n) { const trop = (s.niv.get(n) || 0) - App.niveauMax(o.rarete); return proprio && trop > 0 ? " · +" + trop + " en trop" : ""; }

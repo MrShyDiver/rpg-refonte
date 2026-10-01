@@ -367,8 +367,7 @@ App.fiche = (o, { niveau = 0, possede = null, curseur = true } = {}) => {
     el("div", { class: "pilules" },
       el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom }),
       el("span", { class: "pilule", texte: sousTitre(o) }),
-      o.set ? el("span", { class: "pilule", style: { "--c": "#e2483d" }, texte: "Set " + o.set }) : null,
-      el("span", { class: "pilule", texte: "N°" + o.numero })),
+      o.set ? el("span", { class: "pilule", style: { "--c": "#e2483d" }, texte: "Set " + o.set }) : null),
     el("p", {}, App.anim(o.data) ? App.anim(o.data) + ". " : "", "Niveau maximum : ", el("b", { texte: String(max) }), " (", String(max), " doublons).",
       o.contributeur ? el("span", {}, " Imaginé par ", el("b", { texte: o.contributeur }), ".") : null),
     possede !== null ? el("p", {}, possede ? el("b", { texte: "Dans ta collection · niveau " + niveau + " / " + max }) : "Pas encore dans ta collection.") : null);
@@ -425,17 +424,24 @@ App.fiche = (o, { niveau = 0, possede = null, curseur = true } = {}) => {
 };
 
 // ---------------------------------------------------------------------
-// Carte d'objet (même composant que la page d'accueil)
+// Carte d'objet : rareté en toutes lettres (haut gauche), exemplaires possédés (haut droite),
+// image centrée, nom puis emplacement centrés, « Équipé » en bas à gauche.
+// Par défaut, exemplaires et équipement sont ceux du joueur connecté ; les pages qui montrent
+// les objets d'un autre joueur passent { exemplaires, equipe } explicitement.
 // ---------------------------------------------------------------------
-App.carte = (o, { niveau = null, verrouille = false, equipe = false, fait = null } = {}) => {
-  const r = RARETES[o.rarete];
-  const c = el("div", { class: "carte " + o.rarete + (verrouille ? " verrouillee" : "") + (niveau !== null && niveau >= r.max ? " brillante" : ""), role: "img", "aria-label": o.nom + ", " + r.nom + (niveau ? ", niveau " + niveau : "") + (verrouille ? ", pas encore obtenu" : "") });
+const EMPLACEMENTS_LOADOUT = ["arme", "offhand", "armure", "strategeme"];
+App.carte = (o, { niveau = null, verrouille = false, equipe, exemplaires } = {}) => {
+  const r = RARETES[o.rarete], ctx = App.ctx || {};
+  const ligne = ctx.inventaire && ctx.inventaire.get(o.numero);
+  const nb = verrouille ? 0 : exemplaires !== undefined ? exemplaires : ligne ? (ligne.niveau || 0) + 1 : 0;
+  const eq = !verrouille && (equipe !== undefined ? !!equipe : !!(ctx.loadout && EMPLACEMENTS_LOADOUT.some((k) => ctx.loadout[k] === o.numero)));
+  const c = el("div", { class: "carte " + o.rarete + (verrouille ? " verrouillee" : "") + (niveau !== null && niveau >= r.max ? " brillante" : ""), role: "img",
+    "aria-label": o.nom + ", " + r.nom + ", " + sousTitre(o) + (nb ? ", " + nb + " exemplaire" + (nb > 1 ? "s" : "") : "") + (eq ? ", équipé" : "") + (verrouille ? ", pas encore obtenu" : "") });
   c.innerHTML =
-    '<div class="carte-haut"><span class="pastille-rarete">' + r.lettre + '</span><span class="numero">N°' + o.numero + "</span></div>" +
+    '<div class="carte-haut"><span class="pastille-rarete">' + echapper(r.nom) + "</span>" + (nb ? '<span class="exemplaires">×' + nb + "</span>" : "") + "</div>" +
     '<div class="carte-art"><img src="' + echapper(App.image(o.image)) + '" alt="" loading="lazy" decoding="async"></div>' +
-    '<div class="carte-texte"><div class="carte-nom">' + echapper(o.nom) + '</div><div class="carte-sous">' + echapper(sousTitre(o)) + '</div><div class="carte-fait">' + echapper(fait ?? App.faitMarquant(o, niveau || 0)) + "</div></div>";
-  if (niveau !== null && niveau > 0) c.append(el("span", { class: "niveau-tag" + (niveau >= r.max ? " max" : ""), texte: niveau >= r.max ? "MAX" : "+" + niveau }));
-  if (equipe) c.append(el("span", { class: "equipe-tag", texte: "ÉQUIPÉ" }));
+    '<div class="carte-texte"><div class="carte-nom">' + echapper(o.nom) + '</div><div class="carte-sous">' + echapper(sousTitre(o)) + "</div></div>";
+  if (eq) c.append(el("span", { class: "equipe-tag", texte: "Équipé" }));
   return c;
 };
 
