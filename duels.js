@@ -2,12 +2,14 @@
 (function () {
 const { $, el, icone, fmt, ilYa, date } = App;
 
-const TYPES = { duel: "Duel", auto_battle: "Combat auto", entrainement: "Entraînement" };
+const TYPES = { duel: "Duel ciblé", auto_battle: "Combat automatique", entrainement: "Entraînement" };
 const TRANCHES = { dans_tranche: "Combat équitable", au_dessus: "Cible plus forte", en_dessous: "Cible plus faible" };
 // Estimation qualitative (décision projet : jamais de % exact). Seuils sur le ratio ma puissance / la sienne.
 const ESTIMATIONS = [[1.5, 5, "Largement favori"], [1.15, 4, "Favori"], [0.87, 3, "Serré"], [0.67, 2, "Outsider"], [0, 1, "Très risqué"]];
 const SEUIL_SAIGNEMENT = 20;
 const PAR_PAGE = 20;
+const MIN_TRANCHE_SANS_ECHO = 5;      // comme la fonction duel : en dessous, des échos sont proposés
+const ENTRAINEMENTS_PAR_JOUR = 3, DEVOILEMENTS_PAR_JOUR = 3; // comme enregistrer_combat et devoiler_estimations
 const PICTOS = {
   debut: "M6 5h2.5v14H6zM19 5v14l-9.5-7z", prec: "M17.5 5v14L8 12z", suiv: "M6.5 5v14L16 12z", fin: "M15.5 5H18v14h-2.5zM5 5v14l9.5-7z",
   lecture: "M7 4.5v15l12.5-7.5z", pause: "M6.5 5H10v14H6.5zM14 5h3.5v14H14z",
@@ -21,181 +23,299 @@ function picto(nom) {
 }
 const sansAccent = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const estimation = (moi, lui) => (moi > 0 && lui > 0 ? ESTIMATIONS.find(([s]) => moi / lui >= s) : null);
-const bilan = (v, d, e) => `${fmt(v)} V · ${fmt(d)} D · ${fmt(e)} É`;
+const bilan = (v, d, e) => `${fmt(v)} V · ${fmt(d)} D` + (e ? ` · ${fmt(e)} É` : "");
 const params = new URLSearchParams(location.search);
 
 App.demarrer("duels", async (main, ctx) => {
   const moi = ctx.joueur, login = moi.twitch_login;
-  const maPuissance = (App.puissance(moi, App.niveaux(), ctx.loadout) || {}).powerLevel || 0;
+  let maPuissance = 0;
   let parLogin = new Map([[login, moi]]);
-  const nom = (l) => (parLogin.get(l) || {}).display_name || l || "?";
+  const nom = (l) => App.nomCombattant(l, parLogin);
+  // Un écho (« echo:<login> ») s'affiche avec le portrait du joueur dont il reprend le build.
+  const joueurDe = (l) => parLogin.get(App.echoDe(l) || l) || { display_name: nom(l) };
   let duels = [];
-  const h2h = new Map(); // login adverse -> {v, d, e, n}
+  const h2h = new Map(); // login adverse (ou « echo:<login> ») -> {v, d, e, n}
+  let statut = { entrainements_restants: ENTRAINEMENTS_PAR_JOUR, devoilements_restants: DEVOILEMENTS_PAR_JOUR };
 
   // ------------------------------------------------------------------ Héros
   const joues = (moi.victoires || 0) + (moi.defaites || 0) + (moi.egalites || 0);
   const tickets = moi.tickets || 0;
   const abonne = App.peutEntrainer(moi);
   const horsClassement = App.horsClassement(moi);
-  const versCombat = (l, mode) => `combat.html?adversaire=${encodeURIComponent(l)}&mode=${mode}`;
+  const versCombat = (l, mode, echo) => `combat.html?adversaire=${encodeURIComponent(l)}&mode=${mode}${echo ? "&echo=1" : ""}`;
   const chiffre = (valeur, libelle, detail) => el("div", { class: "chiffre" }, el("b", { class: "num", texte: valeur }), el("span", {}, libelle), detail ? el("small", { texte: detail }) : null);
-  const lienAide = (ancre, sujet) => el("a", { class: "lien-aide", href: "aide.html#" + ancre, "aria-label": "Aide : " + sujet, title: "Aide : " + sujet, texte: "?" });
+  const lienAide = (ancre, sujet) => el("a", { class: "lien-aide", href: "aide.html#" + ancre, target: "_blank", rel: "noopener", "aria-label": "Aide : " + sujet + " (nouvel onglet)", title: "Aide : " + sujet, texte: "?" });
+  const pluriel = (n, mot) => fmt(n) + " " + mot + (n > 1 ? "s" : "");
+  // Boutons de choix (remplacent les listes déroulantes : toutes les options sont visibles).
+  const groupeChoix = (libelle, options, valeur, surChoix) => {
+    const g = el("div", { class: "choix", role: "group", "aria-label": libelle }, el("span", { class: "choix-lib", texte: libelle }),
+      options.map(([v, t]) => el("button", { type: "button", "data-v": v, "aria-pressed": String(v === valeur), texte: t,
+        onclick: () => { g.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); surChoix(v); } })));
+    return g;
+  };
+  const fait = (ic, contenu, cls) => el("li", { class: cls || null }, icone(ic), el("span", {}, contenu));
+  const tuilePuissance = chiffre("…", ["Ta puissance", lienAide("puissance", "la puissance")], "Définit ta tranche de combat");
+  const ligneEntrainement = el("span");
+  function majEntrainement() {
+    const n = statut.entrainements_restants;
+    ligneEntrainement.replaceChildren(...(abonne
+      ? [el("b", { texte: "Entraînement gratuit" }), " : ", el("b", { class: "num", texte: `${n} sur ${ENTRAINEMENTS_PAR_JOUR}` }), ` restant${n > 1 ? "s" : ""} aujourd'hui` + (n < 1 ? ", retour demain." : "."), n < 1 ? null : el("span", { class: "detail-large", texte: " Lance-le depuis le bouton « Entraînement » d'un adversaire : aucune récompense, aucun risque." })]
+      : [el("b", { texte: "Entraînement gratuit" }), ` (${ENTRAINEMENTS_PAR_JOUR} par jour, sans récompense ni risque) : réservé aux abonnés de la chaîne. `,
+        el("a", { class: "lien", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener", texte: "S'abonner sur Twitch" })]));
+  }
+  majEntrainement();
+
   main.append(
     el("header", { class: "entete-page" }, el("div", {},
       el("h1", { texte: "Duels" }),
-      el("p", { texte: "Ton bilan, les adversaires à ta mesure et tous les combats du stream, rejouables tour par tour." }))),
+      el("p", { texte: "Lance un combat, choisis ta cible, et revois chaque combat tour par tour." }))),
     ...(horsClassement ? [el("p", { class: "hors-classement" }, el("span", { class: "pilule", texte: "Compte hors classement" }),
       el("span", { texte: "Le streamer et les comptes de test jouent sans bilan ni stats : tes victoires s'affichent dans l'historique mais ne comptent pas." }))] : []),
     el("div", { class: "grille-chiffres" },
-      chiffre(fmt(moi.victoires || 0), "Victoires", `${fmt(moi.defaites || 0)} défaite${moi.defaites > 1 ? "s" : ""} · ${fmt(moi.egalites || 0)} égalité${moi.egalites > 1 ? "s" : ""}`),
-      chiffre(joues ? fmt((100 * (moi.victoires || 0)) / joues) + " %" : "—", "Taux de victoire", joues ? fmt(joues) + " combats" : "Aucun combat pour l'instant"),
+      chiffre(fmt(moi.victoires || 0), "Victoires", `${pluriel(moi.defaites || 0, "défaite")} · ${pluriel(moi.egalites || 0, "égalité")}`),
+      chiffre(joues ? fmt((100 * (moi.victoires || 0)) / joues) + " %" : "—", "Taux de victoire", joues ? pluriel(joues, "combat") : "Aucun combat pour l'instant"),
       chiffre(fmt(moi.serie_actuelle || 0), "Série en cours", "Record : " + fmt(moi.serie_record || 0)),
-      chiffre(maPuissance ? fmt(maPuissance) : "—", "Ta puissance", "Calculée sur ton équipement"),
-      chiffre(fmt(moi.tickets || 0), ["Tickets de duel", lienAide("tickets", "les tickets de duel")], "1 ticket par duel classé")),
-    el("section", { class: "annonce-defi panneau-b", "aria-labelledby": "titre-defi" },
-      el("div", {},
-        el("span", { class: "pilule nouveau", texte: "Nouveau" }),
-        el("h2", { id: "titre-defi", texte: "Défie qui tu veux, ici et maintenant" }),
-        el("p", {}, "Choisis un adversaire ci-dessous : ton build contre le sien, combat immédiat, même s'il n'est pas connecté. Un ",
-          el("b", { texte: "duel classé" }), " coûte 1 ticket et rapporte médailles et bilan, comme en live. ",
-          abonne ? el("span", {}, "L'", el("b", { texte: "entraînement" }), " est gratuit pour toi : aucune récompense, aucun risque.")
-            : el("span", {}, "L'", el("b", { texte: "entraînement" }), " gratuit est réservé aux abonnés de la chaîne.")),
-        tickets < 1 ? el("p", { class: "manque-ticket" }, icone("i-ticket"), "Plus de ticket de duel — gagne-en en live avec tes points de chaîne.") : null),
-      el("a", { class: "btn-second lien-live", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener" }, icone("i-twitch"), "Aller sur le live")));
+      tuilePuissance),
+    el("section", { class: "section-page se-battre", "aria-labelledby": "titre-se-battre" },
+      el("h2", { id: "titre-se-battre", texte: "Se battre" }),
+      el("p", { class: "ligne-tickets" + (tickets < 1 ? " sans-ticket" : "") }, icone("i-ticket"),
+        tickets < 1
+          ? el("span", {}, el("b", { texte: "Plus de ticket de duel." }), " Gagne-en en live avec tes points de chaîne. ", el("a", { class: "lien", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener", texte: "Aller sur le live" }), lienAide("tickets", "les tickets de duel"))
+          : el("span", {}, "Il te reste ", el("b", { class: "num", texte: pluriel(tickets, "ticket") + " de duel" }), ". Un combat automatique ou un duel ciblé en coûte un.", lienAide("tickets", "les tickets de duel"))),
+      el("div", { class: "modes-combat" },
+        el("article", { class: "mode-combat auto" },
+          el("span", { class: "pilule", texte: "Le plus rapide" }),
+          el("h3", { texte: "Combat automatique" }),
+          el("p", {}, "Le jeu tire au sort un adversaire dans ta tranche de puissance. Personne de disponible ? Tu affrontes un ",
+            el("a", { class: "lien", href: "aide.html#echo", target: "_blank", rel: "noopener", texte: "écho" }), " : l'équipement d'un autre joueur, ramené à ton niveau."),
+          el("ul", { class: "faits" },
+            fait("i-ticket", "1 ticket de duel"),
+            fait("i-alerte", [el("b", { texte: "Récompenses réduites de 50 %" }), " par rapport à un duel ciblé : 6 médailles par victoire au lieu de 12."], "reduit")),
+          tickets > 0
+            ? el("a", { class: "btn-principal", href: "combat.html?mode=auto" }, icone("i-epees"), "Combat automatique")
+            : el("button", { type: "button", class: "btn-principal", "aria-disabled": "true",
+              onclick: () => App.toast("Plus de ticket de duel : gagne-en en live avec tes points de chaîne.", { titre: "Pas de ticket" }) }, icone("i-epees"), "Combat automatique")),
+        el("article", { class: "mode-combat cible" },
+          el("span", { class: "pilule", texte: "Récompenses complètes" }),
+          el("h3", { texte: "Duel ciblé" }),
+          el("p", { texte: "Tu choisis ta cible dans la liste. Plus elle est forte, plus la victoire rapporte." }),
+          el("ul", { class: "faits" },
+            fait("i-ticket", "1 ticket de duel"),
+            fait("i-medaille", ["Par victoire : 12 médailles dans ta tranche, 20 contre plus fort, 3 contre plus ", el("span", { class: "insecable" }, "faible.", lienAide("duels", "les récompenses des duels"))])),
+          el("a", { class: "btn-second vers-bas", href: "#adversaires" }, "Choisir un adversaire", icone("i-fleche")))),
+      el("p", { class: "mention ligne-entrainement" }, ligneEntrainement, lienAide("entrainement", "l'entraînement"))));
 
   // ------------------------------------------------------------------ Adversaires
-  const adv = { liste: [], mode: "proches", q: "", tri: "proche", vus: PAR_PAGE };
-  const zoneAdv = el("div", {}, el("div", { class: "chargement", texte: "Calcul des puissances…" }));
-  const compteAdv = el("span", { class: "mention", "aria-live": "polite" });
+  const adv = { liste: [], echos: [], mode: "tranche", q: "", tri: "proche", vus: PAR_PAGE };
+  const zoneAdv = el("div", {}, el("div", { class: "chargement", texte: "Chargement des joueurs…" }));
+  const compteAdv = el("span", { class: "mention compte", "aria-live": "polite" });
   const ongletsAdv = el("div", { class: "onglets-b", role: "group", "aria-label": "Quels joueurs" },
-    [["proches", "Proches de toi"], ["tous", "Tous"]].map(([v, t]) => el("button", { type: "button", "aria-pressed": String(v === adv.mode), "data-v": v, texte: t,
+    [["tranche", "Dans ta tranche"], ["tous", "Tous les joueurs"]].map(([v, t]) => el("button", { type: "button", "aria-pressed": String(v === adv.mode), "data-v": v, texte: t,
       onclick: () => { adv.mode = v; adv.vus = PAR_PAGE; majOnglets(ongletsAdv, v); rendreAdversaires(); } })));
-  main.append(el("section", { class: "section-page", id: "adversaires" },
+  const zoneDevoiler = el("div", { class: "devoiler", tabindex: "-1" });
+  main.append(el("section", { class: "section-page", id: "adversaires", tabindex: "-1" },
     el("h2", { texte: "Adversaires" }),
-    el("p", { class: "sous", texte: "L'estimation compare ta puissance à la leur : une tendance, pas une promesse. Le build et la chance font le reste." }),
+    el("p", { class: "sous" }, "Ta tranche regroupe les joueurs à 30 % de ta puissance, en plus ou en moins : contre eux, le combat est dit équitable.", lienAide("tranches", "les tranches de puissance")),
     el("div", { class: "barre-filtres" }, ongletsAdv,
       el("label", { class: "champ recherche" }, icone("i-recherche"), el("input", { type: "search", placeholder: "Chercher un joueur", "aria-label": "Chercher un joueur",
         oninput: (e) => { adv.q = sansAccent(e.target.value); adv.vus = PAR_PAGE; rendreAdversaires(); } })),
-      el("label", { class: "champ" }, el("select", { "aria-label": "Trier les adversaires", onchange: (e) => { adv.tri = e.target.value; rendreAdversaires(); } },
-        [["proche", "Puissance la plus proche"], ["fort", "Plus puissants d'abord"], ["victoires", "Plus de victoires"], ["nom", "Nom"]].map(([v, t]) => el("option", { value: v, texte: t })))),
       compteAdv),
+    el("div", { class: "barre-outils" },
+      groupeChoix("Trier", [["proche", "Plus proches"], ["fort", "Plus forts"], ["victoires", "Plus de victoires"], ["nom", "Nom"]], adv.tri, (v) => { adv.tri = v; rendreAdversaires(); }),
+      zoneDevoiler),
     zoneAdv));
+
+  // Estimations : verrouillées, dévoilées par les abonnés (3 fois par jour), jusqu'à la fermeture de l'onglet.
+  const CLE_DEVOILE = "duels-estimations", aujourdhui = new Date().toDateString();
+  let devoile = false;
+  try { devoile = sessionStorage.getItem(CLE_DEVOILE) === aujourdhui; } catch (e) { /* navigation privée */ }
+  function rendreDevoiler() {
+    const reste = statut.devoilements_restants;
+    if (devoile) {
+      zoneDevoiler.replaceChildren(el("span", { class: "devoile-ok" }, icone("i-coche"), "Estimations dévoilées"),
+        el("span", { class: "mention" }, `jusqu'à la fermeture de l'onglet · ${reste} restant${reste > 1 ? "s" : ""} aujourd'hui`, lienAide("estimations", "les estimations")));
+      return;
+    }
+    const bloque = !abonne ? "Dévoiler les estimations est réservé aux abonnés de la chaîne." : reste < 1 ? "Tu as déjà dévoilé les estimations 3 fois aujourd'hui : reviens demain." : null;
+    const b = el("button", { type: "button", class: "btn-second petit", "aria-disabled": bloque ? "true" : null,
+      onclick: () => (bloque ? App.toast(bloque, { titre: abonne ? "Limite du jour atteinte" : "Réservé aux abonnés", icone: "i-cadenas" }) : devoiler(b)) },
+    icone("i-cadenas"), "Dévoiler les estimations");
+    zoneDevoiler.replaceChildren(b,
+      el("span", { class: "mention" }, !abonne ? "Réservé aux abonnés" : reste < 1 ? "0 restant aujourd'hui, retour demain" : null, ...(reste < 1 || !abonne ? [] : [`${reste} restant${reste > 1 ? "s" : ""} aujourd'hui`, el("span", { class: "detail-large", texte: " · dure jusqu'à la fermeture de l'onglet" })]),
+        lienAide("estimations", "les estimations")));
+  }
+  async function devoiler(b) {
+    b.disabled = true;
+    try {
+      const r = await App.rpc("devoiler_estimations");
+      if (r && r.devoilements_restants != null) statut.devoilements_restants = r.devoilements_restants;
+      devoile = true;
+      try { sessionStorage.setItem(CLE_DEVOILE, aujourdhui); } catch (e) { /* navigation privée */ }
+      rendreDevoiler(); rendreAdversaires();
+      zoneDevoiler.focus({ preventScroll: true });
+    } catch (e) { App.erreur(e); b.disabled = false; }
+  }
+  rendreDevoiler();
 
   // ------------------------------------------------------------------ Historique
   const hist = { mode: "moi", type: "", q: sansAccent(params.get("contre") || ""), vus: PAR_PAGE };
   const zoneHist = el("div", {}, el("div", { class: "chargement", texte: "Chargement des combats…" }));
   const zoneH2h = el("div");
   const champHist = el("input", { type: "search", placeholder: "Adversaire", "aria-label": "Filtrer par adversaire", value: params.get("contre") || "",
-    oninput: (e) => { hist.q = sansAccent(e.target.value); hist.vus = PAR_PAGE; rendreHistorique(); } });
-  const ongletsHist = el("div", { class: "onglets-b", role: "group", "aria-label": "Quels duels" },
-    [["moi", "Mes duels"], ["tous", "Tous les duels"]].map(([v, t]) => el("button", { type: "button", "aria-pressed": String(v === hist.mode), "data-v": v, texte: t,
+    oninput: (e) => { hist.contre = null; hist.q = sansAccent(e.target.value); hist.vus = PAR_PAGE; rendreHistorique(); } });
+  const ongletsHist = el("div", { class: "onglets-b", role: "group", "aria-label": "Quels combats" },
+    [["moi", "Mes combats"], ["tous", "Tous les combats"]].map(([v, t]) => el("button", { type: "button", "aria-pressed": String(v === hist.mode), "data-v": v, texte: t,
       onclick: () => { hist.mode = v; hist.vus = PAR_PAGE; majOnglets(ongletsHist, v); rendreHistorique(); } })));
-  const compteHist = el("span", { class: "mention", "aria-live": "polite" });
+  const compteHist = el("span", { class: "mention compte", "aria-live": "polite" });
   main.append(el("section", { class: "section-page", id: "historique" },
     el("h2", { texte: "Historique" }),
     el("p", { class: "sous", texte: "Chaque combat, en live ou sur le site : regarde-le en cinématique ou relis-le tour par tour." }),
     el("div", { class: "barre-filtres" }, ongletsHist,
-      el("label", { class: "champ" }, el("select", { "aria-label": "Type de combat", onchange: (e) => { hist.type = e.target.value; hist.vus = PAR_PAGE; rendreHistorique(); } },
-        el("option", { value: "", texte: "Tous les types" }), Object.entries(TYPES).map(([v, t]) => el("option", { value: v, texte: t })), el("option", { value: "autre", texte: "Autres" }))),
       el("label", { class: "champ recherche" }, icone("i-recherche"), champHist),
       compteHist),
+    el("div", { class: "barre-outils" },
+      groupeChoix("Type", [["", "Tous"], ...Object.entries(TYPES)], hist.type, (v) => { hist.type = v; hist.vus = PAR_PAGE; rendreHistorique(); })),
     zoneH2h, zoneHist));
 
   function majOnglets(groupe, v) { groupe.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
 
   // ------------------------------------------------------------------ Données
-  const pInv = Promise.all([App.api.inventaires(), App.api.loadouts()]);
-  pInv.catch(() => {});
+  // Les puissances sont lues en base (players.puissance) : plus aucun build recalculé ici.
+  let joueurs;
   try {
-    const [joueurs, lignes] = await Promise.all([App.api.joueurs(), App.api.duels()]);
-    parLogin = new Map(joueurs.map((j) => [j.twitch_login, j]));
-    parLogin.set(login, moi);
-    duels = lignes;
-    for (const d of duels) {
-      const adverse = d.attaquant_login === login ? d.defenseur_login : d.defenseur_login === login ? d.attaquant_login : null;
-      if (!adverse) continue;
-      const s = h2h.get(adverse) || { v: 0, d: 0, e: 0, n: 0 };
-      s.n++; if (d.egalite) s.e++; else if (d.vainqueur_login === login) s.v++; else s.d++;
-      h2h.set(adverse, s);
-    }
-    rendreHistorique();
-    const id = params.get("replay");
-    const cible = id && duels.find((d) => String(d.id) === id);
-    if (cible) ouvrirReplay(cible);
+    const [js, lignes, st] = await Promise.all([App.api.joueurs(), App.api.duels(), App.rpc("mon_statut_duel").catch((e) => { console.warn(e); return null; })]);
+    joueurs = js; duels = lignes;
+    if (st) { statut = { ...statut, ...st }; majEntrainement(); rendreDevoiler(); }
   } catch (e) {
     App.erreur(e);
     zoneHist.replaceChildren(erreurBloc("L'historique n'a pas pu se charger."));
     zoneAdv.replaceChildren(erreurBloc("La liste des joueurs n'a pas pu se charger."));
     return;
   }
-  try {
-    const [inventaires, loadouts] = await pInv;
-    const niveaux = new Map(), lo = new Map(loadouts.map((l) => [l.player_id, l]));
-    for (const l of inventaires) { if (!niveaux.has(l.player_id)) niveaux.set(l.player_id, new Map()); niveaux.get(l.player_id).set(l.item_numero, l.niveau); }
-    const autres = [...parLogin.values()].filter((j) => j.twitch_login !== login);
-    // Découpé par paquets pour garder la page réactive quand il y a beaucoup de joueurs.
-    for (let i = 0; i < autres.length; i += 60) {
-      for (const j of autres.slice(i, i + 60)) {
-        const p = App.puissance(j, niveaux.get(j.id) || new Map(), lo.get(j.id));
-        adv.liste.push({ j, puissance: (p && p.powerLevel) || 0 });
-      }
-      await new Promise((r) => setTimeout(r, 0));
-    }
-    rendreAdversaires();
-  } catch (e) {
-    App.erreur(e);
-    zoneAdv.replaceChildren(erreurBloc("Les puissances n'ont pas pu être calculées."));
+  if (joueurs.some((j) => j.puissance_perimee)) {
+    // Des builds ont changé : le serveur met leurs puissances à jour, puis on relit la liste.
+    zoneAdv.replaceChildren(el("div", { class: "chargement", texte: "Mise à jour des puissances…" }));
+    try { await App.rafraichirPuissances(); joueurs = await App.api.joueurs(); } catch (e) { console.warn(e); }
+  }
+  parLogin = new Map(joueurs.map((j) => [j.twitch_login, j]));
+  const moiListe = parLogin.get(login);
+  parLogin.set(login, moi);
+  maPuissance = (moiListe && moiListe.puissance) || Math.round((App.puissance(moi, App.niveaux(), ctx.loadout) || {}).powerLevel || 0);
+  tuilePuissance.querySelector("b").textContent = maPuissance ? fmt(maPuissance) : "—";
+  adv.liste = joueurs.filter((j) => j.twitch_login !== login).map((j) => ({ j, puissance: j.puissance || 0 }));
+  for (const d of duels) {
+    const adverse = d.attaquant_login === login ? d.defenseur_login : d.defenseur_login === login ? d.attaquant_login : null;
+    if (!adverse) continue;
+    const s = h2h.get(adverse) || { v: 0, d: 0, e: 0, n: 0 };
+    s.n++; if (d.egalite) s.e++; else if (d.vainqueur_login === login) s.v++; else s.d++;
+    h2h.set(adverse, s);
+  }
+  rendreHistorique();
+  rendreAdversaires();
+  {
+    const id = params.get("replay");
+    const cible = id && duels.find((d) => String(d.id) === id);
+    if (cible) ouvrirReplay(cible);
   }
 
+  // Échos : proposés quand moins de 5 joueurs actifs sont dans la tranche. Ce sont les builds
+  // (avec une arme) des joueurs actifs les plus proches hors tranche ; le serveur revérifie tout.
+  const actifs = adv.liste.filter((x) => App.estClasse(x.j));
+  const nbProchesActifs = actifs.filter((x) => App.dansTranche(x.puissance, maPuissance)).length;
+  if (maPuissance && nbProchesActifs < MIN_TRANCHE_SANS_ECHO) {
+    try {
+      const armes = new Set((await App.api.loadouts()).filter((l) => l.arme != null).map((l) => l.player_id));
+      let refuses = [];
+      try { refuses = JSON.parse(sessionStorage.getItem("echos-refuses") || "[]"); } catch (e) { /* navigation privée */ }
+      adv.echos = actifs.filter((x) => !App.dansTranche(x.puissance, maPuissance) && armes.has(x.j.id) && !refuses.includes(x.j.twitch_login))
+        .sort((a, b) => ecart(a) - ecart(b)).slice(0, MIN_TRANCHE_SANS_ECHO - nbProchesActifs);
+      rendreAdversaires();
+    } catch (e) { console.warn(e); }
+  }
+
+  function ecart(x) { return x.puissance && maPuissance ? Math.abs(Math.log(x.puissance / maPuissance)) : 99; }
   function erreurBloc(t) {
-    return el("div", { class: "vide" }, el("b", { texte: t }), "Vérifie ta connexion puis ",
-      el("button", { type: "button", class: "lien", texte: "recharge la page", onclick: () => location.reload() }), ".");
+    return el("div", { class: "vide" }, el("b", { texte: t }), "Vérifie ta connexion, puis réessaie.",
+      el("button", { type: "button", class: "btn-second", style: { marginTop: "12px" }, texte: "Réessayer", onclick: () => location.reload() }));
   }
 
   function rendreAdversaires() {
-    let l = adv.liste;
-    if (adv.mode === "proches" && maPuissance) l = l.filter((x) => x.puissance && x.puissance / maPuissance >= 0.75 && x.puissance / maPuissance <= 1.33);
+    const tranche = adv.liste.filter((x) => App.dansTranche(x.puissance, maPuissance));
+    ongletsAdv.querySelector('[data-v="tranche"]').textContent = `Dans ta tranche (${tranche.length})`;
+    ongletsAdv.querySelector('[data-v="tous"]').textContent = `Tous les joueurs (${adv.liste.length})`;
+    let l = adv.mode === "tranche" ? tranche : adv.liste;
     if (adv.q) l = l.filter((x) => sansAccent(x.j.display_name).includes(adv.q) || x.j.twitch_login.includes(adv.q));
-    const ecart = (x) => (x.puissance && maPuissance ? Math.abs(Math.log(x.puissance / maPuissance)) : 99);
     const tris = { proche: (a, b) => ecart(a) - ecart(b), fort: (a, b) => b.puissance - a.puissance, victoires: (a, b) => (b.j.victoires || 0) - (a.j.victoires || 0),
       nom: (a, b) => sansAccent(a.j.display_name).localeCompare(sansAccent(b.j.display_name)) };
     l = [...l].sort(tris[adv.tri]);
-    compteAdv.textContent = l.length + " joueur" + (l.length > 1 ? "s" : "");
-    if (!l.length) {
-      zoneAdv.replaceChildren(el("div", { class: "vide" }, el("b", { texte: adv.q ? "Aucun joueur ne correspond." : "Personne à ta mesure pour l'instant." }),
-        adv.mode === "proches" ? el("button", { type: "button", class: "btn-second", style: { marginTop: "12px" }, texte: "Voir tous les joueurs", onclick: () => ongletsAdv.querySelector('[data-v="tous"]').click() }) : "Essaie un autre nom."));
-      return;
+    const echos = adv.mode === "tranche" && !adv.q ? adv.echos : [];
+    compteAdv.textContent = adv.q ? pluriel(l.length, "joueur") + " trouvé" + (l.length > 1 ? "s" : "") : echos.length ? "+ " + pluriel(echos.length, "écho") : "";
+    const blocs = [];
+    const raisons = [
+      tickets < 1 ? el("span", {}, icone("i-ticket"), "Plus de ticket : « Défier » est désactivé. ", el("a", { class: "lien", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener", texte: "En gagner sur le live" })) : null,
+      !abonne ? el("span", {}, icone("i-cadenas"), "« Entraînement » est réservé aux abonnés de la chaîne.")
+        : statut.entrainements_restants < 1 ? el("span", {}, icone("i-cadenas"), "Tes 3 entraînements du jour sont faits : retour demain.") : null,
+    ].filter(Boolean);
+    if (raisons.length) blocs.push(el("p", { class: "etat-liste" }, raisons));
+    const entetes = () => el("div", { class: "entetes-adv", "aria-hidden": "true" }, el("span"), el("span", { texte: "Joueur" }), el("span", { texte: "Puissance" }), el("span", { texte: "Estimation" }), el("span"));
+    if (l.length) {
+      blocs.push(entetes(), el("ul", { class: "liste-adversaires" }, l.slice(0, adv.vus).map((x) => ligneAdversaire(x, false))));
+      if (l.length > adv.vus) blocs.push(el("button", { type: "button", class: "btn-second plus", texte: `Voir plus (${l.length - adv.vus})`, onclick: () => { adv.vus += PAR_PAGE; rendreAdversaires(); } }));
+    } else {
+      blocs.push(el("div", { class: "vide" }, el("b", { texte: adv.q ? "Aucun joueur ne correspond." : "Personne dans ta tranche pour l'instant." }),
+        adv.q ? "Essaie un autre nom." : echos.length ? "Affronte un écho ci-dessous, ou vise un joueur hors de ta tranche." : "Vise un joueur plus fort ou plus faible : la récompense s'adapte.",
+        adv.mode === "tranche" && !adv.q ? el("button", { type: "button", class: "btn-second", style: { marginTop: "12px" }, texte: "Voir tous les joueurs", onclick: () => ongletsAdv.querySelector('[data-v="tous"]').click() }) : null));
     }
-    const liste = el("ul", { class: "liste-adversaires" }, l.slice(0, adv.vus).map(ligneAdversaire));
-    zoneAdv.replaceChildren(...[liste, l.length > adv.vus ? el("button", { type: "button", class: "btn-second plus", texte: `Voir plus (${l.length - adv.vus})`, onclick: () => { adv.vus += PAR_PAGE; rendreAdversaires(); } }) : null].filter(Boolean));
+    if (echos.length) {
+      blocs.push(el("div", { class: "bloc-echos" },
+        el("h3", {}, "Échos", lienAide("echo", "les échos")),
+        el("p", { class: "sous", texte: "Moins de 5 joueurs actifs dans ta tranche : affronte l'équipement et les stats d'un autre joueur, ramenés à ton niveau. Lui ne gagne ni ne perd rien, et tu touches les récompenses d'un combat équitable." }),
+        l.length ? null : entetes(),
+        el("ul", { class: "liste-adversaires" }, echos.map((x) => ligneAdversaire(x, true)))));
+    }
+    zoneAdv.replaceChildren(...blocs);
   }
 
-  function ligneAdversaire({ j, puissance }) {
-    const est = estimation(maPuissance, puissance);
-    const s = h2h.get(j.twitch_login);
-    return el("li", { class: "adversaire" },
+  function ligneAdversaire({ j, puissance }, echo) {
+    const cle = echo ? "echo:" + j.twitch_login : j.twitch_login;
+    const nomJ = j.display_name || j.twitch_login;
+    const s = h2h.get(cle), n = s ? s.n : 0;
+    const est = echo ? null : estimation(maPuissance, puissance);
+    const pct = !echo && puissance && maPuissance ? Math.round((puissance / maPuissance - 1) * 100) : null;
+    const restants = statut.entrainements_restants;
+    const lienProfil = el("a", { href: "profil.html?joueur=" + encodeURIComponent(j.twitch_login), texte: nomJ });
+    return el("li", { class: "adversaire" + (echo ? " echo" : "") },
       App.avatar(j, 44),
       el("div", { class: "ident" },
-        el("a", { href: "profil.html?joueur=" + encodeURIComponent(j.twitch_login), texte: j.display_name || j.twitch_login }),
-        App.horsClassement(j) ? el("span", { class: "mention", texte: "Hors classement" }) : el("span", { class: "mention num", texte: bilan(j.victoires || 0, j.defaites || 0, j.egalites || 0) })),
-      el("div", { class: "puissance" }, el("b", { class: "num", texte: puissance ? fmt(puissance) : "—" }), el("span", { texte: "puissance" })),
-      est ? el("div", { class: "estimation", "data-niveau": est[1] },
-        el("span", { class: "jauge-est", "aria-hidden": "true" }, [1, 2, 3, 4, 5].map((k) => el("i", { class: k <= est[1] ? "plein" : null }))),
-        el("span", { texte: est[2] })) : el("div", { class: "estimation mention", texte: "Estimation indisponible" }),
+        echo ? el("b", {}, "Écho de ", lienProfil) : lienProfil,
+        echo ? el("span", { class: "mention", texte: "Ramené à ton niveau" })
+          : App.horsClassement(j) ? el("span", { class: "mention", texte: "Hors classement" }) : el("span", { class: "mention num", texte: bilan(j.victoires || 0, j.defaites || 0, j.egalites || 0) })),
+      el("div", { class: "puissance" }, echo ? el("span", { class: "ajustee", title: "Sa puissance est ajustée à la tienne", texte: "Ajustée" }) : el("b", { class: "num", texte: puissance ? fmt(puissance) : "—" }),
+        echo ? null : el("span", { class: "num", texte: pct == null ? "puissance" : pct === 0 ? "comme toi" : Math.abs(pct) + " % de " + (pct > 0 ? "plus" : "moins") })),
+      echo ? el("div", { class: "estimation cale", title: "Pas d'estimation : l'écho est ramené à ton niveau" })
+        : !devoile ? el("div", { class: "estimation verrou" }, icone("i-cadenas"), el("span", { texte: "Verrouillée" }))
+        : est ? el("div", { class: "estimation", "data-niveau": est[1] },
+          el("span", { class: "jauge-est", "aria-hidden": "true" }, [1, 2, 3, 4, 5].map((k) => el("i", { class: k <= est[1] ? "plein" : null }))),
+          el("span", { texte: est[2] })) : el("div", { class: "estimation mention", texte: "Indisponible" }),
       el("div", { class: "actions" },
-        s ? el("button", { type: "button", class: "btn-second petit", onclick: () => voirContre(j.twitch_login) }, "Nos duels ", el("span", { class: "num", texte: "(" + s.n + ")" })) : null,
-        abonne
-          ? el("a", { class: "btn-second petit", href: versCombat(j.twitch_login, "entrainement"), title: "Entraînement gratuit : aucune récompense, aucun impact sur ton bilan" }, "Entraînement")
-          : el("button", { type: "button", class: "btn-second petit verrouille", "aria-disabled": "true", title: "Réservé aux abonnés de la chaîne",
-            onclick: () => App.toast("L'entraînement gratuit est réservé aux abonnés Twitch de la chaîne.", { titre: "Réservé aux abonnés", icone: "i-cadenas" }) }, icone("i-cadenas"), "Entraînement"),
+        n ? el("button", { type: "button", class: "btn-second petit b-nos", onclick: () => voirContre(cle) }, "Nos duels ", el("span", { class: "num", texte: "(" + n + ")" }))
+          : el("button", { type: "button", class: "btn-second petit b-nos", "aria-disabled": "true", title: "Vous ne vous êtes jamais affrontés",
+            onclick: () => App.toast((echo ? "Tu n'as jamais affronté cet écho." : `Tu n'as jamais affronté ${nomJ}.`), { titre: "Aucun combat entre vous" }) }, "Nos duels ", el("span", { class: "num", texte: "(0)" })),
+        !abonne
+          ? el("button", { type: "button", class: "btn-second petit b-entr verrouille", "aria-disabled": "true", title: "Réservé aux abonnés de la chaîne",
+            onclick: () => App.toast("L'entraînement gratuit est réservé aux abonnés Twitch de la chaîne.", { titre: "Réservé aux abonnés", icone: "i-cadenas" }) }, icone("i-cadenas"), "Entraînement")
+          : restants < 1
+            ? el("button", { type: "button", class: "btn-second petit b-entr", "aria-disabled": "true", title: "3 entraînements par jour",
+              onclick: () => App.toast("Tu as fait tes 3 entraînements du jour : reviens demain.", { titre: "Limite du jour atteinte" }) }, "Entraînement")
+            : el("a", { class: "btn-second petit b-entr", href: versCombat(j.twitch_login, "entrainement", echo), title: `Gratuit, sans récompense · ${restants} sur ${ENTRAINEMENTS_PAR_JOUR} restant${restants > 1 ? "s" : ""} aujourd'hui` }, "Entraînement"),
         tickets > 0
-          ? el("a", { class: "btn-principal btn-defier", href: versCombat(j.twitch_login, "classe"), "aria-label": "Défier " + (j.display_name || j.twitch_login) + " en duel classé (1 ticket)" }, icone("i-epees"), "Défier")
-          : el("button", { type: "button", class: "btn-principal btn-defier", "aria-disabled": "true", title: "Plus de ticket de duel — gagne-en en live",
-            onclick: () => App.toast("Plus de ticket de duel — gagne-en en live avec tes points de chaîne.", { titre: "Pas de ticket" }) }, icone("i-epees"), "Défier")));
+          ? el("a", { class: "btn-principal btn-defier", href: versCombat(j.twitch_login, "classe", echo), title: "Coûte 1 ticket de duel", "aria-label": "Défier " + (echo ? "l'écho de " : "") + nomJ + " en duel ciblé (1 ticket)" }, icone("i-epees"), "Défier")
+          : el("button", { type: "button", class: "btn-principal btn-defier", "aria-disabled": "true", title: "Plus de ticket de duel : gagne-en en live",
+            onclick: () => App.toast("Plus de ticket de duel : gagne-en en live avec tes points de chaîne.", { titre: "Pas de ticket" }) }, icone("i-epees"), "Défier")));
   }
 
   function voirContre(l) {
-    hist.mode = "moi"; hist.q = sansAccent(nom(l)); hist.vus = PAR_PAGE; champHist.value = nom(l);
+    hist.mode = "moi"; hist.contre = l; hist.q = sansAccent(nom(l)); hist.vus = PAR_PAGE; champHist.value = nom(l);
     majOnglets(ongletsHist, "moi"); rendreHistorique();
     $("#historique").scrollIntoView({ behavior: App.reduit ? "auto" : "smooth", block: "start" });
   }
@@ -204,9 +324,10 @@ App.demarrer("duels", async (main, ctx) => {
   function rendreHistorique() {
     const mien = (d) => d.attaquant_login === login || d.defenseur_login === login;
     let l = hist.mode === "moi" ? duels.filter(mien) : duels;
-    if (hist.type) l = l.filter((d) => (hist.type === "autre" ? !TYPES[d.type] : d.type === hist.type));
+    if (hist.type) l = l.filter((d) => d.type === hist.type);
     const adverses = (d) => (mien(d) && hist.mode === "moi" ? [d.attaquant_login === login ? d.defenseur_login : d.attaquant_login] : [d.attaquant_login, d.defenseur_login]);
-    if (hist.q) l = l.filter((d) => adverses(d).some((a) => a.includes(hist.q) || sansAccent(nom(a)).includes(hist.q)));
+    if (hist.contre) l = l.filter((d) => adverses(d).includes(hist.contre));
+    else if (hist.q) l = l.filter((d) => adverses(d).some((a) => a.includes(hist.q) || sansAccent(nom(a)).includes(hist.q)));
     compteHist.textContent = l.length + " combat" + (l.length > 1 ? "s" : "");
 
     // Face-à-face : quand le filtre ne laisse qu'un seul adversaire dans mes duels.
@@ -215,10 +336,10 @@ App.demarrer("duels", async (main, ctx) => {
     if (hist.mode === "moi" && hist.q && uniques.size === 1) {
       const a = [...uniques][0], s = { v: 0, d: 0, e: 0 };
       l.forEach((d) => { if (d.egalite) s.e++; else if (d.vainqueur_login === login) s.v++; else s.d++; });
-      const j = parLogin.get(a) || { display_name: a };
+      const j = joueurDe(a);
       zoneH2h.append(el("div", { class: "face-a-face panneau-b" },
         el("div", { class: "fa-duo" }, App.avatar(moi, 40), el("span", { class: "vs", texte: "VS" }), App.avatar(j, 40)),
-        el("div", {}, el("b", { texte: "Toi contre " + (j.display_name || a) }),
+        el("div", {}, el("b", { texte: "Toi contre " + nom(a) }),
           el("span", { class: "mention", texte: l.length + " combat" + (l.length > 1 ? "s" : "") + (hist.type ? " de ce type" : "") + " · dernier " + ilYa(l[0].joue_le) })),
         el("div", { class: "fa-score num" },
           el("span", { class: "v", texte: s.v + " V" }), el("span", { class: "d", texte: s.d + " D" }), el("span", { class: "e", texte: s.e + " É" }))));
@@ -228,7 +349,7 @@ App.demarrer("duels", async (main, ctx) => {
       zoneHist.replaceChildren(el("div", { class: "vide" },
         el("b", { texte: hist.mode === "moi" && !hist.q && !hist.type ? "Tu n'as pas encore combattu." : "Aucun combat ne correspond." }),
         hist.mode === "moi" && !hist.q && !hist.type
-          ? el("span", {}, "Défie un adversaire ci-dessus, ou lance un duel en live avec ", el("code", { texte: "!duel" }), ". ",
+          ? el("span", {}, "Lance un combat automatique ou défie un adversaire ci-dessus. ",
             el("a", { href: "#adversaires", texte: "Choisir un adversaire" }), ".")
           : "Change de filtre ou regarde tous les duels."));
       return;
@@ -248,12 +369,12 @@ App.demarrer("duels", async (main, ctx) => {
     let participants, puissances;
     if (res && hist.mode === "moi") {
       const a = jeSuisA ? d.defenseur_login : d.attaquant_login;
-      participants = el("span", { class: "participants" }, App.avatar(parLogin.get(a) || { display_name: a }, 30),
+      participants = el("span", { class: "participants" }, App.avatar(joueurDe(a), 30),
         el("span", {}, el("span", { class: "mention", texte: jeSuisA ? "Tu attaques " : "Tu défends contre " }), el("b", { texte: nom(a) })));
       puissances = [jeSuisA ? d.power_attaquant : d.power_defenseur, jeSuisA ? d.power_defenseur : d.power_attaquant];
     } else {
       const g = d.egalite ? null : d.vainqueur_login, p = d.vainqueur_login === d.defenseur_login ? d.attaquant_login : d.defenseur_login;
-      participants = el("span", { class: "participants" }, App.avatar(parLogin.get(d.attaquant_login) || { display_name: d.attaquant_login }, 30),
+      participants = el("span", { class: "participants" }, App.avatar(joueurDe(d.attaquant_login), 30),
         g ? el("span", {}, el("b", { texte: nom(g) }), el("span", { class: "mention", texte: " bat " }), nom(p))
           : el("span", {}, el("b", { texte: nom(d.attaquant_login) }), el("span", { class: "mention", texte: " et " }), el("b", { texte: nom(d.defenseur_login) }), el("span", { class: "mention", texte: " : égalité" })));
       puissances = [d.power_attaquant, d.power_defenseur];
@@ -263,8 +384,9 @@ App.demarrer("duels", async (main, ctx) => {
       el("span", { class: "centre" }, participants,
         el("span", { class: "details" },
           el("span", { class: "type-duel", "data-type": d.type || "autre", texte: TYPES[d.type] || "Combat" }),
+          d.echo_de ? el("span", { class: "type-duel", "data-type": "echo", texte: "Écho" }) : null,
           TRANCHES[d.tranche] ? el("span", { class: "mention", texte: TRANCHES[d.tranche] }) : null)),
-      el("span", { class: "puissances num", title: "Puissances au moment du combat" }, fmt(puissances[0]), el("span", { class: "mention", texte: " vs " }), fmt(puissances[1])),
+      el("span", { class: "puissances num", title: "Puissances au moment du combat" }, el("small", { class: "mention", texte: "Puissances" }), fmt(puissances[0]), el("span", { class: "mention", texte: " vs " }), fmt(puissances[1])),
       el("span", { class: "tours num mention", texte: d.nb_rounds ? d.nb_rounds + " tours" : "" }),
       el("time", { class: "mention", datetime: d.joue_le, title: date(d.joue_le, true), texte: ilYa(d.joue_le) }),
       fichier
@@ -356,7 +478,7 @@ App.demarrer("duels", async (main, ctx) => {
     let pos = 0, vitesse = 1, timer = null;
 
     const cote = (suffixe) => {
-      const lg = R[suffixe], j = parLogin.get(lg) || { display_name: lg };
+      const lg = R[suffixe], j = joueurDe(lg);
       const pvMax = R["pv_max_" + suffixe] || 1;
       const barre = el("i"), txt = el("span", { class: "num" }), etatsZone = el("div", { class: "statuts" }), bloc = el("div", { class: "combattant" + (lg === login ? " moi" : "") },
         el("div", { class: "fiche-combattant" }, App.avatar(j, 46), el("div", { class: "ident" }, el("b", { texte: nom(lg) }),

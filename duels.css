@@ -1,28 +1,73 @@
 /* Duels : héros, adversaires, historique, lecteur de replay. */
 :root { --victoire: #5ce0b8; --defaite: #ff6b6b; --pv: #5ce0b8; }
 
-/* ---------- Annonce « défier depuis le site » ---------- */
-.annonce-defi { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; }
-.annonce-defi > div { flex: 1 1 360px; }
-.annonce-defi h2 { font-size: 19px; margin-top: 10px; }
-.annonce-defi p { margin-top: 6px; color: var(--encre-2); font-size: 14.5px; max-width: 62ch; }
-.annonce-defi p b { color: var(--encre); }
-.pilule.nouveau { --c: var(--legendaire); }
-.manque-ticket { display: flex; align-items: center; gap: 8px; color: #ff9b9b !important; font-weight: 600; }
-.manque-ticket svg { width: 18px; height: 18px; flex: none; }
+/* ---------- Se battre : combat automatique ou duel ciblé ---------- */
+.se-battre { margin-top: 26px; }
+.ligne-tickets { display: flex; align-items: center; gap: 10px; margin-top: 6px; font-size: 15px; color: var(--encre-2); }
+.ligne-tickets > svg { width: 20px; height: 20px; flex: none; color: var(--legendaire); }
+.ligne-tickets b { color: var(--encre); }
+.ligne-tickets.sans-ticket, .ligne-tickets.sans-ticket > svg { color: #ff9b9b; }
+.modes-combat { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+.mode-combat { display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 10px; justify-items: start; padding: 20px 22px 22px; border-radius: 18px; background: var(--sol-2); border: 1px solid var(--trait); }
+.mode-combat .pilule { --c: var(--encre-2); }
+.mode-combat.auto .pilule { --c: var(--legendaire); }
+.mode-combat h3 { font-size: 21px; }
+.mode-combat p { color: var(--encre-2); font-size: 14.5px; max-width: 54ch; }
+.faits { list-style: none; display: grid; gap: 8px; align-content: start; font-size: 14.5px; }
+.faits li { display: flex; align-items: flex-start; gap: 10px; }
+.faits svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--encre-3); }
+.faits .reduit { color: #ffc46b; }
+.faits .reduit svg { color: #ffb03d; }
+.faits .reduit b { color: #ffd596; }
+.mode-combat > .btn-principal, .mode-combat > .btn-second { margin-top: 6px; }
+.mode-combat > .btn-principal[aria-disabled="true"] { background: var(--sol-3); color: var(--encre-2); box-shadow: none; border: 1px dashed var(--trait-fort); cursor: not-allowed; transform: none; filter: none; }
+.ligne-entrainement { margin-top: 12px; font-size: 14px; }
+.vers-bas svg { rotate: 90deg; }
+.etat-liste { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 12px; padding: 10px 14px; border-radius: 12px; border: 1px dashed var(--trait-fort); font-size: 14px; color: var(--encre-2); }
+.etat-liste span { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.etat-liste svg { width: 16px; height: 16px; flex: none; color: var(--encre-3); }
+.estimation.cale { font-weight: 500; color: var(--encre-3); }
+.puissance .ajustee { font-size: 13.5px; color: var(--encre-2); white-space: nowrap; }
+.insecable { white-space: nowrap; }
+.devoiler:focus { outline: none; }
+.devoiler .mention .lien-aide { margin-left: 8px; }
+.puissances small { display: block; font-size: 11.5px; font-weight: 500; }
+.lien-aide { flex: none; }
+.ligne-entrainement b { color: var(--encre-2); }
+
+/* ---------- Filtres : boutons de choix (plus de liste déroulante) ---------- */
+.barre-outils { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin: -6px 0 16px; }
+.choix { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.choix-lib { font-size: 13px; color: var(--encre-3); margin-right: 4px; }
+.choix button { min-height: 36px; padding: 6px 13px; border-radius: 999px; font-size: 13.5px; font-weight: 600; color: var(--encre-2); border: 1px solid var(--trait-fort); transition: color .15s, border-color .15s, background .15s; }
+.choix button:hover { color: var(--encre); border-color: var(--encre-3); }
+.choix button[aria-pressed="true"] { background: var(--encre); color: #101116; border-color: transparent; }
+.devoiler { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.devoiler .btn-second svg { width: 16px; height: 16px; }
+.devoile-ok { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--victoire); }
+.devoile-ok svg { width: 17px; height: 17px; }
+.btn-second.petit[aria-disabled="true"] { color: var(--encre-2); border-style: dashed; cursor: not-allowed; }
+.barre-filtres .compte { margin-left: auto; }
 code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1px 6px; border-radius: 6px; background: var(--sol-3); border: 1px solid var(--trait-fort); color: var(--encre); }
 .lien-live svg { color: var(--twitch-2); }
 .lien { color: var(--encre); text-decoration: underline; text-underline-offset: 3px; }
 .recherche { flex: 1 1 200px; max-width: 280px; }
-.barre-filtres .mention { margin-left: auto; }
 .btn-second.plus { display: flex; margin: 14px auto 0; }
 
 /* ---------- Adversaires ---------- */
 .liste-adversaires, .liste-duels { list-style: none; display: grid; gap: 8px; }
-.adversaire {
-  display: grid; grid-template-columns: 44px minmax(0, 1.4fr) 100px minmax(0, 1fr) auto; align-items: center; gap: 14px;
-  padding: 12px 16px; border-radius: 14px; background: var(--sol-2); border: 1px solid var(--trait);
-}
+/* Colonnes fixes : les lignes restent alignées quel que soit leur contenu. */
+.adversaire, .entetes-adv { display: grid; grid-template-columns: 44px minmax(0, 1fr) 96px 168px 370px; align-items: center; gap: 14px; }
+.adversaire { padding: 12px 16px; border-radius: 14px; background: var(--sol-2); border: 1px solid var(--trait); }
+.entetes-adv { padding: 0 17px 8px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--encre-3); }
+.adversaire.echo { border-style: dashed; border-color: color-mix(in oklab, var(--epique) 50%, transparent); background: color-mix(in oklab, var(--epique) 5%, var(--sol-2)); }
+.adversaire.echo > .avatar { outline: 2px dashed color-mix(in oklab, var(--epique) 70%, transparent); outline-offset: 2px; }
+.adversaire .ident b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bloc-echos { margin-top: 24px; }
+.bloc-echos h3 { font-size: 18px; }
+.bloc-echos .sous { margin: 4px 0 12px; max-width: 78ch; color: var(--encre-2); font-size: 14.5px; }
+.estimation.verrou { font-weight: 500; color: var(--encre-3); gap: 8px; }
+.estimation.verrou svg { width: 15px; height: 15px; }
 .adversaire .ident { min-width: 0; display: grid; }
 .adversaire .ident a { font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adversaire .ident a:hover { text-decoration: underline; }
@@ -37,12 +82,13 @@ code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1
 .jauge-est { display: inline-flex; gap: 3px; }
 .jauge-est i { width: 6px; height: 14px; border-radius: 2px; background: var(--sol-3); border: 1px solid var(--trait-fort); }
 .jauge-est i.plein { background: var(--c); border-color: transparent; }
-.adversaire .actions { display: flex; gap: 8px; justify-content: flex-end; }
+.adversaire .actions { display: grid; grid-template-columns: 120px 126px 108px; gap: 8px; }
+.adversaire .actions > * { justify-content: center; }
 .btn-second.petit { white-space: nowrap; padding: 8px 12px; font-size: 13.5px; min-height: 40px; }
 .btn-principal.btn-defier { min-height: 40px; padding: 8px 14px; font-size: 13.5px; }
-.btn-defier svg, .verrouille svg { width: 16px; height: 16px; }
-.btn-defier[aria-disabled="true"] { opacity: .4; cursor: not-allowed; transform: none; filter: none; }
-.btn-second.verrouille { color: var(--encre-3); border-style: dashed; cursor: not-allowed; }
+.btn-defier svg, .verrouille svg { width: 16px; height: 16px; flex: none; }
+.btn-defier[aria-disabled="true"] { background: var(--sol-3); color: var(--encre-2); box-shadow: none; border: 1px dashed var(--trait-fort); cursor: not-allowed; transform: none; filter: none; }
+.btn-second.verrouille { color: var(--encre-2); border-style: dashed; cursor: not-allowed; }
 
 /* ---------- Historique ---------- */
 .face-a-face { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -52,7 +98,7 @@ code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1
 .fa-score { margin-left: auto; display: flex; gap: 14px; font-family: var(--titre); font-weight: 700; font-size: 20px; }
 .fa-score .v { color: var(--victoire); } .fa-score .d { color: var(--defaite); } .fa-score .e { color: var(--encre-2); }
 .duel {
-  width: 100%; text-align: left; display: grid; grid-template-columns: 88px minmax(0, 1fr) 130px 70px 92px 172px; align-items: center; gap: 12px;
+  width: 100%; text-align: left; display: grid; grid-template-columns: 88px minmax(0, 1fr) 138px 70px 92px 172px; align-items: center; gap: 12px;
   padding: 12px 16px; border-radius: 14px; background: var(--sol-2); border: 1px solid var(--trait); font-size: 14.5px; transition: border-color .15s, background .15s;
 }
 .duel:hover { border-color: var(--trait-fort); }
@@ -65,6 +111,7 @@ code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1
 .participants .avatar { flex: none; font-size: 12px; }
 .details { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .type-duel { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--trait-fort); color: var(--encre-2); }
+.type-duel[data-type="echo"] { color: var(--epique); border-color: color-mix(in oklab, var(--epique) 45%, transparent); }
 .type-duel[data-type="duel"] { color: var(--legendaire); border-color: color-mix(in oklab, var(--legendaire) 40%, transparent); }
 .puissances { font-weight: 600; white-space: nowrap; }
 .revoir { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; font-weight: 600; font-size: 13.5px; }
@@ -146,18 +193,33 @@ code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1
 .piste output { font-size: 13px; font-weight: 600; color: var(--encre-2); min-width: 78px; text-align: right; }
 .vitesses button { min-width: 44px; min-height: 40px; }
 
-@media (max-width: 900px) {
+/* Sous 1 180 px (barre latérale comprise), la ligne d'adversaire passe sur trois rangées. */
+@media (max-width: 1180px) {
   .adversaire { grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-areas: "av id pu" "es es es" "ac ac ac"; row-gap: 10px; }
   .adversaire > .avatar { grid-area: av; } .adversaire .ident { grid-area: id; } .adversaire .puissance { grid-area: pu; text-align: right; }
-  .adversaire .estimation { grid-area: es; } .adversaire .actions { grid-area: ac; justify-content: stretch; }
-  .adversaire .actions > * { flex: 1; justify-content: center; min-height: 44px; }
-  .recherche { max-width: none; }
-  .barre-filtres .mention { margin-left: 0; }
+  .adversaire .estimation { grid-area: es; } .adversaire .actions { grid-area: ac; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .adversaire.echo { grid-template-areas: "av id pu" "ac ac ac"; }
+  .adversaire.echo .estimation, .adversaire.echo .puissance { display: none; }
+  .adversaire .actions > * { min-height: 44px; padding-inline: 6px; }
+  .entetes-adv { display: none; }
   .duel { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "re ti" "ce ce" "pu to" ; gap: 8px 12px; }
   .duel .resultat { grid-area: re; } .duel time { grid-area: ti; text-align: right; } .duel .centre { grid-area: ce; }
   .duel .puissances { grid-area: pu; } .duel .tours { display: none; } .duel .revoir { grid-area: to; }
   .duel .resultat.neutre { display: none; }
   .duel:has(.resultat.neutre) { grid-template-areas: "ce ti" "pu to"; }
+}
+@media (max-width: 900px) {
+  .choix button, .revoir a, .revoir button { min-height: 44px; }
+  /* Le tri défile sur une seule ligne : la liste arrive plus vite sous le pouce. */
+  .choix { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; padding-right: 28px;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .detail-large { display: none; }
+  .choix::-webkit-scrollbar { display: none; }
+  .choix button, .choix-lib { flex: none; white-space: nowrap; }
+  .modes-combat { grid-template-columns: 1fr; }
+  .barre-outils { margin-top: 0; }
+  .recherche { max-width: none; }
+  .barre-filtres .compte { margin-left: 0; }
   .contenu > .grille-chiffres > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .scene { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 8px; gap: 6px; }
   .scene > .vs { display: none; }
@@ -179,3 +241,5 @@ code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1
 .lien-aide:hover { color: var(--encre); border-color: var(--encre-3); }
 .hors-classement { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 14px; font-size: 14px; color: var(--encre-2); }
 .hors-classement .pilule { --c: var(--epique); }
+
+@media (max-width: 400px) { .adversaire .actions > * { font-size: 12.5px; } }

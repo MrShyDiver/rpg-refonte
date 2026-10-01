@@ -29,6 +29,17 @@
 .vs-ident { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .vs-ident b { font-family: var(--titre); font-size: clamp(17px, 1.8vw, 22px); }
 .pilule.toi { --c: var(--legendaire); }
+/* Écho et combat automatique */
+.pilule.echo { --c: var(--epique); }
+.vs-joueur.echo { border-style: dashed; border-color: color-mix(in oklab, var(--epique) 50%, transparent); }
+.vs-joueur.echo .vs-portrait { border-style: dashed; border-color: color-mix(in oklab, var(--epique) 70%, transparent); }
+.vs-joueur.mystere { align-content: center; border-style: dashed; }
+.vs-joueur.mystere .vs-portrait { display: grid; place-items: center; background: var(--sol-3); }
+.vs-inconnu { font-family: var(--titre); font-weight: 800; font-size: 1.6em; color: var(--encre-3); }
+.vs-mystere-texte { max-width: 38ch; text-align: center; color: var(--encre-2); font-size: 14.5px; }
+.vs-cout.vs-reduit, .vs-cout.vs-reduit b { color: #ffc46b; }
+.vs-cout.vs-reduit svg { color: #ffb03d; }
+.versus .lien { color: var(--encre); text-decoration: underline; text-underline-offset: 3px; }
 .vs-chiffres { display: flex; gap: 26px; }
 .vs-chiffres > div { display: grid; justify-items: center; }
 .vs-chiffres b { font-family: var(--titre); font-size: 20px; }
@@ -487,6 +498,7 @@
   .vs-duo { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .vs-joueur { grid-template-columns: 76px minmax(0, 1fr); justify-items: start; align-items: center; column-gap: 14px; padding: 14px; }
   .vs-portrait { width: 76px; border-radius: 18px; font-size: 26px; grid-row: span 2; }
+  .vs-mystere-texte { grid-column: 1 / -1; text-align: left; max-width: none; }
   .vs-ident { justify-content: flex-start; } .vs-ident b { font-size: 17px; }
   .vs-chiffres { gap: 18px; } .vs-chiffres > div { justify-items: start; } .vs-chiffres b { font-size: 17px; }
   .vs-build { grid-column: 1 / -1; margin-top: 4px; }

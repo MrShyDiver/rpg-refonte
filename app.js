@@ -137,7 +137,7 @@ App.api = {
   moi: () => q(client().rpc("moi_joueur")).then((r) => (Array.isArray(r) ? r[0] : r) || null),
   joueur: (login) => q(client().from("players").select(COLONNES_JOUEUR).eq("twitch_login", String(login).toLowerCase()).maybeSingle()),
   exporterMesDonnees: () => App.rpc("exporter_mes_donnees"),
-  joueurs: () => q(client().from("players").select("id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks,victoires,defaites,egalites,serie_actuelle,serie_record,degats_infliges,degats_subis,plus_gros_coup,points,medailles,combat_details,premiere_connexion,lootbox_ouvertes,lootbox_leg_ouvertes,cree_le,hors_classement").limit(2000)),
+  joueurs: () => q(client().from("players").select("id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks,victoires,defaites,egalites,serie_actuelle,serie_record,degats_infliges,degats_subis,plus_gros_coup,points,medailles,combat_details,premiere_connexion,lootbox_ouvertes,lootbox_leg_ouvertes,cree_le,hors_classement,puissance,puissance_perimee").limit(2000)),
   objets: () => q(client().from("items").select("numero,nom,slot,rarete,set_nom,actif,data").order("numero")),
   inventaire: (pid) => q(client().from("inventory").select("item_numero,niveau,obtenu_le").eq("player_id", pid)),
   inventaires: () => q(client().from("inventory").select("player_id,item_numero,niveau").limit(20000)),
@@ -145,7 +145,7 @@ App.api = {
   loadouts: () => q(client().from("loadouts").select("*").limit(5000)),
   preferences: (pid) => q(client().from("preferences").select("*").eq("player_id", pid).maybeSingle()),
   grants: (pid) => q(client().from("grants").select("id,type,stat,quantite,source,cree_le").eq("player_id", pid).order("cree_le", { ascending: false }).limit(40)),
-  duels: () => q(client().from("duels").select("id,joue_le,type,attaquant_login,defenseur_login,vainqueur_login,egalite,tranche,power_attaquant,power_defenseur,nb_rounds,replay").order("joue_le", { ascending: false }).limit(1000)),
+  duels: () => q(client().from("duels").select("id,joue_le,type,attaquant_login,defenseur_login,vainqueur_login,egalite,tranche,power_attaquant,power_defenseur,nb_rounds,replay,echo_de").order("joue_le", { ascending: false }).limit(1000)),
   succes: () => q(client().from("succes").select("*").order("ordre")),
   succesJoueurs: (pid) => pid ? q(client().from("succes_joueurs").select("code,debloque_le").eq("player_id", pid)) : q(client().from("succes_joueurs").select("player_id,code,debloque_le").limit(20000)),
   vitrine: (pid) => q(client().from("vitrines").select("position,item_numero").eq("player_id", pid).order("position")),
@@ -178,18 +178,31 @@ App.rpc = async (nom, args) => {
   return data;
 };
 // Duel lancé depuis le site : calculé par l'Edge Function `duel` (jamais dans le navigateur).
-App.lancerDuel = async ({ adversaire, mode = "classe" }) => {
+// mode : "classe", "entrainement" ou "auto" (adversaire tiré au sort par le serveur). echo : affronter l'écho du joueur.
+async function fonctionDuel(corps) {
   const session = await App.api.session();
   if (!session) throw new Error("Ta session a expiré : reconnecte-toi pour lancer un duel.");
   let r;
   try {
     r = await fetch(SUPABASE_URL + "/functions/v1/duel", { method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token, apikey: SUPABASE_ANON },
-      body: JSON.stringify({ adversaire, mode }) });
+      body: JSON.stringify(corps) });
   } catch (e) { throw new Error("Le serveur de duel ne répond pas. Réessaie dans un instant."); }
   const json = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(json.erreur || "Le duel n'a pas pu être lancé (erreur " + r.status + ").");
+  if (!r.ok) { const err = new Error(json.erreur || "Le duel n'a pas pu être lancé (erreur " + r.status + ")."); err.statut = r.status; throw err; }
   return json;
+}
+App.lancerDuel = ({ adversaire, mode = "classe", echo = false }) => fonctionDuel(mode === "auto" ? { mode } : { adversaire, mode, echo: !!echo });
+// Les puissances sont stockées en base ; le serveur recalcule celles dont le build a changé.
+App.rafraichirPuissances = () => fonctionDuel({ action: "puissances" });
+// Tranche de puissance : ±30 %, comme le serveur (enregistrer_combat).
+App.dansTranche = (puissance, moi) => puissance > 0 && moi > 0 && Math.abs(puissance - moi) / Math.max(1, moi) <= 0.30;
+// Écho : build d'un autre joueur ramené à ton niveau. En base, son login est « echo:<login du joueur> ».
+App.echoDe = (login) => (String(login || "").startsWith("echo:") ? String(login).slice(5) : null);
+App.nomCombattant = (login, parLogin) => {
+  const source = App.echoDe(login), j = parLogin && parLogin.get(source || login);
+  const nom = (j && j.display_name) || source || login || "?";
+  return source ? "Écho de " + nom : nom;
 };
 App.DISCORD = DISCORD;
 // Miroir de enregistrer_duel (SQL) : ces comptes ne comptent ni au bilan ni aux stats.
@@ -805,7 +818,7 @@ async function chargerNotifs(cloche) {
     if (p.notif_succes !== false) succes.forEach((s) => { const t = titres.get(s.code); if (t) notifs.push({ quand: s.debloque_le, icone: "i-trophee", texte: "Succès débloqué : " + t.titre, lien: "succes.html" }); });
     const moi = App.ctx.joueur.twitch_login;
     duels.filter((d) => d.attaquant_login === moi || d.defenseur_login === moi).slice(0, 10).forEach((d) => {
-      const autre = d.attaquant_login === moi ? d.defenseur_login : d.attaquant_login;
+      const autre = App.nomCombattant(d.attaquant_login === moi ? d.defenseur_login : d.attaquant_login);
       const res = d.egalite ? "Égalité" : d.vainqueur_login === moi ? "Victoire" : "Défaite";
       notifs.push({ quand: d.joue_le, icone: "i-epees", texte: `${res} en duel contre ${autre}`, lien: "combat.html?duel=" + encodeURIComponent(d.id) });
     });

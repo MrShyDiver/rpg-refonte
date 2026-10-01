@@ -2,7 +2,8 @@
 /* =====================================================================
    Stream RPG — combat.html : l'arène cinématique des duels.
    combat.html?duel=<id>                         rejoue un duel (live ou site)
-   combat.html?adversaire=<login>&mode=classe|entrainement   écran « versus » puis combat
+   combat.html?adversaire=<login>&mode=classe|entrainement   écran « versus » puis combat (&echo=1 : contre son écho)
+   combat.html?mode=auto                                     combat automatique : adversaire tiré au sort par le serveur
    Le replay (format legacy duels/<id>.json, sur-ensemble côté site) pilote tout :
    aucun calcul de combat ici, seulement la mise en scène.
    ===================================================================== */
@@ -76,7 +77,8 @@ App.demarrer("duels", async (main, ctx) => {
   const id = params.get("duel"), adv = params.get("adversaire");
   if (params.get("bac")) return ecranBac(main, ctx);
   if (id) return ecranReplay(main, ctx, id);
-  if (adv) return ecranVersus(main, ctx, String(adv).toLowerCase(), params.get("mode") === "entrainement" ? "entrainement" : "classe");
+  if (params.get("mode") === "auto") return ecranAuto(main, ctx);
+  if (adv) return ecranVersus(main, ctx, String(adv).toLowerCase(), params.get("mode") === "entrainement" ? "entrainement" : "classe", params.get("echo") === "1");
   main.append(blocVide("Aucun combat à afficher.", "Choisis un adversaire ou un combat dans l'historique."));
 });
 
@@ -118,7 +120,62 @@ async function ecranBac(main, ctx) {
 // ---------------------------------------------------------------------
 // Écran « versus » : les deux builds, le mode, le coût, « Lancer le duel »
 // ---------------------------------------------------------------------
-async function ecranVersus(main, ctx, login, modeInitial) {
+// Carte d'un combattant sur l'écran versus. echo : le build affiché sera ramené au niveau de l'attaquant.
+function carteVersus(j, loadout, niveaux, puissance, toi, echo) {
+  const it = (col) => { const n = loadout && loadout[col]; const o = n ? App.objet(n) : null; return o ? { o, niveau: Math.min(niveaux.get(n) || 0, App.niveauMax(o.rarete)) } : null; };
+  return el("div", { class: "vs-joueur" + (toi ? " moi" : "") + (echo ? " echo" : "") },
+    el("div", { class: "vs-portrait" }, visage(j)),
+    el("div", { class: "vs-ident" }, el("b", { texte: (echo ? "Écho de " : "") + (j.display_name || j.twitch_login) }), toi ? el("span", { class: "pilule toi", texte: "Toi" }) : echo ? el("span", { class: "pilule echo", texte: "Écho" }) : null),
+    el("div", { class: "vs-chiffres" },
+      el("div", {}, el("b", { class: "num", texte: echo ? "Ajustée" : puissance ? fmt(puissance) : "—" }), el("span", { texte: echo ? "dans ta tranche" : "puissance" })),
+      echo ? el("div", {}, el("b", { class: "num", texte: "50/50" }), el("span", { texte: "combat visé" }))
+        : el("div", {}, el("b", { class: "num", texte: `${fmt(j.victoires || 0)}-${fmt(j.defaites || 0)}` }), el("span", { texte: "V-D" }))),
+    el("div", { class: "vs-build" }, [["arme", "Arme"], ["armure", "Armure"], ["offhand", "Main gauche"], ["strategeme", "Stratagème"]].map(([c, lib]) => carteOuVide(it(c), lib))));
+}
+// Un écho n'existe pas dans la liste des joueurs : on lui prête le portrait du joueur d'origine.
+const joueurEcho = (source, d) => ({ ...source, twitch_login: d.twitch_login, display_name: d.display_name });
+
+// ---------------------------------------------------------------------
+// Combat automatique : le serveur tire un adversaire dans la tranche (ou un écho)
+// ---------------------------------------------------------------------
+async function ecranAuto(main, ctx) {
+  const moi = ctx.joueur, tickets = moi.tickets || 0;
+  const pMoi = (App.puissance(moi, App.niveaux(), ctx.loadout) || {}).powerLevel || 0;
+  const lancer = el("button", { type: "button", class: "btn-principal vs-lancer", disabled: tickets < 1 }, icone("i-epees"), el("span", { texte: "Lancer le combat" }));
+  const mystere = el("div", { class: "vs-joueur mystere" },
+    el("div", { class: "vs-portrait" }, el("span", { class: "vs-inconnu", "aria-hidden": "true", texte: "?" })),
+    el("div", { class: "vs-ident" }, el("b", { texte: "Adversaire tiré au sort" })),
+    el("p", { class: "vs-mystere-texte" }, "Un joueur de ta tranche de puissance (30 % en plus ou en moins). Personne de disponible ? Tu affrontes un ",
+      el("a", { class: "lien", href: "aide.html#echo", texte: "écho" }), " : le build d'un autre joueur, ramené à ton niveau."));
+  lancer.addEventListener("click", async () => {
+    demarrerSon(); // geste utilisateur : l'audio peut démarrer
+    lancer.disabled = true; lancer.classList.add("occupe"); lancer.lastChild.textContent = "Recherche d'un adversaire…";
+    try {
+      const rep = await App.lancerDuel({ mode: "auto" });
+      if (rep.joueur) { Object.assign(ctx.joueur, rep.joueur); App.majRessources(); }
+      history.replaceState(null, "", "combat.html?duel=" + encodeURIComponent(rep.duel_id));
+      await pSfx; demarrerSon();
+      const d = rep.defenseur || { twitch_login: rep.replay.defenseur, display_name: rep.replay.defenseur };
+      arene(main, ctx, { R: rep.replay, duel: { id: rep.duel_id, type: "auto_battle", replay: { source: "site" } }, joueurs: [moi, d], mode: "auto", resultat: rep.resultat }).jouer();
+      App.rafraichirJoueur().catch(() => {});
+    } catch (e) {
+      App.erreur(e);
+      lancer.classList.remove("occupe"); lancer.lastChild.textContent = "Lancer le combat"; lancer.disabled = (ctx.joueur.tickets || 0) < 1;
+    }
+  });
+  main.replaceChildren(el("section", { class: "versus", "aria-labelledby": "titre-versus" },
+    el("header", { class: "vs-entete" }, el("span", { class: "vs-sur", texte: "Combat automatique" }), el("h1", { id: "titre-versus", texte: "Le jeu choisit ton adversaire" })),
+    el("div", { class: "vs-duo" }, carteVersus(moi, ctx.loadout, App.niveaux(), pMoi, true), el("div", { class: "vs-eclair", "aria-hidden": "true" }, el("span", { texte: "VS" })), mystere),
+    el("div", { class: "vs-bas" },
+      el("p", { class: "vs-cout" }, icone("i-ticket"), el("span", {}, "Coûte ", el("b", { texte: "1 ticket de duel" }), ` · il t'en reste ${fmt(tickets)}.`)),
+      el("p", { class: "vs-cout vs-reduit" }, icone("i-alerte"), el("span", {}, el("b", { texte: "Récompenses réduites de 50 %" }), " par rapport à un duel ciblé : 6 médailles par victoire, 3 par égalité, 1 par défaite.")),
+      lancer,
+      el("p", { class: "vs-raison", texte: tickets < 1 ? "Plus de ticket de duel : gagne-en en live." : "" }),
+      el("p", { class: "mention vs-note", texte: "Le combat est calculé par le serveur avec vos deux builds actuels. Pour toucher les récompenses complètes, choisis toi-même ta cible dans la liste des adversaires." }),
+      el("a", { class: "lien-retour", href: "duels.html" }, picto("retour"), "Retour aux duels"))));
+}
+
+async function ecranVersus(main, ctx, login, modeInitial, echo) {
   const moi = ctx.joueur;
   if (login === moi.twitch_login) { main.replaceChildren(blocVide("Tu ne peux pas te défier toi-même.", "Choisis un autre adversaire dans la liste.")); return; }
   main.replaceChildren(el("div", { class: "chargement", texte: "Préparation du face-à-face…" }));
@@ -134,22 +191,11 @@ async function ecranVersus(main, ctx, login, modeInitial) {
   const abonne = App.peutEntrainer(moi);
   let mode = modeInitial === "entrainement" && abonne ? "entrainement" : "classe";
 
-  const carteJoueur = (j, loadout, niveaux, puissance, toi) => {
-    const it = (col, slot) => { const n = loadout && loadout[col]; const o = n ? App.objet(n) : null; return o ? { o, niveau: Math.min(niveaux.get(n) || 0, App.niveauMax(o.rarete)) } : null; void slot; };
-    return el("div", { class: "vs-joueur" + (toi ? " moi" : "") },
-      el("div", { class: "vs-portrait" }, visage(j)),
-      el("div", { class: "vs-ident" }, el("b", { texte: j.display_name || j.twitch_login }), toi ? el("span", { class: "pilule toi", texte: "Toi" }) : null),
-      el("div", { class: "vs-chiffres" },
-        el("div", {}, el("b", { class: "num", texte: puissance ? fmt(puissance) : "—" }), el("span", { texte: "puissance" })),
-        el("div", {}, el("b", { class: "num", texte: `${fmt(j.victoires || 0)}-${fmt(j.defaites || 0)}` }), el("span", { texte: "V-D" }))),
-      el("div", { class: "vs-build" }, [["arme", "Arme"], ["armure", "Armure"], ["offhand", "Main gauche"], ["strategeme", "Stratagème"]].map(([c, lib]) => carteOuVide(it(c), lib))));
-  };
-
   const cout = el("p", { class: "vs-cout", "aria-live": "polite" });
   const lancer = el("button", { type: "button", class: "btn-principal vs-lancer" }, icone("i-epees"), el("span", { texte: "Lancer le duel" }));
   const raison = el("p", { class: "vs-raison" });
   const modes = el("div", { class: "onglets-b vs-modes", role: "group", "aria-label": "Type de duel" },
-    el("button", { type: "button", "data-v": "classe", onclick: () => choisir("classe") }, "Duel classé"),
+    el("button", { type: "button", "data-v": "classe", onclick: () => choisir("classe") }, "Duel ciblé"),
     el("button", { type: "button", "data-v": "entrainement", title: abonne ? null : "Réservé aux abonnés de la chaîne",
       onclick: () => (abonne ? choisir("entrainement") : App.toast("L'entraînement gratuit est réservé aux abonnés Twitch de la chaîne.", { titre: "Réservé aux abonnés", icone: "i-cadenas" })) },
       abonne ? null : icone("i-cadenas"), "Entraînement"));
@@ -157,14 +203,14 @@ async function ecranVersus(main, ctx, login, modeInitial) {
     mode = m;
     modes.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === m)));
     const tickets = ctx.joueur.tickets || 0;
-    history.replaceState(null, "", `combat.html?adversaire=${encodeURIComponent(login)}&mode=${m}`);
+    history.replaceState(null, "", `combat.html?adversaire=${encodeURIComponent(login)}&mode=${m}${echo ? "&echo=1" : ""}`);
     if (m === "classe") {
       cout.replaceChildren(icone("i-ticket"), el("span", {}, "Coûte ", el("b", { texte: "1 ticket de duel" }), ` · il t'en reste ${fmt(tickets)}. Médailles et bilan en jeu, comme en live.`));
       const bloque = tickets < 1;
       lancer.disabled = bloque;
       raison.textContent = bloque ? "Plus de ticket de duel — gagne-en en live." : "";
     } else {
-      cout.replaceChildren(icone("i-coche"), el("span", {}, el("b", { texte: "Gratuit" }), " pour les abonnés · aucune récompense, ton bilan ne bouge pas."));
+      cout.replaceChildren(icone("i-coche"), el("span", {}, el("b", { texte: "Gratuit" }), " pour les abonnés, 3 par jour · aucune récompense, ton bilan ne bouge pas."));
       lancer.disabled = false; raison.textContent = "";
     }
   }
@@ -172,25 +218,31 @@ async function ecranVersus(main, ctx, login, modeInitial) {
     demarrerSon(); // geste utilisateur : l'audio peut démarrer
     lancer.disabled = true; lancer.classList.add("occupe"); lancer.lastChild.textContent = "Combat en cours…";
     try {
-      const rep = await App.lancerDuel({ adversaire: login, mode });
+      const rep = await App.lancerDuel({ adversaire: login, mode, echo });
       if (rep.joueur) { Object.assign(ctx.joueur, rep.joueur); App.majRessources(); }
       history.replaceState(null, "", "combat.html?duel=" + encodeURIComponent(rep.duel_id));
       await pSfx; demarrerSon();
-      const joueurs = [moi, adv];
+      const joueurs = [moi, echo && rep.defenseur ? joueurEcho(adv, rep.defenseur) : adv];
       const duel = { id: rep.duel_id, type: (rep.mode || mode) === "entrainement" ? "entrainement" : "duel", replay: { source: "site" } };
       arene(main, ctx, { R: rep.replay, duel, joueurs, mode: rep.mode || mode, resultat: rep.resultat }).jouer();
       App.rafraichirJoueur().catch(() => {});
     } catch (e) {
       App.erreur(e);
+      // Écho refusé par le serveur (impossible à ramener à ton niveau) : la page Duels ne le proposera plus.
+      if (echo && e.statut === 409) {
+        try { const l = JSON.parse(sessionStorage.getItem("echos-refuses") || "[]"); if (!l.includes(login)) sessionStorage.setItem("echos-refuses", JSON.stringify([...l, login])); } catch (x) { /* navigation privée */ }
+      }
       lancer.classList.remove("occupe"); lancer.lastChild.textContent = "Lancer le duel"; choisir(mode);
     }
   });
 
   main.replaceChildren(el("section", { class: "versus", "aria-labelledby": "titre-versus" },
-    el("header", { class: "vs-entete" }, el("span", { class: "vs-sur", texte: "Face-à-face" }), el("h1", { id: "titre-versus", texte: "Toi contre " + (adv.display_name || adv.twitch_login) })),
-    el("div", { class: "vs-duo" }, carteJoueur(moi, ctx.loadout, App.niveaux(), pMoi, true), el("div", { class: "vs-eclair", "aria-hidden": "true" }, el("span", { texte: "VS" })), carteJoueur(adv, lo, nivAdv, pAdv, false)),
+    el("header", { class: "vs-entete" }, el("span", { class: "vs-sur", texte: "Face-à-face" }), el("h1", { id: "titre-versus", texte: "Toi contre " + (echo ? "l'écho de " : "") + (adv.display_name || adv.twitch_login) })),
+    el("div", { class: "vs-duo" }, carteVersus(moi, ctx.loadout, App.niveaux(), pMoi, true), el("div", { class: "vs-eclair", "aria-hidden": "true" }, el("span", { texte: "VS" })), carteVersus(adv, lo, nivAdv, pAdv, false, echo)),
     el("div", { class: "vs-bas" }, modes, cout, lancer, raison,
-      el("p", { class: "mention vs-note", texte: "Le combat est calculé par le serveur avec vos deux builds actuels. " + (adv.display_name || login) + " n'a pas besoin d'être connecté : il verra le résultat dans ses notifications." }),
+      el("p", { class: "mention vs-note" }, echo
+        ? ["Tu affrontes un ", el("a", { class: "lien", href: "aide.html#echo", texte: "écho" }), " : le build de " + (adv.display_name || login) + ", dont les stats sont ramenées à ton niveau par le serveur pour un combat serré. Lui ne gagne ni ne perd rien, et tu touches les récompenses d'un combat équitable."]
+        : "Le combat est calculé par le serveur avec vos deux builds actuels. " + (adv.display_name || login) + " n'a pas besoin d'être connecté : il verra le résultat dans ses notifications."),
       el("a", { class: "lien-retour", href: "duels.html" }, picto("retour"), "Retour aux duels"))));
   choisir(mode);
 }
@@ -203,6 +255,10 @@ function arene(main, ctx, opts) {
   const moi = ctx.joueur.twitch_login;
   const parLogin = new Map((opts.joueurs || []).map((j) => [j.twitch_login, j]));
   parLogin.set(moi, ctx.joueur);
+  for (const c of ["attaquant", "defenseur"]) { // replay d'un écho : portrait et nom du joueur d'origine
+    const source = App.echoDe(R[c]);
+    if (source && !parLogin.has(R[c])) parLogin.set(R[c], { ...(parLogin.get(source) || {}), twitch_login: R[c], display_name: App.nomCombattant(R[c], parLogin) });
+  }
   const nomDe = (l) => (parLogin.get(l) || {}).display_name || l || "?";
   const index = parNom();
   const gauche = R.defenseur === moi && R.attaquant !== moi ? "defenseur" : "attaquant";
@@ -1050,7 +1106,7 @@ function arene(main, ctx, opts) {
     const bouton = avecPorte ? el("button", { type: "button", class: "btn-principal intro-go" }, picto("lecture"), "Regarder le combat") : null;
     const voile = el("div", { class: "intro" + (avecPorte ? " porte" : ""), role: avecPorte ? "dialog" : null, "aria-label": "Présentation du combat" },
       el("div", { class: "intro-ligne" }, cote(G), el("div", { class: "intro-vs", texte: "VS" }), cote(D)),
-      el("div", { class: "intro-infos" }, [opts.bac ? "Bac à sable" : opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel classé", auto_battle: "Combat auto" }[(opts.duel || {}).type] || "Duel", TRANCHES[R.tranche] || null].filter(Boolean).join(" · ")),
+      el("div", { class: "intro-infos" }, [opts.bac ? "Bac à sable" : opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel ciblé", auto_battle: "Combat automatique" }[(opts.duel || {}).type] || "Duel", R.echo_de ? "Écho" : null, TRANCHES[R.tranche] || null].filter(Boolean).join(" · ")),
       compte, bouton);
     racine.append(voile);
     return { voile, compte, bouton };
@@ -1202,14 +1258,19 @@ function arene(main, ctx, opts) {
       if (res.medailles_gagnees != null) { recompenses.push(med(res.medailles_gagnees)); if (res.medailles_perdues) recompenses.push(med(-res.medailles_perdues)); }
       else if (monCote && R["medailles_" + monCote] != null) recompenses.push(med(R["medailles_" + monCote]));
       else for (const X of [G, D]) if (R["medailles_" + X.c] != null) recompenses.push(med(R["medailles_" + X.c], X.nom));
+      if (opts.mode === "auto" && participant) recompenses.push(el("p", { class: "mention", texte: "Combat automatique : récompenses réduites de 50 %. Choisis ta cible pour les toucher en entier." }));
     }
     const ligne = (lib, k) => el("tr", {}, el("th", { scope: "row", texte: lib }), el("td", { class: "num", texte: fmt(R[k + "_" + G.c] || 0) }), el("td", { class: "num", texte: fmt(R[k + "_" + D.c] || 0) }));
     const adverse = participant ? (R.attaquant === moi ? R.defenseur : R.attaquant) : null;
     const tickets = ctx.joueur.tickets || 0;
     const actions = [];
-    if (adverse) actions.push(tickets > 0
-      ? el("a", { class: "btn-principal", href: `combat.html?adversaire=${encodeURIComponent(adverse)}&mode=classe` }, icone("i-epees"), "Revanche")
-      : el("button", { type: "button", class: "btn-principal", disabled: true, title: "Plus de ticket de duel — gagne-en en live" }, icone("i-epees"), "Revanche"));
+    // Combat automatique : on relance un tirage. Écho : revanche contre le même écho.
+    const auto = opts.mode === "auto" && R.attaquant === moi;
+    const suite = auto ? ["combat.html?mode=auto", "Nouveau combat auto"]
+      : adverse ? [`combat.html?adversaire=${encodeURIComponent(App.echoDe(adverse) || adverse)}&mode=classe${App.echoDe(adverse) ? "&echo=1" : ""}`, "Revanche"] : null;
+    if (suite) actions.push(tickets > 0
+      ? el("a", { class: "btn-principal", href: suite[0] }, icone("i-epees"), suite[1])
+      : el("button", { type: "button", class: "btn-principal", disabled: true, title: "Plus de ticket de duel — gagne-en en live" }, icone("i-epees"), suite[1]));
     if (opts.bac) actions.push(el("a", { class: "btn-principal", href: "recette.html?relancer=1" }, icone("i-epees"), "Relancer"));
     actions.push(el("button", { type: "button", class: "btn-second", onclick: () => arene(main, ctx, opts).jouer() }, picto("rejouer"), "Revoir"));
     actions.push(opts.bac ? el("a", { class: "btn-second", href: "recette.html" }, picto("retour"), "Retour à la recette")
@@ -1217,7 +1278,7 @@ function arene(main, ctx, opts) {
     const titreEl = el("h2", { class: "outro-titre", tabindex: "-1", texte: titre });
     const panneau = el("div", { class: "outro " + genre, role: "dialog", "aria-labelledby": "outro-titre" },
       el("div", { class: "outro-carte" },
-        el("span", { class: "outro-sur", texte: opts.bac ? "Combat de test terminé" : opts.mode === "entrainement" ? "Entraînement terminé" : "Combat terminé" }),
+        el("span", { class: "outro-sur", texte: opts.bac ? "Combat de test terminé" : opts.mode === "entrainement" ? "Entraînement terminé" : opts.mode === "auto" ? "Combat automatique terminé" : "Combat terminé" }),
         titreEl, sous ? el("p", { class: "outro-sous", texte: sous }) : null,
         recompenses.length ? el("div", { class: "outro-gains" }, recompenses) : null,
         el("table", { class: "outro-stats" }, el("thead", {}, el("tr", {}, el("td"), el("th", { scope: "col", texte: G.nom }), el("th", { scope: "col", texte: D.nom }))),
