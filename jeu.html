@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Sécurité : mêmes règles que jeu.html. Si tu modifies le script en bas de page, son empreinte
      sha256 change : regénère-la (sinon le navigateur refuse de l'exécuter). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js 'sha256-pa31YY/AIqGZLsqPBgv2Xrr6hHs4ys8bHmahl5ypo2c='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js 'sha256-/Fh+NW6f4FwO4yoQx8+99R6avRklWUQ5oP58Pe/yySg='; media-src 'self'; connect-src 'self' https://jpmrgxezdzkvbkctwqlh.supabase.co wss://jpmrgxezdzkvbkctwqlh.supabase.co; img-src 'self' https://static-cdn.jtvnw.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Stream RPG</title>
 <meta name="description" content="Le jeu de rôle de la chaîne MrShyDiver : gagne des lootbox en live, ouvre-les ici, équipe ton personnage et affronte le chat en duel.">
@@ -1073,7 +1073,7 @@ const btnPasser = $("btn-passer");
 // commande-lootbox-legendaire.cs : jamais de Commun). Passer la standard à
 // 45/30/15/8/2 quand la table « après boss » sera activée.
 const TAUX = {
-  standard: { commun: 46, normal: 31, rare: 15, epique: 8, legendaire: 0 },
+  standard: { commun: 45, normal: 30, rare: 15, epique: 8, legendaire: 2 }, // = lootbox_raretes (01/10)
   legendaire: { commun: 0, normal: 46, rare: 31, epique: 15, legendaire: 8 },
 };
 // Suspense du coffre selon la meilleure rareté du tirage, charge de chaque carte avant son
