@@ -110,16 +110,19 @@
 .portrait[data-degats="3"] .visage { filter: saturate(.55) brightness(.92) contrast(1.05); }
 .portrait[data-degats="4"] .visage { filter: saturate(.3) brightness(.8) contrast(1.1); }
 .portrait[data-degats="5"] .visage { filter: grayscale(1) brightness(.5); }
-.fissures { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.fissures path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.fissures .ombre { stroke: rgba(0,0,0,.6); }
-.fissures .lumiere { stroke: rgba(255,238,228,.85); }
-.fissures .sang { fill: #a3111f; opacity: .85; }
-.fissures g { opacity: 0; transition: opacity calc(.3s / var(--vit)); }
-.portrait[data-degats="1"] [data-e="1"],
-.portrait[data-degats="2"] :is([data-e="1"], [data-e="2"]),
-.portrait[data-degats="3"] :is([data-e="1"], [data-e="2"], [data-e="3"]),
-.portrait:is([data-degats="4"], [data-degats="5"]) .fissures g { opacity: 1; }
+/* Blessures accumulées : coupures, contusions, impacts, brûlures, taches de sang */
+.blessures { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.bl { position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%) rotate(var(--r)) scale(var(--s)); animation: bl-entree calc(.4s / var(--vit)) cubic-bezier(.2,.8,.3,1) both; }
+@keyframes bl-entree { from { opacity: 0; scale: 1.7; } }
+.bl-entaille { width: 36%; height: 3.6%; border-radius: 50%; background: linear-gradient(90deg, transparent, #4d000e 14%, #b3122a 38%, #ff6b7d 50%, #b3122a 62%, #4d000e 86%, transparent); box-shadow: 0 0 3px rgba(90,0,12,.9); }
+.bl-entaille::after { content: ""; position: absolute; left: 46%; top: 60%; width: 6%; height: 180%; border-radius: 0 0 50% 50%; background: linear-gradient(180deg, #b3122a, rgba(179,18,42,0)); }
+.bl-entaille.gros { height: 5%; }
+.bl-contusion { width: 28%; aspect-ratio: 1; border-radius: 46% 54% 50% 50%; background: radial-gradient(circle, rgba(95,25,120,.6), rgba(60,20,95,.38) 45%, transparent 70%); mix-blend-mode: multiply; }
+.bl-impact { width: 7.5%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, #120003 0 28%, #7d0014 42%, rgba(200,20,40,.55) 58%, transparent 72%); }
+.bl-brulure { width: 32%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(18,8,4,.7), rgba(70,28,10,.42) 42%, rgba(255,120,40,.12) 58%, transparent 70%); mix-blend-mode: multiply; }
+.bl-sang { width: 20%; aspect-ratio: 1; opacity: .88;
+  background: radial-gradient(circle at 42% 44%, #a3001a 0 26%, transparent 28%), radial-gradient(circle at 72% 62%, #a3001a 0 12%, transparent 14%),
+    radial-gradient(circle at 24% 74%, #a3001a 0 9%, transparent 11%), radial-gradient(circle at 80% 24%, #a3001a 0 7%, transparent 9%), radial-gradient(circle at 56% 86%, #a3001a 0 5%, transparent 7%); }
 .vignette { background: radial-gradient(circle at 50% 50%, transparent 42%, rgba(150,8,22,.8) 100%); opacity: 0; transition: opacity .6s; }
 .portrait[data-degats="3"] .vignette { opacity: .5; }
 .portrait[data-degats="4"] .vignette { opacity: .9; animation: pouls calc(1.1s / var(--vit)) ease-in-out infinite; }
@@ -252,7 +255,8 @@
 .orbe-vie { width: 11px; height: 11px; border-radius: 50%; background: #ff5a6e; box-shadow: 0 0 12px #ff4d6d; }
 .etoile-stun { width: 16px; height: 16px; background: var(--c-elec); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); filter: drop-shadow(0 0 4px #fff07a); }
 .eclat-visage { overflow: hidden; }
-.portrait.detruit > .visage, .portrait.detruit > .fissures { opacity: 0; }
+.portrait.detruit > .visage, .portrait.detruit > .blessures { opacity: 0; }
+.eclat-visage .blessures .bl { animation: none; }
 
 /* Carte de stratagème qui vole, se retourne et brûle */
 .carte-vol { aspect-ratio: 5 / 7; z-index: 4; }
@@ -336,34 +340,32 @@
 .socle[class*="vient-"] .au { animation: au-entree calc(.7s / var(--vit)) cubic-bezier(.2,.8,.3,1) both; }
 @keyframes au-entree { 0% { transform: scale(1.5); opacity: 0; filter: brightness(2.5); } 60% { opacity: 1; } 100% { transform: none; filter: none; } }
 
-/* Poison : nuages verts qui tournent, bulles qui montent */
-.au-poison i, .au-antisoin i { left: 14%; top: 14%; width: 72%; height: 72%; border-radius: 50%; mix-blend-mode: screen; filter: blur(3px);
-  background: radial-gradient(circle, rgba(150,240,110,.42), rgba(90,190,70,.18) 45%, transparent 70%);
-  animation: derive calc((5.5s + var(--k) * 1.3s) / var(--vit)) ease-in-out infinite; animation-delay: calc(var(--k) * -1.7s); }
-@keyframes derive { 0%, 100% { transform: translate(-20%, 10%) scale(1); } 33% { transform: translate(18%, -8%) scale(1.18); } 66% { transform: translate(4%, 18%) scale(.9); } }
-.au-poison b, .au-antisoin b { bottom: 20%; left: calc(22% + var(--k) * 11%); width: 7%; aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--c-poison); background: rgba(126,224,109,.25);
-  animation: bulle-monte calc((1.8s + var(--k) * .25s) / var(--vit)) ease-in infinite; animation-delay: calc(var(--k) * -.45s); }
-@keyframes bulle-monte { 0% { transform: translateY(0) scale(.5); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-260%) scale(1.15); opacity: 0; } }
-.socle.a-poison .portrait { box-shadow: 0 0 34px -6px rgba(126,224,109,.75), 0 22px 40px -22px rgba(0,0,0,.95); }
-/* Anti-soin : même brume, en violet sombre */
-.au-antisoin i { background: radial-gradient(circle, rgba(190,110,255,.45), rgba(110,40,170,.25) 45%, transparent 70%); }
+/* Brûlure, poison, anti-soin : de légères vagues qui tournent autour du cadre (anneau en dégradé conique, masqué au centre). */
+@property --a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.au-feu i, .au-poison i, .au-antisoin i { inset: 10.5%; border-radius: 30%; padding: 3.5%;
+  background: conic-gradient(from var(--a), var(--c1), transparent 50deg, var(--c2) 110deg, transparent 170deg, var(--c1) 220deg, transparent 285deg, var(--c2) 330deg, var(--c1));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  filter: blur(3px); animation: vague calc(4.2s / var(--vit)) linear infinite, ondule calc(.45s / var(--vit)) ease-in-out infinite alternate; }
+.au-feu i:nth-child(2), .au-poison i:nth-child(2), .au-antisoin i:nth-child(2) { inset: 8%; padding: 4.5%; opacity: .6; filter: blur(5px); animation-duration: calc(6.8s / var(--vit)), calc(.6s / var(--vit)); animation-direction: reverse, alternate; }
+@keyframes vague { to { --a: 360deg; } }
+@keyframes ondule { to { transform: scale(1.018); opacity: .8; } }
+.au-feu { --c1: rgba(255,120,30,.95); --c2: rgba(255,210,90,.85); }
+.au-poison { --c1: rgba(140,235,100,.75); --c2: rgba(90,190,70,.5); }
+.au-poison i, .au-antisoin i { padding: 5%; filter: blur(6px); animation-duration: calc(7s / var(--vit)), calc(1.6s / var(--vit)); }
+.au-antisoin { --c1: rgba(190,110,255,.65); --c2: rgba(110,40,170,.45); }
+/* quelques braises / bulles discrètes au bord */
+.au-feu b { bottom: 16%; left: calc(24% + var(--k) * 16%); width: 2.2%; aspect-ratio: 1; border-radius: 50%; background: #ffc24d; box-shadow: 0 0 6px #ff6a1a;
+  animation: braise-monte calc((1.6s + var(--k) * .3s) / var(--vit)) ease-out infinite; animation-delay: calc(var(--k) * -.5s); }
+@keyframes braise-monte { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(calc((var(--k) - 1.5) * 8px), -300%); opacity: 0; } }
+.au-poison b, .au-antisoin b { bottom: 14%; left: calc(26% + var(--k) * 22%); width: 5%; aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--c-poison); background: rgba(126,224,109,.2);
+  animation: bulle-monte calc((2.2s + var(--k) * .3s) / var(--vit)) ease-in infinite; animation-delay: calc(var(--k) * -.7s); }
 .au-antisoin b { border-color: #c98bff; background: rgba(150,80,220,.2); }
-
-/* Brûlure : flammes qui lèchent le portrait, braises qui montent */
-.au-feu i { bottom: 14%; left: calc(10% + var(--k) * 9.5%); width: 18%; height: 34%; transform-origin: 50% 100%; mix-blend-mode: screen; filter: blur(.6px);
-  border-radius: 50% 50% 45% 45% / 70% 70% 30% 30%;
-  background: radial-gradient(ellipse at 50% 88%, #fff6c8 0 12%, #ffd04d 26%, #ff8a2b 46%, rgba(230,60,20,.75) 62%, transparent 74%);
-  animation: flamme calc((.55s + var(--k) * .04s) / var(--vit)) ease-in-out infinite alternate; animation-delay: calc(var(--k) * -.13s); }
-.au-feu i:nth-child(odd) { height: 44%; }
-.au-feu i:nth-child(1), .au-feu i:nth-child(9) { bottom: 26%; height: 50%; }
-@keyframes flamme { 0% { transform: scaleY(.72) scaleX(1.08) skewX(-6deg); opacity: .7; } 50% { transform: scaleY(1.18) scaleX(.88) skewX(5deg); opacity: 1; } 100% { transform: scaleY(.9) scaleX(1) skewX(-2deg); opacity: .85; } }
-.au-feu b { bottom: 30%; left: calc(18% + var(--k) * 10%); width: 2.6%; aspect-ratio: 1; border-radius: 50%; background: #ffc24d; box-shadow: 0 0 6px #ff6a1a;
-  animation: braise-monte calc((1.3s + var(--k) * .2s) / var(--vit)) ease-out infinite; animation-delay: calc(var(--k) * -.37s); }
-@keyframes braise-monte { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(calc((var(--k) - 3) * 6px), -340%); opacity: 0; } }
-.socle.a-feu .portrait { box-shadow: 0 0 40px -6px rgba(255,120,30,.85), inset 0 -20px 30px -12px rgba(255,120,30,.5), 0 22px 40px -22px rgba(0,0,0,.95); }
-.socle.flambe .au-feu i { animation-duration: calc(.25s / var(--vit)); }
+@keyframes bulle-monte { 0% { transform: translateY(0) scale(.5); opacity: 0; } 20% { opacity: .9; } 100% { transform: translateY(-240%) scale(1.1); opacity: 0; } }
+.socle.a-feu .portrait { box-shadow: 0 0 22px -8px rgba(255,120,30,.65), 0 22px 40px -22px rgba(0,0,0,.95); }
+.socle.a-poison .portrait { box-shadow: 0 0 22px -8px rgba(126,224,109,.55), 0 22px 40px -22px rgba(0,0,0,.95); }
+.socle.flambe .au-feu i { filter: blur(2px) brightness(1.7); }
 .socle.flambe .au-feu { animation: embrase calc(.8s / var(--vit)) ease-out; }
-@keyframes embrase { 25% { transform: scale(1.25); filter: brightness(1.6); } }
+@keyframes embrase { 25% { transform: scale(1.12); } }
 
 /* Paralysie : arcs électriques qui crépitent autour du portrait */
 .au-elec { width: 100%; height: 100%; overflow: visible; }

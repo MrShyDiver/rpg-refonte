@@ -5,6 +5,8 @@
    Fichiers : les noms de sons du replay (ex. "sword_slash_1.mp3", choisis par
    objet dans le catalogue) sont joués depuis le dossier sons/ de l'ancien site
    (/rpg/sons/, même domaine) ; un fichier absent retombe sur la synthèse.
+   Événements : sons/combat/<nom>.mp3, s'il est listé dans sons/combat/liste.json,
+   remplace la synthèse de cet événement (crit, ko, esquive…).
    Musique : SFX.musique enchaîne les pistes de sons/musiques/ en fondu.
    ===================================================================== */
 "use strict";
@@ -31,6 +33,7 @@ function demarrer() {
     reverb = ctx.createConvolver(); reverb.buffer = impulsion(2.4, 2.8);
     const retour = ctx.createGain(); retour.gain.value = 0.3;
     reverb.connect(retour).connect(maitre);
+    chargerRemplacements();
   }
   if (ctx.state === "suspended") ctx.resume();
   return true;
@@ -293,21 +296,39 @@ const musique = (() => {
     // Avant le geste : choisit la piste et commence le téléchargement.
     preparer(l) { liste = l.slice(); if (!premiere) premiere = choisir(); if (premiere) telecharger(premiere); },
     jouer() { if (enCours || !ctx || !premiere || (window.App && App.DEMO)) return; enCours = true; lancer(premiere); },
+    // Fondu de sortie sur le bus entier (un bus neuf servira au prochain morceau).
     arreter(fondu = 1.2) {
       enCours = false; clearInterval(veille); premiere = null;
-      if (!ctx) return;
-      const t = ctx.currentTime;
-      voix.forEach((v) => { v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(Math.max(0.0001, v.g.gain.value), t); v.g.gain.exponentialRampToValueAtTime(0.0001, t + fondu); try { v.src.stop(t + fondu + 0.05); } catch (e) {} });
+      if (!ctx || !bus) return;
+      const t = ctx.currentTime, b = bus, vs = voix;
+      bus = null; voix = [];
+      b.gain.cancelScheduledValues(t); b.gain.setValueAtTime(b.gain.value, t); b.gain.linearRampToValueAtTime(0, t + fondu);
+      vs.forEach((v) => { try { v.src.stop(t + fondu + 0.1); } catch (e) {} });
+      setTimeout(() => b.disconnect(), (fondu + 0.5) * 1000);
     },
     get coupee() { return coupee; },
     set coupee(c) { coupee = !!c; if (bus && ctx) bus.gain.setTargetAtTime(coupee ? 0 : VOL, ctx.currentTime, 0.15); },
   };
 })();
 
+// ---------------------------------------------------------------------
+// Bruitages de remplacement : sons/combat/liste.json donne les noms d'événements
+// (ex. ["crit", "ko"]) qui ont un fichier sons/combat/<nom>.mp3 ; il remplace la synthèse.
+// ---------------------------------------------------------------------
+let remplacements = new Set();
+function chargerRemplacements() {
+  if (window.App && App.DEMO) return;
+  fetch(BASE + "combat/liste.json").then((r) => (r.ok ? r.json() : [])).then((l) => {
+    remplacements = new Set((Array.isArray(l) ? l : []).map(String).filter((n) => /^[\w-]+$/.test(n)));
+    remplacements.forEach((n) => tampon("combat/" + n + ".mp3"));
+  }).catch(() => {});
+}
+
 // jouer("slash_katana", { pan, retard (s), fichiers: "a.mp3,b.mp3", vol, envoi })
+// Priorité : fichier de l'objet (catalogue) > fichier d'événement (sons/combat/) > synthèse.
 function jouer(nom, o = {}) {
   if (!actif || !ctx || ctx.state === "closed") return;
-  const f = fichierDisponible(o.fichiers);
+  const f = fichierDisponible(o.fichiers) || (remplacements.has(nom) && fichiers.get("combat/" + nom + ".mp3") !== null ? "combat/" + nom + ".mp3" : null);
   const t = ctx.currentTime + Math.max(0, o.retard || 0);
   if (f) {
     const b = fichiers.get(f);

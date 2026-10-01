@@ -32,7 +32,7 @@ function picto(nom) {
   p.setAttribute("d", PICTOS[nom]); p.setAttribute("fill", "currentColor"); s.append(p);
   return s;
 }
-// Aléatoire déterministe (fissures identiques d'un visionnage à l'autre).
+// Aléatoire déterministe (tracés identiques d'un visionnage à l'autre).
 function graine(txt) { let h = 2166136261; for (const c of String(txt)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 function alea(seed) { let a = seed || 1; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const hasard = (a, b) => a + Math.random() * (b - a);
@@ -267,7 +267,8 @@ function arene(main, ctx, opts) {
     const barre = el("div", { class: "barre", role: "meter", "aria-valuemin": "0", "aria-valuemax": String(X.pvMax0) }, fantome, plein, erosion, bouclier);
     const pvTxt = el("span", { class: "pv-txt num" }), statuts = el("div", { class: "statuts" });
     const vis = visage(X.j);
-    const portrait = el("div", { class: "portrait", "data-degats": "0" }, vis, fissuresPortrait(graine(X.login)), el("i", { class: "teinte" }), el("i", { class: "vignette" }), el("i", { class: "eclair-blanc" }));
+    const blessures = el("div", { class: "blessures" });
+    const portrait = el("div", { class: "portrait", "data-degats": "0" }, vis, blessures, el("i", { class: "teinte" }), el("i", { class: "vignette" }), el("i", { class: "eclair-blanc" }));
     const slot = (k, lib) => el("div", { class: "slot slot-" + k }, carteOuVide(X.it[k], lib));
     const sArme = slot("arme", "Mains nues"), sArmure = slot("armure", "Sans armure"), sOff = slot("offhand", "Main gauche");
     // Stratagème : la carte elle-même, face visible, à la taille de la main gauche.
@@ -281,15 +282,15 @@ function arene(main, ctx, opts) {
           X.puissance ? el("span", { class: "jauge-puissance num", texte: "Puissance " + fmt(X.puissance) }) : null),
         barre, el("div", { class: "jauge-pied" }, pvTxt, statuts)),
       el("div", { class: "corps" }, socle, el("div", { class: "main-cartes" }, sArme, sArmure, sOff, deck)));
-    X.dom = { racine, barre, plein, fantome, bouclier, erosion, pvTxt, statuts, portrait, vis, socle, sArme, sArmure, sOff, deck, pips, cd };
+    X.dom = { racine, barre, plein, fantome, bouclier, erosion, pvTxt, statuts, portrait, vis, blessures, socle, sArme, sArmure, sOff, deck, pips, cd };
   }
   initialiser(F.attaquant); initialiser(F.defenseur);
   construire(G); construire(D);
   const scene = el("div", { class: "scene-arene" }, G.dom.racine,
-    el("div", { class: "centre" }, el("div", { class: "tour" }, el("span", { texte: "Tour" }), numTour, el("small", { class: "num", texte: "/ " + n })),
+    el("div", { class: "centre" }, el("div", { class: "tour" }, el("span", { texte: "Tour" }), numTour),
       el("span", { class: "vs-centre", "aria-hidden": "true", texte: "VS" })), D.dom.racine, annonceur);
 
-  let vitesse = 1, ralenti = 1, enPause = false, jeton = 0, prochain = 0, fini = false;
+  let vitesse = 1, enPause = false, jeton = 0, prochain = 0, fini = false;
   const bPause = el("button", { type: "button", class: "bouton-icone", "aria-label": "Pause", title: "Pause (espace)", onclick: () => basculerPause() }, picto("pause"));
   const vitesses = el("div", { class: "onglets-b vitesses", role: "group", "aria-label": "Vitesse" },
     [1, 2, 4].map((v) => el("button", { type: "button", "aria-pressed": String(v === 1), texte: v + "×", "aria-label": "Vitesse " + v + " fois", onclick: () => regler(v) })));
@@ -413,8 +414,8 @@ function arene(main, ctx, opts) {
   }
 
   // -------------------------------------------------------------- Temps
-  // Vitesse réelle = choix du joueur × tempo de base × ralenti (coup final).
-  const rythme = () => vitesse * TEMPO * ralenti;
+  // Vitesse réelle = choix du joueur × tempo de base.
+  const rythme = () => vitesse * TEMPO;
   function appliquerRythme() {
     const v = rythme();
     racine.style.setProperty("--vit", String(v));
@@ -593,12 +594,16 @@ function arene(main, ctx, opts) {
     const nb = balles.length;
     const profil = strat ? A.profilStrat : A.profil;
     const sonsFichiers = r.sons_override || (strat ? A.sonsStrat : A.sons);
+    // Marque laissée sur le portrait : coupure, contusion, impact de balle ou brûlure selon l'arme.
+    const marque = strat ? (profil === "gaz" ? null : profil === "shuriken" ? "entaille" : "brulure")
+      : /slash/.test(style) ? "entaille" : style === "smash" || style === "poing" ? "contusion" : style === "tir" ? "impact" : "brulure";
     const toucher = (k, x, y, lourd) => {
       const crit = !!crits[k];
       if (rate) return;
       if (r.parade_reussie) return;
       frappe(C, crit || lourd);
       eclatBlanc(C);
+      if (marque) blessure(C, marque, crit || lourd);
       nombre(C, (crit ? "−" : "−") + balles[k], crit ? "crit" : "", k, nb);
       if (crit) { son("crit", { pan: C.pan }); flashArene("or", 260); particules(x, y, 10, "etincelle or", 90, 600); geler(nb > 1 ? 45 : 95); zoom(0.04); }
       else if (lourd || Number(balles[k]) >= C.pvMax0 * 0.2) zoom(0.022);
@@ -660,6 +665,7 @@ function arene(main, ctx, opts) {
     await elan(C, A, "slash");
     entaille(A, false, false);
     frappe(A);
+    blessure(A, "entaille", false);
     if (r.degats_ripostee > 0) { nombre(A, "−" + r.degats_ripostee, "riposte"); blesse(A, r.degats_ripostee); }
   }
 
@@ -853,12 +859,25 @@ function arene(main, ctx, opts) {
     await dormir(900);
     X.dom.portrait.classList.remove("renait");
   }
+  // Les blessures s'accumulent sur le portrait pendant tout le combat (les plus anciennes s'effacent au-delà de 18).
+  function blessure(X, genre, gros) {
+    const b = X.dom.blessures, e = el("i", { class: "bl bl-" + genre + (gros ? " gros" : "") });
+    e.style.cssText = `--x:${hasard(16, 84).toFixed(1)}%;--y:${hasard(14, 86).toFixed(1)}%;--r:${hasard(-80, 80).toFixed(0)}deg;--s:${(gros ? hasard(1.15, 1.45) : hasard(0.75, 1.05)).toFixed(2)}`;
+    b.append(e);
+    if (genre !== "contusion" && genre !== "brulure" || gros) {
+      const t = el("i", { class: "bl bl-sang" });
+      t.style.cssText = `--x:${hasard(10, 90).toFixed(1)}%;--y:${hasard(10, 90).toFixed(1)}%;--r:${hasard(0, 360).toFixed(0)}deg;--s:${hasard(0.6, gros ? 1.4 : 1).toFixed(2)}`;
+      b.append(t);
+    }
+    while (b.childElementCount > 18) b.firstElementChild.remove();
+  }
   function explosionSaignement(X, v) {
     const p = pos(X.dom.portrait);
     annonce("Le saignement explose !", "sang");
     son("saignement_explosion", { pan: X.pan, fichiers: X.r && X.r["sons_explosion_saignement_" + X.c] });
     onde(p.x, p.y, "sang", 2.8, 620); particules(p.x, p.y, 22, "goutte", p.w * 0.9, 900, 70);
     frappe(X, true);
+    blessure(X, "sang", true); blessure(X, "sang", true);
     nombre(X, "−" + v, "saignement gros");
     blesse(X, v);
   }
@@ -1018,7 +1037,7 @@ function arene(main, ctx, opts) {
     const bouton = avecPorte ? el("button", { type: "button", class: "btn-principal intro-go" }, picto("lecture"), "Regarder le combat") : null;
     const voile = el("div", { class: "intro" + (avecPorte ? " porte" : ""), role: avecPorte ? "dialog" : null, "aria-label": "Présentation du combat" },
       el("div", { class: "intro-ligne" }, cote(G), el("div", { class: "intro-vs", texte: "VS" }), cote(D)),
-      el("div", { class: "intro-infos" }, [opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel classé", auto_battle: "Combat auto" }[(opts.duel || {}).type] || "Duel", TRANCHES[R.tranche] || null, n + " tours"].filter(Boolean).join(" · ")),
+      el("div", { class: "intro-infos" }, [opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel classé", auto_battle: "Combat auto" }[(opts.duel || {}).type] || "Duel", TRANCHES[R.tranche] || null].filter(Boolean).join(" · ")),
       compte, bouton);
     racine.append(voile);
     return { voile, compte, bouton };
@@ -1052,8 +1071,6 @@ function arene(main, ctx, opts) {
     try {
       await decompte(v);
       for (let i = prochain; i < n; i++) {
-        // Coup final au ralenti.
-        if (i === n - 1 && gagnant) { ralenti = 0.55; appliquerRythme(); }
         await tour(rounds[i], i);
         appliquer(rounds[i]); prochain = i + 1;
         rendreTout(true);
@@ -1083,12 +1100,12 @@ function arene(main, ctx, opts) {
 
   const gagnant = R.egalite ? null : (R.vainqueur || (opts.duel || {}).vainqueur_login || (opts.resultat || {}).vainqueur_login || null);
   async function finale() {
-    fini = true; ralenti = 1; appliquerRythme();
+    fini = true;
     racine.classList.remove("fatigue"); racine.classList.add("terminee");
     bPause.disabled = true; bPasser.disabled = true;
     F.attaquant.dom.racine.classList.remove("actif"); F.defenseur.dom.racine.classList.remove("actif");
     const V = gagnant ? de(gagnant) : null, P = V ? autre(V) : null;
-    if (window.SFX) SFX.musique.arreter(P ? 0.5 : 1.6);
+    if (window.SFX) SFX.musique.arreter(3);
     if (P) {
       P.ko = true; rendre(P, false);
       await ko(P);
@@ -1138,7 +1155,7 @@ function arene(main, ctx, opts) {
       const reste = Math.random() < 0.38;
       const e = point("eclat-visage", p.x, p.y, { width: p.w + "px", height: p.h + "px", fontSize: (p.w * 0.16).toFixed(1) + "px", borderRadius: rayon,
         clipPath: `inset(${pc(li)} ${pc(n - co - 1)} ${pc(n - li - 1)} ${pc(co)})`, transformOrigin: `${pc(co + 0.5)} ${pc(li + 0.5)}` });
-      e.append(X.dom.vis.cloneNode(true));
+      e.append(X.dom.vis.cloneNode(true), X.dom.blessures.cloneNode(true));
       const a = Math.atan2((li + 0.5) / n - 0.5, (co + 0.5) / n - 0.5) + hasard(-0.5, 0.5);
       const dist = reste ? hasard(3, 9) : hasard(p.w * 0.5, p.w * 1.3), rot = reste ? hasard(-14, 14) : hasard(-300, 300);
       anime(e, [{ transform: T(p.x, p.y), opacity: 1, filter: "brightness(2.2)" },
@@ -1224,43 +1241,17 @@ function arene(main, ctx, opts) {
 }
 
 // ---------------------------------------------------------------------
-// Dessins procéduraux (SVG) : fissures du portrait et de l'armure
+// Dessins procéduraux (SVG)
 // ---------------------------------------------------------------------
 const NS = "http://www.w3.org/2000/svg";
 function svgEl(tag, attrs) { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; }
-function trait(g, pts, epais = 1) {
-  const d = "M" + pts.map((p) => p[0].toFixed(1) + " " + p[1].toFixed(1)).join("L");
-  g.append(svgEl("path", { d, class: "ombre", "stroke-width": String(epais * 1.7) }), svgEl("path", { d, class: "lumiere", "stroke-width": String(epais * 0.7) }));
-}
-function fissure(rnd, x, y, ang, long, seg) {
-  const pts = [[x, y]];
-  for (let i = 0; i < seg; i++) { ang += (rnd() - 0.5) * 0.9; x += Math.cos(ang) * (long / seg); y += Math.sin(ang) * (long / seg); pts.push([x, y]); }
-  return pts;
-}
-function fissuresPortrait(seed) {
-  const rnd = alea(seed), svg = svgEl("svg", { class: "fissures", viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true" });
-  const g = [1, 2, 3, 4].map((e) => { const x = svgEl("g", { "data-e": String(e) }); svg.append(x); return x; });
-  // 1 : griffures
-  const gx = 25 + rnd() * 40, gy = 20 + rnd() * 30;
-  for (let i = 0; i < 3; i++) trait(g[0], [[gx + i * 6, gy + i * 2], [gx + 14 + i * 6, gy + 22 + i * 2]], 0.7);
-  // 2 : fissures depuis les bords
-  for (let i = 0; i < 2; i++) { const a = rnd() * Math.PI * 2; trait(g[1], fissure(rnd, 50 + Math.cos(a) * 55, 50 + Math.sin(a) * 55, a + Math.PI, 38, 6), 0.9); }
-  // 3 : étoile d'impact + sang
-  const ix = 38 + rnd() * 24, iy = 34 + rnd() * 24;
-  for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2 + rnd() * 0.4; trait(g[2], fissure(rnd, ix, iy, a, 20 + rnd() * 26, 4), 0.8); }
-  for (let i = 0; i < 6; i++) g[2].append(svgEl("circle", { cx: (ix + (rnd() - 0.5) * 40).toFixed(1), cy: (iy + (rnd() - 0.2) * 40).toFixed(1), r: (0.8 + rnd() * 2.4).toFixed(1), class: "sang" }));
-  // 4 : éclatement
-  for (let i = 0; i < 5; i++) { const a = rnd() * Math.PI * 2; trait(g[3], fissure(rnd, ix, iy, a, 45 + rnd() * 20, 7), 1.1); }
-  for (let i = 0; i < 5; i++) g[3].append(svgEl("ellipse", { cx: (15 + rnd() * 70).toFixed(1), cy: (40 + rnd() * 55).toFixed(1), rx: (2 + rnd() * 5).toFixed(1), ry: (1.5 + rnd() * 3).toFixed(1), class: "sang" }));
-  return svg;
-}
 // Calques d'aura des états : le CSS les anime ; seule l'électricité a besoin d'un tracé.
 function auras(seed) {
   const rnd = alea(seed), d = document.createElement("div");
   d.className = "auras"; d.setAttribute("aria-hidden", "true");
   const n = (k, tag = "i") => Array.from({ length: k }, (_, i) => `<${tag} style="--k:${i}"></${tag}>`).join("");
-  d.innerHTML = `<div class="au au-poison">${n(3)}${n(6, "b")}</div><div class="au au-antisoin">${n(3)}${n(4, "b")}</div>` +
-    `<div class="au au-feu">${n(9)}${n(7, "b")}</div><div class="au au-sang">${n(7)}</div>` +
+  d.innerHTML = `<div class="au au-poison">${n(2)}${n(3, "b")}</div><div class="au au-antisoin">${n(2)}${n(3, "b")}</div>` +
+    `<div class="au au-feu">${n(2)}${n(4, "b")}</div><div class="au au-sang">${n(7)}</div>` +
     `<div class="au au-stun">${[0, 1, 2].map((i) => `<i style="--k:${i}"><b></b></i>`).join("")}</div>` +
     `<div class="au au-bouclier"></div><div class="au au-marque"><i></i></div><div class="au au-brise"></div>` +
     `<div class="au au-rage"></div><div class="au au-envol">${n(3)}</div><div class="au au-souffle"></div>`;
