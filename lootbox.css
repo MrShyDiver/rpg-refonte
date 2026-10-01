@@ -175,3 +175,40 @@
   .lb-premiers-pas { gap: 10px; }
   .lb-premiers-pas { padding: 14px; }
 }
+
+/* ---------- Ouverture v2 (reprise de l'accueil) : échelle, secousse, éclair, tampon, pièces ---------- */
+.echelle { position: absolute; top: 14px; left: 50%; translate: -50% 0; z-index: 5; display: flex; gap: 6px; pointer-events: none; }
+.echelle[hidden] { display: none; }
+.echelle span {
+  font-family: var(--titre); font-weight: 700; font-size: 11px; letter-spacing: .02em; padding: 5px 9px 6px; border-radius: 999px;
+  color: var(--encre-3); background: rgba(12,13,18,.6); border: 1px solid var(--trait);
+  transition: color .2s, background .2s, border-color .2s, box-shadow .3s, scale .3s var(--ease);
+}
+.echelle span.atteint { color: #101116; background: var(--c); border-color: transparent; }
+.echelle span.actuel { scale: 1.16; box-shadow: 0 0 22px -2px var(--c); }
+.echelle span.exclu { opacity: .3; text-decoration: line-through; }
+.table-jeu.secoue { animation: camera var(--secousse, .5s) cubic-bezier(.36, .07, .19, .97); }
+@keyframes camera {
+  10%, 90% { transform: translate(-2px, 1px); } 20%, 80% { transform: translate(4px, -2px); }
+  30%, 50%, 70% { transform: translate(-7px, 3px) rotate(-.4deg); } 40%, 60% { transform: translate(7px, -3px) rotate(.4deg); }
+}
+.eclair { position: absolute; inset: 0; z-index: 6; pointer-events: none; background: radial-gradient(circle at 50% 45%, #fff, color-mix(in oklab, var(--flash) 55%, transparent) 30%, transparent 72%); animation: flash-table var(--df, .7s) ease-out forwards; }
+.coffre.inspire svg { scale: 1.14; transition: scale .14s ease-in; }
+.tampon {
+  position: absolute; left: 50%; top: 50%; z-index: 8; translate: -50% -50%; pointer-events: none; white-space: nowrap;
+  font-family: var(--titre); font-weight: 800; font-size: clamp(30px, 7vw, 64px); letter-spacing: -.02em; color: var(--c);
+  text-shadow: 0 0 30px var(--c), 0 4px 0 #000; animation: tampon 1.5s var(--ease) forwards;
+}
+@keyframes tampon { 0% { opacity: 0; scale: 2.4; filter: blur(8px); } 18% { opacity: 1; scale: .94; filter: none; } 28% { scale: 1.04; } 36% { scale: 1; } 75% { opacity: 1; } 100% { opacity: 0; scale: 1.08; } }
+.dcarte:not(.retournee) { cursor: pointer; }
+.dcarte.pop .dcarte-in { animation: pop .55s var(--ease); }
+@keyframes pop { 35% { scale: var(--pop, 1.1); } }
+.table-jeu.focus .dcarte:not(.vedette) { filter: brightness(.3) saturate(.5); }
+.dcarte.vedette { z-index: 5; }
+.piece {
+  position: absolute; top: -12px; left: var(--x); width: 8px; height: 8px; z-index: 7; pointer-events: none;
+  background: var(--legendaire); box-shadow: inset -2px -2px 0 #b8841f, inset 2px 2px 0 #fff1c2;
+  animation: piece var(--d) cubic-bezier(.4, 0, .8, .6) var(--r) forwards;
+}
+@keyframes piece { to { transform: translateY(var(--h)) rotate(540deg); opacity: .2; } }
+@media (max-width: 720px) { .echelle { gap: 4px; } .echelle span { font-size: 9.5px; padding: 4px 6px 5px; } }

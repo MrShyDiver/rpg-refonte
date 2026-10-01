@@ -487,25 +487,62 @@ App.toast = (texte, { type = "info", titre = null, icone: ic = null, duree = 420
 App.erreur = (e) => { console.error(e); App.toast(e && e.message ? e.message : String(e), { type: "erreur", duree: 6000 }); };
 
 // ---------------------------------------------------------------------
-// Sons (mêmes motifs que la page d'accueil)
+// Sons de la lootbox, des succès et de la boutique (mêmes motifs que la page d'accueil).
+// Chaque son est généré, sauf si un fichier le remplace : sons/lootbox/<nom>.mp3, à condition
+// que <nom> figure dans sons/lootbox/liste.json (ex. ["explosion", "rarete-legendaire"]).
+// Noms : tension (boucle pendant que le coffre tremble), tic, battement, explosion, explosion-<rareté>,
+// rarete-<rareté>, envol, retournement, combo, nouveau, amelioration, max, piece.
+// Rareté : commun, normal, rare, epique, legendaire. tic, combo et amelioration montent d'un cran
+// à chaque appel (vitesse de lecture) : un seul fichier suffit.
 // ---------------------------------------------------------------------
-// ---------- Sons (Web Audio, aucun fichier requis) ----------
-const SONS_FICHIERS = { commun: "", normal: "", rare: "", epique: "", legendaire: "" }; // chemins .mp3 optionnels, sinon synthèse
-let actx = null, maitre = null, sonActif = true;
+let actx = null, maitre = null, echo = null, sonActif = true, remplacementsLb = null;
+const tamponsLb = new Map(); // nom -> AudioBuffer | null (absent ou illisible)
 function demarrerAudio() {
   if (!sonActif) return;
   if (!actx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     actx = new AC();
+    const comp = actx.createDynamicsCompressor();
+    comp.connect(actx.destination);
     maitre = actx.createGain();
     maitre.gain.value = 0.5;
-    maitre.connect(actx.createDynamicsCompressor()).connect(actx.destination);
+    maitre.connect(comp);
+    // Réverbération générée (bruit qui s'éteint) : donne de l'ampleur aux grosses révélations.
+    const rev = actx.createConvolver(), n = Math.floor(actx.sampleRate * 1.8), ir = actx.createBuffer(2, n, actx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3); }
+    rev.buffer = ir;
+    echo = actx.createGain();
+    echo.gain.value = 0.3;
+    echo.connect(rev).connect(comp);
+    chargerSonsLootbox();
   }
   if (actx.state === "suspended") actx.resume();
 }
+function chargerSonsLootbox() {
+  if (remplacementsLb || App.DEMO) return;
+  remplacementsLb = new Set();
+  fetch("sons/lootbox/liste.json").then((r) => (r.ok ? r.json() : [])).then((l) => {
+    (Array.isArray(l) ? l : []).map(String).filter((n) => /^[\w-]+$/.test(n)).forEach((n) => {
+      remplacementsLb.add(n);
+      fetch("sons/lootbox/" + n + ".mp3").then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then((o) => actx.decodeAudioData(o)).then((b) => tamponsLb.set(n, b)).catch(() => tamponsLb.set(n, null));
+    });
+  }).catch(() => {});
+}
+// Joue le fichier qui remplace <nom> s'il est prêt ; renvoie la fonction d'arrêt, ou null (synthèse).
+function fichierLb(noms, { vitesse = 1, vol = 1, boucle = false, t0 = 0 } = {}) {
+  if (!audible()) return null;
+  const nom = noms.find((n) => tamponsLb.get(n));
+  if (!nom) return null;
+  const t = actx.currentTime + t0, s = actx.createBufferSource(), g = actx.createGain();
+  s.buffer = tamponsLb.get(nom); s.loop = boucle; s.playbackRate.value = vitesse;
+  g.gain.value = vol;
+  s.connect(g).connect(maitre); s.start(t);
+  return () => { const t2 = actx.currentTime; g.gain.setValueAtTime(g.gain.value, t2); g.gain.linearRampToValueAtTime(0, t2 + 0.12); s.stop(t2 + 0.15); };
+}
 const audible = () => sonActif && actx;
-function note(f, t0, duree, type = "triangle", vol = 0.16) {
+function note(f, t0, duree, type = "triangle", vol = 0.16, reverb = 0) {
   if (!audible()) return;
   const t = actx.currentTime + t0, o = actx.createOscillator(), g = actx.createGain();
   o.type = type; o.frequency.setValueAtTime(f, t);
@@ -513,6 +550,7 @@ function note(f, t0, duree, type = "triangle", vol = 0.16) {
   g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
   g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
   o.connect(g).connect(maitre);
+  if (reverb) { const s = actx.createGain(); s.gain.value = reverb; g.connect(s).connect(echo); }
   o.start(t); o.stop(t + duree + 0.05);
 }
 function bruit(duree) {
@@ -520,33 +558,73 @@ function bruit(duree) {
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   const s = actx.createBufferSource(); s.buffer = b; return s;
 }
-// Grondement du coffre qui tremble ; renvoie la fonction qui l'arrête.
-function grondement() {
+// Bruit filtré qui balaie une bande : souffle d'explosion, envol des cartes, claquement.
+function souffle(de, a, duree, vol, type = "bandpass", t0 = 0) {
+  if (!audible()) return;
+  const t = actx.currentTime + t0, s = bruit(duree), f = actx.createBiquadFilter(), g = actx.createGain();
+  f.type = type; f.Q.value = 1.2;
+  f.frequency.setValueAtTime(de, t); f.frequency.exponentialRampToValueAtTime(a, t + duree);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + duree * 0.3);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+  s.connect(f).connect(g).connect(maitre); s.start(t); s.stop(t + duree + 0.05);
+}
+// Sinus qui chute : battement de cœur, basse de l'explosion.
+function coup(f0, f1, t0, duree, vol) {
+  if (!audible()) return;
+  const t = actx.currentTime + t0, o = actx.createOscillator(), g = actx.createGain();
+  o.type = "sine"; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + duree);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+  o.connect(g).connect(maitre); o.start(t); o.stop(t + duree + 0.05);
+}
+// Grondement + montée pendant que le coffre tremble ; renvoie la fonction qui coupe tout.
+function tension(duree = 2) {
   if (!audible()) return () => {};
-  const s = bruit(2), f = actx.createBiquadFilter(), g = actx.createGain();
-  s.loop = true; f.type = "lowpass"; f.frequency.value = 150;
-  g.gain.setValueAtTime(0.0001, actx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.55, actx.currentTime + 0.25);
-  s.connect(f).connect(g).connect(maitre); s.start();
+  const f = fichierLb(["tension"], { boucle: true });
+  if (f) return f;
+  const t = actx.currentTime, s = bruit(2), fl = actx.createBiquadFilter(), g = actx.createGain();
+  s.loop = true; fl.type = "lowpass"; fl.frequency.value = 150;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.25);
+  s.connect(fl).connect(g).connect(maitre); s.start(t);
+  const o = actx.createOscillator(), fo = actx.createBiquadFilter(), go = actx.createGain();
+  o.type = "sawtooth"; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(380, t + duree);
+  fo.type = "lowpass"; fo.frequency.setValueAtTime(300, t); fo.frequency.exponentialRampToValueAtTime(3400, t + duree);
+  go.gain.setValueAtTime(0.0001, t); go.gain.exponentialRampToValueAtTime(0.08, t + duree);
+  o.connect(fo).connect(go).connect(maitre); o.start(t);
   return () => {
-    const t = actx.currentTime;
-    g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(0.4, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12); s.stop(t + 0.15);
+    const t2 = actx.currentTime;
+    [g, go].forEach((x) => { x.gain.cancelScheduledValues(t2); x.gain.setValueAtTime(Math.max(x.gain.value, 0.0001), t2); x.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.08); });
+    s.stop(t2 + 0.1); o.stop(t2 + 0.1);
   };
 }
 // Un « tic » qui monte d'un cran à chaque palier de rareté franchi pendant le suspense.
-function tic(palier) { note(196 * Math.pow(1.26, palier), 0, 0.12, "square", 0.06); note(98 * Math.pow(1.26, palier), 0, 0.22, "sine", 0.22); }
-function explosion() {
-  if (!audible()) return;
-  const t = actx.currentTime, s = bruit(0.6), f = actx.createBiquadFilter(), g = actx.createGain();
-  f.type = "bandpass"; f.frequency.setValueAtTime(2400, t); f.frequency.exponentialRampToValueAtTime(300, t + 0.5);
-  g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
-  s.connect(f).connect(g).connect(maitre); s.start(t);
-  const o = actx.createOscillator(), go = actx.createGain();
-  o.type = "sine"; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.4);
-  go.gain.setValueAtTime(0.6, t); go.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
-  o.connect(go).connect(maitre); o.start(t); o.stop(t + 0.5);
+function tic(palier) {
+  if (fichierLb(["tic"], { vitesse: Math.pow(1.12, palier) })) return;
+  note(196 * Math.pow(1.26, palier), 0, 0.12, "square", 0.06); note(98 * Math.pow(1.26, palier), 0, 0.22, "sine", 0.22);
 }
+function battement() { if (fichierLb(["battement"])) return; coup(75, 38, 0, 0.18, 0.7); coup(70, 36, 0.2, 0.18, 0.5); }
+function explosion(rang = 0) {
+  if (fichierLb(["explosion-" + ORDRE_RARETE[rang], "explosion"])) return;
+  souffle(2600, 260, 0.5 + rang * 0.12, 0.5);
+  coup(130, 38, 0, 0.45 + rang * 0.1, 0.6);
+  if (rang >= 3) coup(55, 26, 0.02, 1.2, 0.55);
+}
+function envol(t0 = 0) { if (fichierLb(["envol"], { t0, vol: 0.6 })) return; souffle(700, 3200, 0.2, 0.1, "bandpass", t0); }
+function retournement() { if (fichierLb(["retournement"])) return; souffle(5000, 2500, 0.05, 0.22, "highpass"); }
+// Chaque carte retournée sonne un cran plus haut que la précédente (gamme pentatonique).
+const PENTA = [0, 2, 4, 7, 9];
+function combo(i) {
+  const demi = PENTA[i % 5] + 12 * Math.floor(i / 5);
+  if (fichierLb(["combo"], { vitesse: Math.pow(2, Math.min(demi, 24) / 12) })) return;
+  note(523.25 * Math.pow(2, demi / 12), 0, 0.24, "triangle", 0.08, 0.2);
+}
+function scintille() { if (fichierLb(["nouveau"])) return; [1568, 1976, 2349, 2637, 3136].forEach((f, i) => note(f, i * 0.045, 0.32, "sine", 0.06, 0.5)); }
+function cloche(niveau) {
+  if (fichierLb(["amelioration"], { vitesse: Math.pow(2, Math.min(niveau, 24) / 24) })) return;
+  const f = 660 * Math.pow(2, Math.min(niveau, 24) / 24); note(f, 0, 0.7, "sine", 0.11, 0.3); note(f * 2.76, 0, 0.25, "sine", 0.03, 0.3);
+}
+function accordMax() { if (fichierLb(["max"])) return; [784, 988, 1175, 1568].forEach((f, i) => note(f, i * 0.035, 1, "triangle", 0.07, 0.45)); }
+function tinte() { if (fichierLb(["piece"], { vitesse: 0.9 + Math.random() * 0.3, vol: 0.5 })) return; note(2200 + Math.random() * 1400, 0, 0.12, "triangle", 0.035, 0.25); }
 // Motif de chaque rareté : [fréquence, départ, durée, forme, volume]
 const MOTIFS = [
   [[523, 0, 0.16, "square", 0.05]],
@@ -557,16 +635,16 @@ const MOTIFS = [
    [784, 0.3, 1.4], [1047, 0.3, 1.4], [1319, 0.3, 1.4], [1568, 0.3, 1.5, "sine", 0.1],
    [2637, 0.55, 0.5, "sine", 0.05], [3136, 0.75, 0.5, "sine", 0.05], [2093, 0.95, 0.7, "sine", 0.05]],
 ];
+const REVERB = [0, 0.1, 0.3, 0.45, 0.6];
 function sonRarete(rang) {
   if (!sonActif) return;
-  const fichier = SONS_FICHIERS[ORDRE_RARETE[rang]];
-  if (fichier) { const a = new Audio(fichier); a.volume = 0.8; a.play().catch(() => {}); return; }
-  MOTIFS[rang].forEach(([f, t, d, type, v]) => note(f, t, d, type || "triangle", v || 0.15));
+  if (fichierLb(["rarete-" + ORDRE_RARETE[rang]])) return;
+  MOTIFS[rang].forEach(([f, t, d, type, v]) => note(f, t, d, type || "triangle", v || 0.15, REVERB[rang]));
 }
 
-
 App.sons = {
-  demarrer: demarrerAudio, rarete: sonRarete, grondement, tic, explosion,
+  demarrer: demarrerAudio, rarete: sonRarete, grondement: () => tension(2), tension, tic, battement, explosion,
+  envol, retournement, combo, scintille, cloche, accordMax, tinte,
   get actif() { return sonActif; },
   set actif(v) { sonActif = !!v; },
 };
