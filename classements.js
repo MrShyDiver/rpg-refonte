@@ -108,6 +108,8 @@
         el("span", {}, "Ta position : ", el("b", { class: "num", texte: ordinal(moi.rang) }), " / " + fmt(l.length)),
         el("button", { class: "btn-second", type: "button", onclick: allerAMaLigne }, "Voir ma ligne", icone("i-fleche")));
       const j = ctx.joueur;
+      if (App.horsClassement(j)) return el("div", { class: "ma-position", role: "status" },
+        el("span", { texte: "Ton compte est hors classement : le streamer et les comptes de test n'apparaissent pas ici." }));
       const pourquoi = courant.id === "winrate" && duels(j) < MIN_DUELS
         ? ` Il te faut ${MIN_DUELS} duels (tu en as ${fmt(duels(j))}).`
         : courant.id === "collection" ? " Ouvre une lootbox pour lancer ta collection." : "";
@@ -188,7 +190,7 @@
         const palierDe = new Map(catalogue.map((s) => [s.code, s.palier]));
         const succesPar = new Map();
         for (const s of succesJ) { if (!succesPar.has(s.player_id)) succesPar.set(s.player_id, []); succesPar.get(s.player_id).push(palierDe.get(s.code)); }
-        joueurs = liste.map((p) => {
+        joueurs = liste.filter(App.estClasse).map((p) => {
           const niv = niveauxPar.get(p.id) || new Map();
           let distincts = 0, niveaux = 0;
           for (const [n, v] of niv) { const o = App.objet(n); if (!o) continue; distincts++; niveaux += Math.min(v, App.niveauMax(o.rarete)); }

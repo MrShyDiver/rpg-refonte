@@ -119,7 +119,7 @@ App.image = (chemin) => App.IMAGES[chemin] || (chemin && HORS_ANCIEN_SITE && /^g
 // ---------------------------------------------------------------------
 // Accès aux données (remplaçable par demo.js pour l'aperçu)
 // ---------------------------------------------------------------------
-const COLONNES_JOUEUR = "id,twitch_user_id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks,lootbox,lootbox_legendaire,tickets,tickets_reset,credits_reset,medailles,medailles_duel,medailles_revente,points,victoires,defaites,egalites,serie_actuelle,serie_record,degats_infliges,degats_subis,plus_gros_coup,combat_details,cree_le,premiere_connexion,lootbox_ouvertes,lootbox_leg_ouvertes,achats_boutique,abonne_jusqu_au,abonne_tier,admin";
+const COLONNES_JOUEUR = "id,twitch_user_id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks,lootbox,lootbox_legendaire,tickets,tickets_reset,credits_reset,medailles,medailles_duel,medailles_revente,points,victoires,defaites,egalites,serie_actuelle,serie_record,degats_infliges,degats_subis,plus_gros_coup,combat_details,cree_le,premiere_connexion,lootbox_ouvertes,lootbox_leg_ouvertes,achats_boutique,admin,hors_classement";
 let sb = null;
 function client() {
   if (!sb && window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { flowType: "pkce" } });
@@ -137,7 +137,7 @@ App.api = {
   moi: () => q(client().rpc("moi_joueur")).then((r) => (Array.isArray(r) ? r[0] : r) || null),
   joueur: (login) => q(client().from("players").select(COLONNES_JOUEUR).eq("twitch_login", String(login).toLowerCase()).maybeSingle()),
   exporterMesDonnees: () => App.rpc("exporter_mes_donnees"),
-  joueurs: () => q(client().from("players").select("id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks,victoires,defaites,egalites,serie_actuelle,serie_record,degats_infliges,degats_subis,plus_gros_coup,points,medailles,combat_details,premiere_connexion,lootbox_ouvertes,lootbox_leg_ouvertes,cree_le").limit(2000)),
+  joueurs: () => q(client().from("players").select("id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks,victoires,defaites,egalites,serie_actuelle,serie_record,degats_infliges,degats_subis,plus_gros_coup,points,medailles,combat_details,premiere_connexion,lootbox_ouvertes,lootbox_leg_ouvertes,cree_le,hors_classement").limit(2000)),
   objets: () => q(client().from("items").select("numero,nom,slot,rarete,set_nom,actif,data").order("numero")),
   inventaire: (pid) => q(client().from("inventory").select("item_numero,niveau,obtenu_le").eq("player_id", pid)),
   inventaires: () => q(client().from("inventory").select("player_id,item_numero,niveau").limit(20000)),
@@ -194,7 +194,11 @@ App.lancerDuel = async ({ adversaire, mode = "classe" }) => {
 App.DISCORD = DISCORD;
 // Miroir de enregistrer_duel (SQL) : ces comptes ne comptent ni au bilan ni aux stats.
 App.HORS_CLASSEMENT = ["mrshydiver", "mikumosana"];
-App.horsClassement = (j) => !!j && App.HORS_CLASSEMENT.includes(String(j.twitch_login || "").toLowerCase());
+App.horsClassement = (j) => !!j && (j.hors_classement === true || App.HORS_CLASSEMENT.includes(String(j.twitch_login || "").toLowerCase()));
+// Classé = ni hors classement, ni compte qui n'a jamais joué (au moins un duel, une lootbox ou une connexion au site).
+App.estClasse = (j) => !App.horsClassement(j) &&
+  ((j.victoires || 0) + (j.defaites || 0) + (j.egalites || 0) + (j.lootbox_ouvertes || 0) > 0 || !!j.premiere_connexion);
+App.deuxMains = (numero) => { const o = numero ? App.objet(numero) : null; return !!o && o.data && o.data.hand === "two_handed"; };
 // Joueurs importés du stream le 28/09/2026 : cree_le est la date d'import, pas leur arrivée.
 App.DATE_IMPORT = "2026-09-28";
 App.estImporte = (j) => !!j && String(j.cree_le || "").slice(0, 10) <= App.DATE_IMPORT;

@@ -111,6 +111,7 @@
         el("span", { texte: "Le streamer et les comptes de test jouent sans bilan ni stats : leurs victoires ne comptent pas." }));
     }
     function texteRang() {
+      if (App.horsClassement(s.joueur)) return el("span", { texte: "Hors classement" });
       if (!s.puissances) return el("span", { class: "pf-attente", texte: "Classement en cours de calcul…" });
       const { rang, total } = classer();
       return [el("b", { class: "num", texte: "#" + fmt(rang) }), " sur " + fmt(total) + " joueurs"];
@@ -246,6 +247,12 @@
       const grille = el("div", { class: "pf-slots" });
       for (const [slot, def] of Object.entries(SLOTS)) {
         const n = s.loadout[def.col], o = n ? App.objet(n) : null;
+        if (def.col === "offhand" && !o && App.deuxMains(s.loadout.arme)) {
+          grille.append(el("div", { class: "pf-slot" }, el("h3", { class: "pf-slot-nom", texte: def.nom }),
+            el("div", { class: "zone" }, el("div", { class: "pf-slot-vide" }, el("span", { class: "pf-plus", "aria-hidden": "true", texte: "—" }),
+              el("span", { texte: "Occupée par l'arme à deux mains" })))));
+          continue;
+        }
         const contenu = o ? App.carte(o, { niveau: niveauEffectif(n) })
           : el("div", { class: "pf-slot-vide" }, el("span", { class: "pf-plus", "aria-hidden": "true", texte: proprio ? "+" : "—" }), el("span", { texte: proprio ? "Choisir" : "Rien d'équipé" }));
         const zone = proprio || o
@@ -550,7 +557,7 @@
     for (const l of invs) { if (!niv.has(l.player_id)) niv.set(l.player_id, new Map()); niv.get(l.player_id).set(l.item_numero, l.niveau); }
     const lo = new Map(los.map((l) => [l.player_id, l]));
     const p = {};
-    for (const j of joueurs) { const r = App.puissance(j, niv.get(j.id) || new Map(), lo.get(j.id)); if (r) p[j.id] = r.powerLevel; }
+    for (const j of joueurs.filter(App.estClasse)) { const r = App.puissance(j, niv.get(j.id) || new Map(), lo.get(j.id)); if (r) p[j.id] = r.powerLevel; }
     try { sessionStorage.setItem(CLE_CACHE, JSON.stringify({ t: Date.now(), p })); } catch (e) { /* ignoré */ }
     return new Map(Object.entries(p));
   }
