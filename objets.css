@@ -146,3 +146,4 @@
   .btn-filtres .n-filtres:empty { display: none; }
   .rangee-recherche .champ.tri { flex: 1 1 auto; }
 }
+.outils-objets [hidden] { display: none !important; }

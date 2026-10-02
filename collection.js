@@ -150,6 +150,10 @@ App.demarrer("collection", async (main, ctx) => {
   const inter = el("button", { type: "button", class: "interrupteur", role: "switch", id: "voir-manquants", onclick: () => { f.manquants = !f.manquants; rendre(); } });
   const compte = el("p", { class: "compte-resultats", "aria-live": "polite" });
   const grille = el("div", { class: "grille-cartes" });
+  const nEffets = el("span", { class: "n-filtres num" });
+  const plusFiltres = el("details", { class: "plus-filtres repliable", open: f.effets.size > 0 },
+    el("summary", {}, icone("i-fleche"), "Voir plus de filtres", nEffets),
+    el("div", { class: "puces", role: "group", "aria-label": "Effets et set" }, btnEff));
   const nFiltres = el("span", { class: "n-filtres num" });
   const outils = el("div", { class: "outils-objets", id: "outils-collection" });
   const btnFiltres = el("button", { type: "button", class: "btn-second btn-filtres", "aria-expanded": "false", "aria-controls": "outils-collection",
@@ -159,7 +163,7 @@ App.demarrer("collection", async (main, ctx) => {
         el("div", { class: "onglets-b defile", role: "group", "aria-label": "Emplacement" }, btnSlots),
         el("div", { class: "bascule" }, inter, el("label", { for: "voir-manquants", texte: "Afficher ce qui me manque" }))),
       el("div", { class: "puces repliable", role: "group", "aria-label": "Rareté" }, btnRar),
-      el("div", { class: "puces repliable", role: "group", "aria-label": "Effets" }, btnEff),
+      plusFiltres,
       el("div", { class: "rangee rangee-recherche" },
         el("label", { class: "champ recherche" }, icone("i-recherche"), recherche),
         btnFiltres,
@@ -172,7 +176,7 @@ App.demarrer("collection", async (main, ctx) => {
   const passe = (o, sauf) =>
     (sauf === "slot" || f.slot === "tout" || o.slot === f.slot)
     && (sauf === "rarete" || !f.raretes.size || f.raretes.has(o.rarete))
-    && (sauf === "effet" || !f.effets.size || effetsDe.get(o.numero).some((e) => f.effets.has(e)))
+    && [...f.effets].every((e) => effetsDe.get(o.numero).includes(e))
     && (!f.q || norm(o.nom).includes(norm(f.q)));
   const cle = {
     rarete: (a, b) => rangRarete(b.rarete) - rangRarete(a.rarete) || niv(b) - niv(a) || a.numero - b.numero,
@@ -204,9 +208,13 @@ App.demarrer("collection", async (main, ctx) => {
 
   function rendre() {
     const b = base();
-    btnSlots.forEach((x) => { const k = x.dataset.v; x.setAttribute("aria-pressed", String(f.slot === k)); x.lastChild.textContent = b.filter((o) => (k === "tout" || o.slot === k) && passe(o, "slot")).length; });
-    btnRar.forEach((x) => { x.setAttribute("aria-pressed", String(f.raretes.has(x.dataset.v))); x.lastChild.textContent = b.filter((o) => o.rarete === x.dataset.v && passe(o, "rarete")).length; });
-    btnEff.forEach((x) => { x.setAttribute("aria-pressed", String(f.effets.has(x.dataset.v))); x.lastChild.textContent = b.filter((o) => effetsDe.get(o.numero).includes(x.dataset.v) && passe(o, "effet")).length; });
+    // Chaque option affiche ce qu'elle donnerait avec les autres filtres en place ; à 0, elle est masquée (sauf si elle est cochée).
+    const option = (x, actif, n) => { x.setAttribute("aria-pressed", String(actif)); x.lastChild.textContent = n; x.hidden = !n && !actif && x.dataset.v !== "tout"; };
+    btnSlots.forEach((x) => { const k = x.dataset.v; option(x, f.slot === k, b.filter((o) => (k === "tout" || o.slot === k) && passe(o, "slot")).length); });
+    btnRar.forEach((x) => option(x, f.raretes.has(x.dataset.v), b.filter((o) => o.rarete === x.dataset.v && passe(o, "rarete")).length));
+    btnEff.forEach((x) => option(x, f.effets.has(x.dataset.v), b.filter((o) => effetsDe.get(o.numero).includes(x.dataset.v) && passe(o)).length));
+    plusFiltres.hidden = btnEff.every((x) => x.hidden);
+    nEffets.textContent = f.effets.size || "";
     inter.setAttribute("aria-checked", String(f.manquants));
     const nf = (f.slot !== "tout") + f.raretes.size + f.effets.size + f.manquants;
     nFiltres.textContent = nf || "";

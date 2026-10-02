@@ -117,7 +117,7 @@ App.demarrer("arsenal", async (main, ctx) => {
   const passe = (o, sauf) =>
     (sauf === "slot" || f.slot === "tout" || o.slot === f.slot)
     && (sauf === "rarete" || !f.raretes.size || f.raretes.has(o.rarete))
-    && (sauf === "effet" || !f.effets.size || effetsDe.get(o.numero).some((e) => f.effets.has(e)))
+    && [...f.effets].every((e) => effetsDe.get(o.numero).includes(e))
     && (!f.q || norm(o.nom).includes(norm(f.q)));
   const parNom = (a, b) => a.nom.localeCompare(b.nom, "fr");
   const cle = {
@@ -149,12 +149,15 @@ App.demarrer("arsenal", async (main, ctx) => {
   function rendre() {
     btnVue.forEach((x) => x.setAttribute("aria-pressed", String(f.vue === x.dataset.v)));
     btnNiv.forEach((x) => x.setAttribute("aria-pressed", String(f.niv === x.dataset.v)));
-    btnSlots.forEach((x) => { const k = x.dataset.v; x.setAttribute("aria-pressed", String(f.slot === k)); x.lastChild.textContent = tous.filter((o) => (k === "tout" || o.slot === k) && passe(o, "slot")).length; });
-    btnRar.forEach((x) => { x.setAttribute("aria-pressed", String(f.raretes.has(x.dataset.v))); x.lastChild.textContent = tous.filter((o) => o.rarete === x.dataset.v && passe(o, "rarete")).length; });
-    btnEff.forEach((x) => { x.setAttribute("aria-pressed", String(f.effets.has(x.dataset.v))); x.lastChild.textContent = tous.filter((o) => effetsDe.get(o.numero).includes(x.dataset.v) && passe(o, "effet")).length; });
+    // Chaque option affiche ce qu'elle donnerait avec les autres filtres en place ; à 0, elle est masquée (sauf si elle est cochée).
+    const option = (x, actif, n) => { x.setAttribute("aria-pressed", String(actif)); x.lastChild.textContent = n; x.hidden = !n && !actif && x.dataset.v !== "tout"; };
+    btnSlots.forEach((x) => { const k = x.dataset.v; option(x, f.slot === k, tous.filter((o) => (k === "tout" || o.slot === k) && passe(o, "slot")).length); });
+    btnRar.forEach((x) => option(x, f.raretes.has(x.dataset.v), tous.filter((o) => o.rarete === x.dataset.v && passe(o, "rarete")).length));
+    btnEff.forEach((x) => option(x, f.effets.has(x.dataset.v), tous.filter((o) => effetsDe.get(o.numero).includes(x.dataset.v) && passe(o)).length));
+    plusFiltres.hidden = btnEff.every((x) => x.hidden);
+    nEffets.textContent = f.effets.size || "";
     const nf = (f.slot !== "tout") + f.raretes.size + f.effets.size + (f.niv === "max") + (f.vue === "tableau");
     nFiltres.textContent = nf || "";
-    nEffets.textContent = f.effets.size || "";
     btnFiltres.setAttribute("aria-label", nf ? `Filtres et affichage, ${nf} actif${nf > 1 ? "s" : ""}` : "Filtres et affichage");
     majUrl();
 
