@@ -16,7 +16,7 @@ import {
   estimerAtkEquivalentAvecStance, appliquerBonusArmeStance, vueArmeSelonStance, valeurStat, niveauMaxPourRarete,
 } from "./formule-combat.gen.ts";
 
-export const VERSION_MOTEUR = "site-1.2.0";
+export const VERSION_MOTEUR = "site-1.3.0";
 
 // ---------------------------------------------------------------- contrat
 export interface Equipement { data: Record<string, any>; niveau: number; numero?: number }
@@ -71,10 +71,11 @@ interface Correctifs {
   ampFeuStrategeme: boolean;     // F8 amplification feu du torse s'applique à la brûlure de stratagème
   plancherMainsNues: boolean;    // F10 une arme ne frappe jamais moins fort que les mains nues
   arrondiSansBiais: boolean;     // F11 arrondi cumulatif des dégâts par balle (au lieu de la troncature)
+  critStrategeme: boolean;       // F13 (v1.3) les dégâts directs d'un stratagème peuvent être critiques, comme un coup d'arme
 }
 const CORRIGE: Correctifs = {
   ronde11: true, reviveUniverselle: true, stratBriseDefMarque: true, antiHealVolDeVie: true, dureesParPorteur: true,
-  clampPvMaxErosion: true, tenaciteStrategeme: true, ampFeuStrategeme: true, plancherMainsNues: true, arrondiSansBiais: true,
+  clampPvMaxErosion: true, tenaciteStrategeme: true, ampFeuStrategeme: true, plancherMainsNues: true, arrondiSansBiais: true, critStrategeme: true,
 };
 const COMPAT_CS: Correctifs = Object.fromEntries(Object.keys(CORRIGE).map(k => [k, false])) as unknown as Correctifs;
 
@@ -362,14 +363,17 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
     const mitigation = mitigationDe(defCible * (1.0 - Math.min(1.0, strategeme.penetration / 100.0)));
     const marque = F.stratBriseDefMarque && c.marqueDegats > 0 ? 1.0 + c.marqueDegats / 100.0 : 1.0;
     const coupsParUsage = Math.max(1, strategeme.coupsParUsage);
-    const bruts: number[] = [];
+    // v1.3 : même chance de critique qu'un coup d'arme (chance du lanceur, moins l'anti-critique de la cible), sans le bonus propre à l'arme.
+    const critChance = F.critStrategeme ? Math.max(0, BASE_CRIT + LUCK_CRIT_MAX * Math.tanh(p.luck / K_LUCK) - (c.torso?.resistanceCrit ?? 0)) : 0;
+    const bruts: number[] = [], critParBalle: boolean[] = [];
     for (let coup = 0; coup < coupsParUsage; coup++) {
-      let d = 0;
+      let d = 0, critCoup = false;
       if (strategeme.degatsDirects > 0) {
         const variance = 0.9 + rnd() * 0.20;
-        d = Math.max(0.1, strategeme.degatsDirects * (1.0 - mitigation)) * variance * marque;
+        critCoup = critChance > 0 && rnd() * 100.0 < Math.min(100, critChance);
+        d = Math.max(0.1, strategeme.degatsDirects * (1.0 - mitigation)) * variance * marque * (critCoup ? 2.0 : 1.0);
       }
-      bruts.push(d);
+      bruts.push(d); critParBalle.push(critCoup);
       if (strategeme.saignementChanceParCoup > 0 && strategeme.saignementDegats > 0 && rnd() * 100.0 < strategeme.saignementChanceParCoup)
         AppliquerSaignement(c, strategeme.saignementDegats, strategeme.saignementStacksParCoup, strategeme.sonsExplosionSaignement ?? null, p);
       if (strategeme.etourdissementChance > 0 && rnd() * 100.0 < strategeme.etourdissementChance)
@@ -394,8 +398,9 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
     }
     if (strategeme.briseDefPoints > 0) { c.briseDefPoints = strategeme.briseDefPoints; c.briseDefDuree = i(strategeme.briseDefDuree); acc.effets.add("brise_def"); }
     if (degatsTotal > 0 && marque > 1) acc.effets.add("marque");
+    const crit = critParBalle.some(Boolean); if (crit) acc.effets.add("crit");
     ajouterRound(p, c.nom, {
-      touche: true, degats: degatsTotal, degats_par_balle: degatsParBalle, crit_par_balle: degatsParBalle.map(() => false),
+      touche: true, crit, degats: degatsTotal, degats_par_balle: degatsParBalle, crit_par_balle: critParBalle,
       poison_applique: poisonApplique, strategeme: true, strategeme_cooldown_tours: strategeme.cooldownTours, sons_override: sonsOverride,
       etourdi_applique: acc.effets.has("etourdi_applique"),
       paralysie_applique: paralysieAppliquee,

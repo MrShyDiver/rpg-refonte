@@ -144,3 +144,19 @@ Après toute modification : `node outils/moteur-navigateur.mjs` (régénère `mo
 Décision de MrShyDiver : **chaque point de vitesse d'avance = 1,2 % de tour en plus** (`TOUR_BONUS_PAR_POINT = 1.2`, dans `formule-combat.js`). La jauge de chacun gagne 100 par échange, celle du plus rapide 100 + 1,2 × écart ; le plafond de 2 tours d'affilée reste. +10 d'avance : un tour bonus tous les ~8 tours adverses ; +25 : un tous les ~3 ; +83 : le plafond de 2 pour 1. La formule de puissance suit la même règle face à un adversaire de vitesse 20.
 
 Mesures : à build identique, N points en vitesse contre N points ailleurs → la vitesse gagne 48 % / 48 % / 49 % pour 5 / 10 / 20 points (72 % / 82 % / 87 % avec le rapport des vitesses). Sur builds aléatoires, le plus rapide gagne 61 % des duels (74 % avant). 6 000 duels sans anomalie, 15,9 tours en moyenne.
+
+
+### 1.3.0 (03/10) — critique des stratagèmes
+
+Constat de MrShyDiver, confirmé dans le code : les dégâts directs d'un stratagème ne pouvaient jamais être critiques (`crit_par_balle` forcé à faux).
+Corrigé (drapeau `critStrategeme`, inactif en mode compat C#) : chaque coup d'un stratagème tire un critique avec la chance du lanceur
+(`15 + 55·tanh(chance/55)` %, moins l'anti-critique de l'armure adverse, sans le bonus de critique propre à l'arme) et fait alors ×2. Vaut aussi pour les impacts différés
+(Solo Silo, Éclair de Tomoe : tirage à l'impact). Le round publie `crit` et `crit_par_balle` ; l'écran et le récit les lisaient déjà.
+Formule de puissance : dégâts directs de stratagème × (1 + critique %).
+Non concernés : bouclier, poison et brûlure (dégâts dans le temps). Les mains gauches n'infligent aucun dégât direct (elles posent poison, brûlure, marque, brise-défense, anti-soin) : rien à corriger.
+À noter : les dégâts de stratagème ne dépendent toujours d'aucune stat d'attaque.
+
+Contrôle (600 duels par cas) : chance 0 → 13,8 % de critiques (théorie 15), chance 60 → 59,1 % (58,8), Frappe Aérienne 6 coups chance 30 → 42,0 % (42,3),
+Éclair de Tomoe différé → 44,1 % (42,3), cible en Armure Anti-crit → 0 %, mode compat → 0 % ; dégâts critiques = 2 × dégâts normaux. 6 000 duels sans anomalie.
+Effet mesuré sur 20 000 duels (builds au hasard, objets à mi-chemin) : 13,5 → 12,7 tours ; Éclair de Tomoe 63,6 → 66,6 % de victoires, Solo Silo 54,5 → 57,2,
+Frappe 500kg 45,8 → 48,5, Frappe Aérienne 39,4 → 41,1, Frappe de précision 34,6 → 35,9 ; Générateur de bouclier 66,6 → 62,6, Gas Orbital 49,4 → 44,4.

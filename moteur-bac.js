@@ -404,6 +404,7 @@ function calculerPowerLevelSimule(s, atkEquivalent, critPct, esquivePct, arme, o
     totalDmg += brulureDmgGear;
     if (strat) {
         let stratDegats = (strat.degatsDirects || 0) * usagesEffectifsStrategeme(strat, survieTours) * Math.max(1, strat.coupsParUsage || 1);
+        stratDegats *= 1.0 + Math.max(0, critPct || 0) / 100.0;
         if (strat.delaiTours > 0) {
             const fiabilite = Math.min(1.0, survieTours / (strat.delaiTours + 1.0));
             stratDegats *= fiabilite;
@@ -464,7 +465,7 @@ if (typeof module !== 'undefined') module.exports = {
 };
 
 
-const VERSION_MOTEUR = "site-1.2.0";
+const VERSION_MOTEUR = "site-1.3.0";
 const AP_THRESHOLD = 100.0;
 const MAX_TOURS_DAFFILEE = 2;
 const TOUR_BONUS_PAR_POINT = CST.TOUR_BONUS_PAR_POINT;
@@ -486,7 +487,8 @@ const CORRIGE = {
     tenaciteStrategeme: true,
     ampFeuStrategeme: true,
     plancherMainsNues: true,
-    arrondiSansBiais: true
+    arrondiSansBiais: true,
+    critStrategeme: true
 };
 const COMPAT_CS = Object.fromEntries(Object.keys(CORRIGE).map((k)=>[
         k,
@@ -918,14 +920,17 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
         const mitigation = mitigationDe(defCible * (1.0 - Math.min(1.0, strategeme.penetration / 100.0)));
         const marque = F.stratBriseDefMarque && c.marqueDegats > 0 ? 1.0 + c.marqueDegats / 100.0 : 1.0;
         const coupsParUsage = Math.max(1, strategeme.coupsParUsage);
-        const bruts = [];
+        const critChance = F.critStrategeme ? Math.max(0, BASE_CRIT + LUCK_CRIT_MAX * Math.tanh(p.luck / K_LUCK) - (c.torso?.resistanceCrit ?? 0)) : 0;
+        const bruts = [], critParBalle = [];
         for(let coup = 0; coup < coupsParUsage; coup++){
-            let d = 0;
+            let d = 0, critCoup = false;
             if (strategeme.degatsDirects > 0) {
                 const variance = 0.9 + rnd() * 0.20;
-                d = Math.max(0.1, strategeme.degatsDirects * (1.0 - mitigation)) * variance * marque;
+                critCoup = critChance > 0 && rnd() * 100.0 < Math.min(100, critChance);
+                d = Math.max(0.1, strategeme.degatsDirects * (1.0 - mitigation)) * variance * marque * (critCoup ? 2.0 : 1.0);
             }
             bruts.push(d);
+            critParBalle.push(critCoup);
             if (strategeme.saignementChanceParCoup > 0 && strategeme.saignementDegats > 0 && rnd() * 100.0 < strategeme.saignementChanceParCoup) AppliquerSaignement(c, strategeme.saignementDegats, strategeme.saignementStacksParCoup, strategeme.sonsExplosionSaignement ?? null, p);
             if (strategeme.etourdissementChance > 0 && rnd() * 100.0 < strategeme.etourdissementChance) AppliquerEtourdissement(c, Math.max(1, strategeme.etourdissementDureeTours), F.tenaciteStrategeme);
         }
@@ -956,11 +961,14 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
             acc.effets.add("brise_def");
         }
         if (degatsTotal > 0 && marque > 1) acc.effets.add("marque");
+        const crit = critParBalle.some(Boolean);
+        if (crit) acc.effets.add("crit");
         ajouterRound(p, c.nom, {
             touche: true,
+            crit,
             degats: degatsTotal,
             degats_par_balle: degatsParBalle,
-            crit_par_balle: degatsParBalle.map(()=>false),
+            crit_par_balle: critParBalle,
             poison_applique: poisonApplique,
             strategeme: true,
             strategeme_cooldown_tours: strategeme.cooldownTours,

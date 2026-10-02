@@ -456,6 +456,7 @@ function calculerPowerLevelSimule(s, atkEquivalent, critPct, esquivePct, arme, o
 
     if (strat) {
         let stratDegats = (strat.degatsDirects || 0) * usagesEffectifsStrategeme(strat, survieTours) * Math.max(1, strat.coupsParUsage || 1);
+        stratDegats *= 1.0 + Math.max(0, critPct || 0) / 100.0; // moteur 1.3 : un stratagème peut faire un coup critique (×2)
         if (strat.delaiTours > 0) {
             const fiabilite = Math.min(1.0, survieTours / (strat.delaiTours + 1.0));
             stratDegats *= fiabilite;
