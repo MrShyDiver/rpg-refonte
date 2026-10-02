@@ -22,3 +22,24 @@
 @media (max-width: 480px) { .rc-ligne { grid-template-columns: minmax(0, 1fr) 76px; } .rc-ligne > span { grid-column: 1 / -1; } .rc-stacks { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .rc-cartes .case-vide { aspect-ratio: 5 / 7; border-radius: 14px; border: 1px dashed var(--trait-fort); display: grid; place-content: center; text-align: center; padding: 6px; font-size: 11.5px; color: var(--encre-3); background: rgba(255,255,255,.015); }
 .rc-cartes .case-vide small { font-size: 10.5px; }
+
+/* Simulateur (même accès que la recette) */
+.sim-reglages { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px 20px; padding: 18px; margin-bottom: 18px; }
+.sim-reglages > .sim-lancer { grid-column: 1 / -1; }
+.sim-reglage { display: grid; gap: 6px; }
+.sim-lancer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.sim-progres { flex: 1 1 200px; height: 8px; }
+.sim-progres i { width: 0; background: var(--legendaire); transition: width .2s linear; }
+.sim-table { min-width: 860px; }
+.sim-table thead th { padding: 0; }
+.sim-table thead th:last-child { padding: 11px 14px; }
+.sim-tri { width: 100%; padding: 11px 14px; text-align: left; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; white-space: nowrap; }
+.sim-tri:hover { color: var(--encre); }
+.sim-table td { vertical-align: middle; }
+.sim-taux { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 4px 8px; min-width: 150px; }
+.sim-taux .jauge-niv { grid-column: 1 / -1; height: 5px; }
+.sim-taux .jauge-niv i { background: var(--c); }
+.sim-verdict { font-weight: 700; color: var(--encre-3); white-space: nowrap; }
+.sim-verdict.hausse { color: var(--legendaire); }
+.sim-verdict.baisse { color: #ff8a8a; }
+.sim-note { margin-top: 12px; max-width: 90ch; }

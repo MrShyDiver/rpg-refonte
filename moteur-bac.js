@@ -1722,5 +1722,5 @@ function construireReplay(cbA, cbD, A, B, rounds, vainqueur, premierRoundFatigue
     return r;
 }
 
-window.MoteurDuel = { simulerDuel, VERSION_MOTEUR };
+window.MoteurDuel = { simulerDuel, construireCombattant, VERSION_MOTEUR };
 })();

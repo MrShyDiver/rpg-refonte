@@ -853,6 +853,7 @@ App.estRecetteur = (j) => !!j && j.admin === true && j.twitch_login === "mrshydi
 function coque(page) {
   const j = App.ctx.joueur;
   const lienRecette = App.estRecetteur(j) ? el("a", { href: "recette.html", "aria-current": page === "recette" ? "page" : null }, icone("i-cle"), "Recette") : null;
+  const lienSimulateur = App.estRecetteur(j) ? el("a", { href: "simulateur.html", "aria-current": page === "simulateur" ? "page" : null }, icone("i-podium"), "Simulateur") : null;
   const lien = (p) => el("a", { href: p.href, "aria-current": p.id === page ? "page" : null }, icone(p.icone), p.titre,
     p.id === "lootbox" ? el("span", { class: "pastille", "data-pastille-lootbox": "" }) : null);
   const lateral = el("nav", { class: "lateral", "aria-label": "Navigation du jeu" },
@@ -863,10 +864,10 @@ function coque(page) {
     el("div", { class: "nav-bas" },
       el("a", { href: "aide.html", "aria-current": page === "aide" ? "page" : null }, icone("i-livre"), "Comment jouer"),
       el("a", { href: "parametres.html", "aria-current": page === "parametres" ? "page" : null }, icone("i-reglages"), "Paramètres"),
-      lienRecette,
+      lienRecette, lienSimulateur,
       el("button", { type: "button", onclick: App.seDeconnecter }, icone("i-sortie"), "Se déconnecter")));
 
-  const titrePage = (PAGES.find((p) => p.id === page) || { titre: { aide: "Comment jouer", recette: "Recette" }[page] || "Paramètres" }).titre;
+  const titrePage = (PAGES.find((p) => p.id === page) || { titre: { aide: "Comment jouer", recette: "Recette", simulateur: "Simulateur" }[page] || "Paramètres" }).titre;
   const cloche = el("button", { class: "bouton-icone", type: "button", "aria-label": "Notifications", "aria-expanded": "false", onclick: () => basculerNotifs(cloche) }, icone("i-cloche"));
   const haute = el("header", { class: "barre-haute" },
     el("a", { class: "marque marque-mobile", href: "lootbox.html", "aria-label": "Stream RPG" }, icone("i-marque"), el("b", { texte: "Stream RPG" })),
@@ -879,7 +880,7 @@ function coque(page) {
     PAGES.filter((p) => !p.mobile).map((p) => el("a", { href: p.href, "aria-current": p.id === page ? "page" : null }, icone(p.icone), p.titre)),
     el("a", { href: "aide.html", "aria-current": page === "aide" ? "page" : null }, icone("i-livre"), "Comment jouer"),
     el("a", { href: "parametres.html", "aria-current": page === "parametres" ? "page" : null }, icone("i-reglages"), "Paramètres"),
-    lienRecette && lienRecette.cloneNode(true),
+    lienRecette && lienRecette.cloneNode(true), lienSimulateur && lienSimulateur.cloneNode(true),
     el("div", { class: "legende-ressources" }, el("b", { texte: "Tes ressources" }), el("div", { "data-ressources": "" }),
       el("a", { href: "aide.html#lexique", texte: "À quoi servent-elles ?" })));
   const onglets = el("nav", { class: "barre-onglets", "aria-label": "Navigation principale" },
