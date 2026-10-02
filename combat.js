@@ -1189,7 +1189,7 @@ function arene(main, ctx, opts) {
       V.dom.racine.classList.add("vainqueur");
       triomphe(V);
       const perdu = P.login === moi;
-      son(perdu ? "defaite" : "victoire", { fichiers: perdu ? "lose.mp3" : "win.mp3" });
+      son(perdu ? "defaite" : "victoire", { fichiers: perdu ? "lose.mp3" : "win.mp3", pitch: 1 }); // un jingle reste à sa hauteur
     } else {
       F.attaquant.dom.racine.classList.add("nul"); F.defenseur.dom.racine.classList.add("nul");
       son("egalite");
