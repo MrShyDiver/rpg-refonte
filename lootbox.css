@@ -93,7 +93,10 @@
 /* Les faisceaux : ils partent de la bouche du coffre, en éventail. 1, 2, 3, 4… puis tout l'écran au Légendaire. */
 /* Ils passent devant le coffre (et son couvercle) : on doit pouvoir les compter. Le cône du coffre s'efface. */
 .lb-table.invocation .coffre .faisceau { opacity: 0; }
-.lb-rayons { --l: 150px; position: absolute; left: 50%; top: 43%; width: 0; height: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .3s, scale .3s var(--ease); }
+/* Fenêtre des faisceaux : elle s'arrête au bord du coffre (hauteur posée par le script), ce qui dépasse dessous est masqué.
+   L'origine des faisceaux (.lb-rayons-in) est plus bas, dans le coffre : ils en sortent sur toute la largeur de l'ouverture. */
+.lb-rayons { --l: 150px; position: absolute; left: 0; right: 0; top: 0; height: 43%; overflow: clip; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .3s; }
+.lb-rayons-in { position: absolute; left: 50%; top: 100%; width: 0; height: 0; transition: scale .3s var(--ease); }
 .lb-table.invocation .lb-rayons { opacity: 1; }
 /* De larges bandes pleines, comme dans Vampire Survivors : pas de flou, pas de transparence timide. */
 .lb-rayons i {
@@ -109,7 +112,7 @@
 /* Jackpot : 7 faisceaux or et orange qui balaient, fond doré qui pulse, soleil blanc qui tourne, cadre en or. */
 .lb-rayons[data-rang="4"] i { --lueur: #ffb21f; height: 780px; }
 .lb-rayons[data-rang="4"] i:nth-child(even) { --lueur: #ff7a3d; }
-.lb-rayons[data-rang="4"] { animation: balaie 2s ease-in-out infinite alternate; }
+.lb-rayons[data-rang="4"] .lb-rayons-in { animation: balaie 2s ease-in-out infinite alternate; }
 @keyframes balaie { from { rotate: -6deg; } to { rotate: 6deg; } }
 .lb-table.jackpot { border-color: var(--legendaire); box-shadow: 0 0 0 2px var(--legendaire), 0 0 90px -8px var(--legendaire); }
 .lb-table.jackpot .lb-voile::before { background: linear-gradient(#fff8dc, #ffd45e); opacity: .94; animation: jackpot-fond .55s ease-in-out infinite alternate; }
@@ -118,11 +121,12 @@
 .lb-table.jackpot .tampon { color: #fff; -webkit-text-stroke: 2px #8a5200; text-shadow: 0 5px 0 #8a5200, 0 0 40px #fff; }
 .lb-flash-page { position: fixed; inset: 0; z-index: 54; pointer-events: none; background: radial-gradient(circle at 50% 45%, rgba(255,248,220,.96), rgba(255,197,61,.6) 45%, rgba(255,197,61,.2)); animation: flash-table 1.6s ease-out forwards; }
 /* Hésitation avant le palier suivant : les faisceaux crépitent. */
-.lb-table.hesite .lb-rayons { animation: crepite .12s steps(2) infinite; }
+.lb-table.hesite .lb-rayons-in { animation: crepite .12s steps(2) infinite; }
 @keyframes crepite { 50% { opacity: .55; scale: 1.08 1; } }
-.lb-table.calme .lb-rayons { opacity: .3; scale: .5 1; }
+.lb-table.calme .lb-rayons { opacity: .3; }
+.lb-table.calme .lb-rayons-in { scale: .5 1; }
 .lb-table.calme .lb-voile { opacity: .6; }
-.lb-table.cartes .lb-rayons { opacity: 0; scale: 1.6 1; transition: opacity .5s, scale .5s var(--ease); }
+.lb-table.cartes .lb-rayons { opacity: 0; transition: opacity .5s; }
 .lb-table.invocation .coffre { z-index: 2; }
 .lb-table.invocation .echelle { z-index: 5; }
 
@@ -150,7 +154,7 @@
 .lb-encore .mention { text-shadow: 0 1px 6px #000; }
 
 @media (prefers-reduced-motion: reduce) {
-  .lb-rayons, .lb-rayons i, .lb-table.hesite .lb-rayons, .lb-btn-encore, .dcarte.vedette.charge .dos, .lb-table.jackpot .lb-voile::before, .lb-flash-page { animation: none !important; }
+  .lb-rayons-in, .lb-rayons i, .lb-table.hesite .lb-rayons-in, .lb-btn-encore, .dcarte.vedette.charge .dos, .lb-table.jackpot .lb-voile::before, .lb-flash-page { animation: none !important; }
   .lb-flash-page { display: none; }
 }
 .btn-ouvrir[data-manque]:disabled { cursor: not-allowed; }

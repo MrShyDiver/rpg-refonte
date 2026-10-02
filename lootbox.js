@@ -4,8 +4,8 @@
 //      de plus en plus fort (montée de tension) ;
 //   2. le couvercle saute et des faisceaux jaillissent, un palier de rareté après l'autre :
 //      1 blanc au Commun, 2 verts au Normal, 3 bleus au Rare, 4 violets à l'Épique (de larges bandes
-//      pleines, des pièces et des mini-cartes qui remontent), et au Légendaire le jackpot : toute la
-//      page s'embrase, 7 faisceaux, feux d'artifice, fontaine de pièces qui déborde de la table.
+//      pleines qui sortent du coffre, des mini-cartes de la couleur de la rareté qui les remontent), et au
+//      Légendaire le jackpot : toute la page s'embrase, 7 faisceaux, feux d'artifice, gerbes de cartes dorées.
 //      Chaque palier dure le temps de son extrait musical (3 s) ; les sons et le tremblement montent
 //      d'un cran à chaque fois, et la musique finit sur la conclusion de la rareté obtenue ;
 //   3. les cartes s'abattent une à une, de la moins rare à la plus rare ; la meilleure (Épique ou
@@ -18,8 +18,7 @@ const { $, $$, el, icone, fmt, nombre, RARETES, ORDRE_RARETE, SLOTS, rangRarete,
 const DUREE_PALIER = 3000;  // un palier de rareté dure le temps de son extrait musical : 3 s sans fichier (ms)
 const DUREE_CHARGE = 1000;  // montée de tension après le clic, avant que le couvercle saute (ms)
 // Faisceaux par rareté : 1, 2, 3, 4, puis l'éventail complet du Légendaire (angles en degrés).
-const EVENTAILS = [[0], [-22, 22], [-38, 0, 38], [-57, -19, 19, 57], [-69, -46, -23, 0, 23, 46, 69]];
-const PIECES_PAR_TIC = [0.25, 0.5, 0.9, 1.5, 6]; // fontaine de pièces du coffre, par palier (toutes les 45 ms)
+const EVENTAILS = [[0], [-22, 22], [-38, 0, 38], [-57, -19, 19, 57], [-63, -42, -21, 0, 21, 42, 63]];
 const CHARGE = [0, 0, 260, 520, 800];     // une carte posée se charge de sa couleur avant de se retourner (ms, par rareté)
 const ECART = [90, 130, 320, 520, 800];   // pause avant la carte suivante : les communes tombent en rafale
 const BLANC = "#f4f2ec";
@@ -90,7 +89,9 @@ App.demarrer("lootbox", async (main, ctx) => {
   table.innerHTML = COFFRE;
   const coffre = $(".coffre", table);
   const voile = el("span", { class: "lb-voile", "aria-hidden": "true" });
-  const rayons = el("span", { class: "lb-rayons", "aria-hidden": "true" });
+  // Les faisceaux naissent DANS le coffre : leur origine est sous le bord, et tout ce qui est sous le bord est masqué.
+  const rayonsIn = el("span", { class: "lb-rayons-in" });
+  const rayons = el("span", { class: "lb-rayons", "aria-hidden": "true" }, rayonsIn);
   const toile = el("canvas", { class: "lb-particules", "aria-hidden": "true" });
   const echelle = el("div", { class: "echelle", hidden: true, "aria-hidden": "true" });
   // Un clic sur le coffre lance tout : bouton rond posé dessus, avec la jauge de la montée de tension.
@@ -381,24 +382,17 @@ App.demarrer("lootbox", async (main, ctx) => {
       if (p.age >= p.vie) { P.splice(i, 1); continue; }
       p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
       const k = 1 - p.age / p.vie, X = (p.x + o.left) * dpr, Y = (p.y + o.top) * dpr;
-      if (p.genre === "piece") {
-        const r = p.t * dpr, l = Math.max(0.2, Math.abs(Math.cos(p.rot += p.vr * dt)));
-        ctx2.globalCompositeOperation = "source-over";
-        ctx2.globalAlpha = Math.min(1, k * 4);
-        ctx2.beginPath(); ctx2.ellipse(X, Y, r * l, r, 0, 0, 6.2832);
-        ctx2.fillStyle = p.c; ctx2.fill();
-        ctx2.lineWidth = dpr; ctx2.strokeStyle = "rgba(70, 42, 0, .9)"; ctx2.stroke();
-      } else if (p.genre === "carte") {
-        // Les mini-cartes ne sortent pas de la table : elles s'effacent en approchant du bord.
+      if (p.genre === "carte") {
+        // Mini-carte de la couleur de la rareté. Elle ne sort pas de la table : elle s'efface en approchant du bord.
         const bord = Math.min(p.x, o.width - p.x, p.y, o.height - p.y);
         if (bord < 6) { P.splice(i, 1); continue; }
         const lw = p.t * dpr, lh = lw * 1.4;
         ctx2.globalCompositeOperation = "source-over";
         ctx2.globalAlpha = Math.min(1, k * 3, (bord - 6) / 34);
         ctx2.save(); ctx2.translate(X, Y); ctx2.rotate(Math.sin(p.rot + p.age * 3) * 0.3);
-        ctx2.fillStyle = "#1c1533"; ctx2.fillRect(-lw / 2, -lh / 2, lw, lh);
-        ctx2.lineWidth = 2 * dpr; ctx2.strokeStyle = "#fff"; ctx2.strokeRect(-lw / 2, -lh / 2, lw, lh);
-        ctx2.fillStyle = p.c; ctx2.fillRect(-lw * 0.18, -lw * 0.18, lw * 0.36, lw * 0.36);
+        ctx2.fillStyle = "#15121f"; ctx2.fillRect(-lw / 2 - dpr, -lh / 2 - dpr, lw + 2 * dpr, lh + 2 * dpr);
+        ctx2.fillStyle = p.c; ctx2.fillRect(-lw / 2, -lh / 2, lw, lh);
+        ctx2.lineWidth = 1.5 * dpr; ctx2.strokeStyle = "rgba(255,255,255,.75)"; ctx2.strokeRect(-lw / 2 + 2 * dpr, -lh / 2 + 2 * dpr, lw - 4 * dpr, lh - 4 * dpr);
         ctx2.restore();
       } else {
         const c = p.t * dpr * (0.45 + k * 0.55);
@@ -418,24 +412,21 @@ App.demarrer("lootbox", async (main, ctx) => {
       braise(x, y, Math.cos(a) * s, Math.sin(a) * s, g, vie * (0.6 + Math.random() * 0.8), Math.random() < 0.28 ? "#fff" : c, taille * (0.6 + Math.random() * 0.9));
     }
   }
-  // Fontaine de pièces : elles jaillissent du coffre et retombent, jusqu'en dehors de la table.
-  function pieces(x, y, n, force = 1) {
-    for (let i = 0; i < n; i++) braise(x + (Math.random() - 0.5) * 30, y, (Math.random() - 0.5) * 540 * force, -(340 + Math.random() * 430) * force, 1100, 1.5 + Math.random() * 0.8, Math.random() < 0.22 ? "#d5d7e2" : "#ffc53d", 5 + Math.random() * 3.5, "piece");
+  // Gerbe de mini-cartes (jackpot) : elles jaillissent du coffre et retombent, sans quitter la table.
+  function cartesEnGerbe(x, y, c, n, taille) {
+    for (let i = 0; i < n; i++) braise(x + (Math.random() - 0.5) * 30, y, (Math.random() - 0.5) * 520, -(330 + Math.random() * 420), 900, 1.6 + Math.random() * 0.6, c, taille * (0.8 + Math.random() * 0.4), "carte");
   }
-  // Tant que les faisceaux sont allumés : pièces qui jaillissent, éclats et mini-cartes qui remontent chaque faisceau.
+  const tailleCarte = () => Math.min(26, (Number(rayons.style.getPropertyValue("--l").replace("px", "")) || 120) * 0.2);
+  // Tant que les faisceaux sont allumés, des mini-cartes de la couleur de la rareté remontent chacun d'eux. Rien d'autre.
   function demarrerFlux() {
     arreterFlux();
     if (App.reduit) return;
     flux = setInterval(() => {
-      const o = centreCoffre(), rang = Number(table.style.getPropertyValue("--rang")) || 0, c = table.style.getPropertyValue("--lueur") || BLANC;
-      const large = Number(rayons.style.getPropertyValue("--l").replace("px", "")) || 120;
-      const q = PIECES_PAR_TIC[rang];
-      pieces(o.x, o.y, Math.floor(q) + (Math.random() < q % 1 ? 1 : 0), 0.8 + rang * 0.08);
+      const o = centreCoffre(), rang = Number(table.style.getPropertyValue("--rang")) || 0, c = couleur(ORDRE_RARETE[rang]), t = tailleCarte();
       for (const angle of EVENTAILS[rang]) {
-        const a = angle * Math.PI / 180, dx = Math.sin(a), dy = -Math.cos(a), d = Math.random() * 40, cote = (Math.random() - 0.5) * large * 0.3;
-        const x = o.x + dx * d + dy * cote, y = o.y + dy * d - dx * cote;
-        if (Math.random() < 0.7) { const v = 380 + Math.random() * 260; braise(x, y, dx * v, dy * v, 0, 0.9 + Math.random() * 0.5, Math.random() < 0.5 ? "#fff" : c, 5 + Math.random() * 5); }
-        if (Math.random() < 0.06) { const v = 200 + Math.random() * 90; braise(x, y, dx * v, dy * v, 0, 1.9, c, Math.min(22, large * 0.16), "carte"); }
+        if (Math.random() > 0.15 + rang * 0.02) continue;
+        const a = angle * Math.PI / 180, dx = Math.sin(a), dy = -Math.cos(a), cote = (Math.random() - 0.5) * t * 1.6, v = 210 + Math.random() * 110;
+        braise(o.x + dy * cote, o.y - dx * cote, dx * v, dy * v, 0, 2.4, c, t * (0.85 + Math.random() * 0.3), "carte");
       }
     }, 45);
   }
@@ -454,8 +445,10 @@ App.demarrer("lootbox", async (main, ctx) => {
   const teinte = (r) => (r === 0 ? BLANC : couleur(ORDRE_RARETE[r]));
   function faisceaux(rang) {
     rayons.style.setProperty("--l", Math.round(Math.max(76, Math.min(140, table.clientWidth * 0.19))) + "px");
-    rayons.style.top = centreCoffre().y + "px"; // ils partent de la bouche du coffre, où qu'il soit
-    rayons.replaceChildren(...EVENTAILS[rang].map((a, i) => el("i", { style: { "--a": a + "deg", "--d": i * 35 + "ms" } })));
+    const bord = centreCoffre().y;
+    rayons.style.height = Math.round(bord + 3) + "px";
+    rayonsIn.style.top = Math.round(bord + coffre.offsetHeight * 0.16) + "px";
+    rayonsIn.replaceChildren(...EVENTAILS[rang].map((a, i) => el("i", { style: { "--a": a + "deg", "--d": i * 35 + "ms" } })));
     rayons.dataset.rang = String(rang);
   }
   // Le coffre tremble d'autant plus fort que le palier est haut.
@@ -470,7 +463,9 @@ App.demarrer("lootbox", async (main, ctx) => {
   // ---------- La montée de tension : le coffre tremble de plus en plus fort, puis s'ouvre ----------
   // Au clic, le coffre tombe au fond de la table (choc, secousse, poussière) : toute la hauteur est aux faisceaux.
   function tomber() {
-    table.style.setProperty("--chute", Math.max(0, Math.round(table.clientHeight / 2 - coffre.offsetHeight * 0.56 - 14)) + "px");
+    // Hauteur cible de la table, pas sa hauteur du moment : après « Encore », elle est encore en train de rétrécir.
+    const h = parseFloat(table.style.getPropertyValue("--h-table")) || table.clientHeight;
+    table.style.setProperty("--chute", Math.max(0, Math.round(h / 2 - coffre.offsetHeight * 0.56 - 14)) + "px");
     table.classList.add("au-sol");
     if (App.reduit) return Promise.resolve();
     App.sons.envol();
@@ -654,8 +649,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     setTimeout(() => flash.remove(), 1700);
     tampon("legendaire");
     secouer(2.4, 2.4);
-    pieces(o.x, o.y, 90, 1.25);
-    pluieDePieces();
+    cartesEnGerbe(o.x, o.y, c, 40, tailleCarte());
     if (!App.reduit && navigator.vibrate) navigator.vibrate([80, 40, 80, 40, 80, 40, 300]);
     for (let k = 0; k < 9; k++) setTimeout(() => {
       if (passer || !enCours) return;
@@ -663,10 +657,8 @@ App.demarrer("lootbox", async (main, ctx) => {
       gerbe(x, y, k % 3 === 2 ? "#fff" : c, 46, { v: 300, cone: Math.PI * 2, g: 260, vie: 1, taille: 5 });
       onde(x, y, c);
       App.sons.explosion(2 + (k % 3));
-      pieces(o.x, o.y, 28, 1.2);
-      if (k === 4) pluieDePieces();
+      cartesEnGerbe(o.x, o.y, k % 2 ? "#ff9a3d" : c, 14, tailleCarte());
     }, 260 + k * 270);
-    for (let k = 0; k < 30; k++) setTimeout(() => { if (!passer && enCours) App.sons.tinte(); }, k * 90);
     await pause(2900);
   }
 
@@ -783,7 +775,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     table.classList.remove("flash-leg", "focus", "final", "secoue", "invocation", "cartes", "hesite", "calme", "en-charge", "jackpot", "au-sol");
     coffre.classList.remove("tremble", "ouvert", "rayonne", "recule", "inspire", "atterrit");
     arreterFlux();
-    rayons.replaceChildren();
+    rayonsIn.replaceChildren();
     echelle.hidden = true;
     encore.hidden = true;
     coffre.classList.toggle("version-legendaire", type === "legendaire");
