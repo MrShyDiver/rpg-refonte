@@ -323,7 +323,8 @@ function chargerRemplacements() {
   }).catch(() => {});
 }
 
-// jouer("slash_katana", { pan, retard (s), fichiers: "a.mp3,b.mp3", vol, envoi })
+const VARIATION_PITCH = 1.5; // demi-tons, en plus ou en moins, sur les bruitages joués depuis un fichier
+// jouer("slash_katana", { pan, retard (s), fichiers: "a.mp3,b.mp3", vol, envoi, pitch })
 // Priorité : fichier de l'objet (catalogue) > fichier d'événement (sons/combat/) > synthèse.
 function jouer(nom, o = {}) {
   if (!actif || !ctx || ctx.state === "closed") return;
@@ -333,6 +334,8 @@ function jouer(nom, o = {}) {
     const b = fichiers.get(f);
     if (b && !(b instanceof Promise)) {
       const src = ctx.createBufferSource(), g = ctx.createGain(); src.buffer = b; g.gain.value = o.vol ?? 0.9;
+      // Le même fichier ne sonne jamais deux fois pareil : hauteur tirée au hasard à chaque coup (o.pitch pour l'imposer).
+      src.playbackRate.value = o.pitch ?? Math.pow(2, (Math.random() * 2 - 1) * VARIATION_PITCH / 12);
       src.connect(g).connect(sortie(o.pan || 0, 0.12)); src.start(t); return;
     }
     tampon(f); // chargé pour la prochaine fois ; synthèse en attendant
