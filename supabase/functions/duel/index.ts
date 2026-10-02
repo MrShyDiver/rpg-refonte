@@ -1,4 +1,4 @@
-// Edge Function `duel` — Stream RPG (v5, moteur 1.2 : combat automatique, échos validés, puissances stockées).
+// Edge Function `duel` — Stream RPG (v5, moteur 1.3 : combat automatique, échos validés, puissances stockées).
 //
 // POST, Authorization: Bearer <jeton de session> :
 //   { mode: "classe" | "entrainement", adversaire: "<login>" }               duel ciblé
@@ -17,7 +17,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   construireCombattant, simulerDuel, type Equipement, type JoueurEntree,
-} from "https://raw.githubusercontent.com/MrShyDiver/rpg-refonte/074e98bac7ba88103438c9dbd02273a32ec1115e/supabase/functions/duel/moteur.ts";
+} from "https://raw.githubusercontent.com/MrShyDiver/rpg-refonte/d884ccd7c0337c5fab0da66e10ffb79800c17e1b/supabase/functions/duel/moteur.ts";
 
 const ORIGINES = /^(https:\/\/mrshydiver\.github\.io|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/;
 const COLONNES = "id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks," +
