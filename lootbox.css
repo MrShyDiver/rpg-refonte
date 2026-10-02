@@ -58,6 +58,12 @@
   position: absolute; left: 50%; top: 50%; width: min(300px, 74%); aspect-ratio: 1; translate: -50% -50%; z-index: 3; border-radius: 50%;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
+/* Le coffre tombe au fond de la table : chute qui accélère, écrasement à l'impact. */
+.lb-table.au-sol .coffre { translate: -50% calc(-46% + var(--chute, 0px)); transition: translate .27s cubic-bezier(.55, 0, .95, .45), --lueur .35s; }
+.lb-table.au-sol .coffre:not(.tremble):not(.ouvert) svg { animation: none; }
+.lb-table.au-sol .coffre.atterrit:not(.tremble):not(.ouvert) svg { transform-origin: 50% 100%; animation: atterrit .3s var(--ease); }
+@keyframes atterrit { 0% { scale: 1.14 .8; } 55% { scale: .96 1.06; } 100% { scale: 1; } }
+.lb-table.au-sol .lb-jauge { display: none; }
 .lb-ouvrir-coffre:focus-visible { outline: 2px solid var(--legendaire); outline-offset: 4px; }
 .lb-table:has(.lb-ouvrir-coffre:hover) .coffre svg { scale: 1.06; }
 .lb-table:has(.lb-ouvrir-coffre:hover) .coffre .halo { opacity: .3; scale: .8; }
@@ -91,7 +97,7 @@
 .lb-table.invocation .lb-rayons { opacity: 1; }
 /* De larges bandes pleines, comme dans Vampire Survivors : pas de flou, pas de transparence timide. */
 .lb-rayons i {
-  position: absolute; left: calc(var(--l) / -2); bottom: 0; width: var(--l); height: 460px; transform-origin: 50% 100%; rotate: var(--a);
+  position: absolute; left: calc(var(--l) / -2); bottom: 0; width: var(--l); height: 640px; transform-origin: 50% 100%; rotate: var(--a);
   background:
     linear-gradient(90deg, rgba(0,0,0,.28), transparent 9%, rgba(255,255,255,.4) 50%, transparent 91%, rgba(0,0,0,.28)),
     linear-gradient(to top, #fff, color-mix(in oklab, var(--lueur) 80%, #fff) 9%, var(--lueur) 34%, color-mix(in oklab, var(--lueur) 82%, transparent));
@@ -101,7 +107,7 @@
 @keyframes jaillit { from { scale: .3 0; opacity: 0; } to { scale: 1 1; opacity: .9; } }
 @keyframes balance { from { rotate: calc(var(--a) - 2deg); } to { rotate: calc(var(--a) + 2deg); } }
 /* Jackpot : 7 faisceaux or et orange qui balaient, fond doré qui pulse, soleil blanc qui tourne, cadre en or. */
-.lb-rayons[data-rang="4"] i { --lueur: #ffb21f; height: 620px; }
+.lb-rayons[data-rang="4"] i { --lueur: #ffb21f; height: 780px; }
 .lb-rayons[data-rang="4"] i:nth-child(even) { --lueur: #ff7a3d; }
 .lb-rayons[data-rang="4"] { animation: balaie 2s ease-in-out infinite alternate; }
 @keyframes balaie { from { rotate: -6deg; } to { rotate: 6deg; } }

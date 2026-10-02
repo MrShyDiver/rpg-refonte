@@ -1,6 +1,7 @@
 "use strict";
 // Lootbox : la page d'arrivée. L'ouverture suit la logique des coffres de Vampire Survivors :
-//   1. un clic sur le coffre lance tout : il tremble de plus en plus fort (montée de tension) ;
+//   1. un clic sur le coffre lance tout : il tombe au fond de la table (choc, secousse), puis tremble
+//      de plus en plus fort (montée de tension) ;
 //   2. le couvercle saute et des faisceaux jaillissent, un palier de rareté après l'autre :
 //      1 blanc au Commun, 2 verts au Normal, 3 bleus au Rare, 4 violets à l'Épique (de larges bandes
 //      pleines, des pièces et des mini-cartes qui remontent), et au Légendaire le jackpot : toute la
@@ -388,9 +389,12 @@ App.demarrer("lootbox", async (main, ctx) => {
         ctx2.fillStyle = p.c; ctx2.fill();
         ctx2.lineWidth = dpr; ctx2.strokeStyle = "rgba(70, 42, 0, .9)"; ctx2.stroke();
       } else if (p.genre === "carte") {
+        // Les mini-cartes ne sortent pas de la table : elles s'effacent en approchant du bord.
+        const bord = Math.min(p.x, o.width - p.x, p.y, o.height - p.y);
+        if (bord < 6) { P.splice(i, 1); continue; }
         const lw = p.t * dpr, lh = lw * 1.4;
         ctx2.globalCompositeOperation = "source-over";
-        ctx2.globalAlpha = Math.min(1, k * 3);
+        ctx2.globalAlpha = Math.min(1, k * 3, (bord - 6) / 34);
         ctx2.save(); ctx2.translate(X, Y); ctx2.rotate(Math.sin(p.rot + p.age * 3) * 0.3);
         ctx2.fillStyle = "#1c1533"; ctx2.fillRect(-lw / 2, -lh / 2, lw, lh);
         ctx2.lineWidth = 2 * dpr; ctx2.strokeStyle = "#fff"; ctx2.strokeRect(-lw / 2, -lh / 2, lw, lh);
@@ -450,6 +454,7 @@ App.demarrer("lootbox", async (main, ctx) => {
   const teinte = (r) => (r === 0 ? BLANC : couleur(ORDRE_RARETE[r]));
   function faisceaux(rang) {
     rayons.style.setProperty("--l", Math.round(Math.max(76, Math.min(140, table.clientWidth * 0.19))) + "px");
+    rayons.style.top = centreCoffre().y + "px"; // ils partent de la bouche du coffre, où qu'il soit
     rayons.replaceChildren(...EVENTAILS[rang].map((a, i) => el("i", { style: { "--a": a + "deg", "--d": i * 35 + "ms" } })));
     rayons.dataset.rang = String(rang);
   }
@@ -463,17 +468,35 @@ App.demarrer("lootbox", async (main, ctx) => {
   }
 
   // ---------- La montée de tension : le coffre tremble de plus en plus fort, puis s'ouvre ----------
-  function debutCharge() {
+  // Au clic, le coffre tombe au fond de la table (choc, secousse, poussière) : toute la hauteur est aux faisceaux.
+  function tomber() {
+    table.style.setProperty("--chute", Math.max(0, Math.round(table.clientHeight / 2 - coffre.offsetHeight * 0.56 - 14)) + "px");
+    table.classList.add("au-sol");
+    if (App.reduit) return Promise.resolve();
+    App.sons.envol();
+    return new Promise((fin) => setTimeout(() => {
+      const o = centreCoffre(), bas = o.y + coffre.offsetHeight * 0.6;
+      App.sons.impact(4);
+      secouer(0.32, 1.4);
+      for (const cote of [-1, 1]) gerbe(o.x + cote * 70, bas, "#b9a48a", 14, { dir: cote < 0 ? Math.PI : 0, cone: 1.2, v: 190, g: 300, vie: 0.5, taille: 4 });
+      coffre.classList.remove("atterrit"); void coffre.offsetWidth; coffre.classList.add("atterrit");
+      if (navigator.vibrate) navigator.vibrate(40);
+      setTimeout(fin, 170);
+    }, 270));
+  }
+  async function debutCharge() {
     if (enCours || !pret || charge || stock(type) < choix) return;
     App.sons.demarrer();
-    if (App.reduit) { ouvrir(choix); return; }
+    if (App.reduit) { tomber(); ouvrir(choix); return; }
     // Sur un petit écran, la table vient au centre : toute la scène doit se voir.
     const cadre = table.getBoundingClientRect();
     if (cadre.top < 60 || cadre.bottom > innerHeight - 60) table.scrollIntoView({ block: "center", behavior: "smooth" });
+    charge = {}; // verrou pendant la chute
+    consigne.textContent = "";
+    await tomber();
     charge = { t0: performance.now(), o: centreCoffre(), couper: App.sons.tension(DUREE_CHARGE / 1000) };
     coffre.classList.add("tremble");
     table.classList.add("en-charge");
-    consigne.textContent = "";
     const tour = (t) => {
       const p = Math.min(1, (t - charge.t0) / DUREE_CHARGE), o = charge.o;
       table.style.setProperty("--charge", p.toFixed(3));
@@ -757,8 +780,8 @@ App.demarrer("lootbox", async (main, ctx) => {
   }
   function remettreCoffre() {
     $$(".dcarte, .eclair, .tampon, .piece, .onde-choc", table).forEach((e) => e.remove());
-    table.classList.remove("flash-leg", "focus", "final", "secoue", "invocation", "cartes", "hesite", "calme", "en-charge", "jackpot");
-    coffre.classList.remove("tremble", "ouvert", "rayonne", "recule", "inspire");
+    table.classList.remove("flash-leg", "focus", "final", "secoue", "invocation", "cartes", "hesite", "calme", "en-charge", "jackpot", "au-sol");
+    coffre.classList.remove("tremble", "ouvert", "rayonne", "recule", "inspire", "atterrit");
     arreterFlux();
     rayons.replaceChildren();
     echelle.hidden = true;
@@ -853,6 +876,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     table.style.setProperty("--h-table", disp.hauteur + "px");
     table.classList.toggle("etroite", disp.dw < 110);
     coffre.classList.add("recule");
+    table.classList.remove("au-sol"); // le coffre s'efface : sa lueur revient au centre, derrière les cartes
     table.classList.add("cartes");
     await pause(380);
     const etat = { tirages: ordre, cartes: [], disp, combo: 0 };
