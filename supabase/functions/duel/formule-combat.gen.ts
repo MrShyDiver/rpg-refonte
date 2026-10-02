@@ -23,6 +23,7 @@ const CST = {
     BASE_PV: 100.0, BONUS_PV_PAR_STACK: 10.0,
     BASE_SPD: 10.0, SPD_MAX_BONUS: 40.0, K_SPD: 40.0, // SPD_MAX_BONUS / K_SPD : plus utilisés depuis la v1.1 (vitesse linéaire)
     SPD_REFERENCE: 20.0, // vitesse d'un adversaire type (10 de base + ~10 investis), pour la puissance
+    TOUR_BONUS_PAR_POINT: 1.2, // % de tour en plus par point de vitesse d'avance (moteur 1.2)
     BASE_ESQUIVE: 15.0,
     BASE_CRIT: 15.0, LUCK_CRIT_MAX: 55.0, K_LUCK: 55.0,
     DEF_MITIGATION_MAX: 60.0, K_DEF_MITIGATION: 58.27,
@@ -419,7 +420,9 @@ function calculerPowerLevelSimule(s, atkEquivalent, critPct, esquivePct, arme, o
 
     // v1.1 : part des tours jouée face à un adversaire de vitesse SPD_REFERENCE, ramenée à 1 pour un
     // joueur sans vitesse (échelle de puissance inchangée pour lui), et qui sature comme le moteur.
-    const facteurVitesse = s.spd * (CST.BASE_SPD + CST.SPD_REFERENCE) / (CST.BASE_SPD * (s.spd + CST.SPD_REFERENCE));
+    // v1.2 : même règle que le moteur (jauge de 100 + 1,2 par point d'avance, au plus 2 tours pour 1).
+    const rythme = (v) => Math.min(2.0, Math.max(0.5, (100.0 + CST.TOUR_BONUS_PAR_POINT * Math.max(0, v - CST.SPD_REFERENCE)) / (100.0 + CST.TOUR_BONUS_PAR_POINT * Math.max(0, CST.SPD_REFERENCE - v))));
+    const facteurVitesse = rythme(s.spd) / rythme(CST.BASE_SPD);
     const fractionActionsPropres = facteurVitesse / (facteurVitesse + 1.0);
     const tourDebutCroissance = CST.ROPE_START_ACTION * fractionActionsPropres;
     const toursParTickCroissance = Math.max(0.01, CST.ROPE_CADENCE * fractionActionsPropres);

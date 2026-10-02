@@ -13,6 +13,7 @@ const CST = {
     SPD_MAX_BONUS: 40.0,
     K_SPD: 40.0,
     SPD_REFERENCE: 20.0,
+    TOUR_BONUS_PAR_POINT: 1.2,
     BASE_ESQUIVE: 15.0,
     BASE_CRIT: 15.0,
     LUCK_CRIT_MAX: 55.0,
@@ -378,7 +379,8 @@ function calculerPowerLevelSimule(s, atkEquivalent, critPct, esquivePct, arme, o
     enemyHitChance *= (100.0 - parade) / 100.0;
     const mitigationSelf = mitigation(s.def);
     const blocageMitig = blocage / 100.0 * (blocageReduc / 100.0);
-    const facteurVitesse = s.spd * (CST.BASE_SPD + CST.SPD_REFERENCE) / (CST.BASE_SPD * (s.spd + CST.SPD_REFERENCE));
+    const rythme = (v)=>Math.min(2.0, Math.max(0.5, (100.0 + CST.TOUR_BONUS_PAR_POINT * Math.max(0, v - CST.SPD_REFERENCE)) / (100.0 + CST.TOUR_BONUS_PAR_POINT * Math.max(0, CST.SPD_REFERENCE - v))));
+    const facteurVitesse = rythme(s.spd) / rythme(CST.BASE_SPD);
     const fractionActionsPropres = facteurVitesse / (facteurVitesse + 1.0);
     const tourDebutCroissance = CST.ROPE_START_ACTION * fractionActionsPropres;
     const toursParTickCroissance = Math.max(0.01, CST.ROPE_CADENCE * fractionActionsPropres);
@@ -462,9 +464,10 @@ if (typeof module !== 'undefined') module.exports = {
 };
 
 
-const VERSION_MOTEUR = "site-1.1.1";
+const VERSION_MOTEUR = "site-1.2.0";
 const AP_THRESHOLD = 100.0;
 const MAX_TOURS_DAFFILEE = 2;
+const TOUR_BONUS_PAR_POINT = CST.TOUR_BONUS_PAR_POINT;
 const SEUIL_SOIN_URGENCE = 0.5;
 const MAX_ACTIONS = 45, ROPE_START_ACTION = 20, ROPE_CADENCE = 2;
 const FATIGUE_BASE = 10, FATIGUE_CROISSANCE = 1.30;
@@ -1040,8 +1043,9 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
         }
     }
     while(A.pv > 0 && B.pv > 0 && totalActions < MAX_ACTIONS){
-        A.ap = Math.min(2 * AP_THRESHOLD, A.ap + Math.max(1, A.stats.spd + A.frenesieBonusSpd));
-        B.ap = Math.min(2 * AP_THRESHOLD, B.ap + Math.max(1, B.stats.spd + B.frenesieBonusSpd));
+        const vA = A.stats.spd + A.frenesieBonusSpd, vB = B.stats.spd + B.frenesieBonusSpd;
+        A.ap = Math.min(2 * AP_THRESHOLD, A.ap + AP_THRESHOLD + TOUR_BONUS_PAR_POINT * Math.max(0, vA - vB));
+        B.ap = Math.min(2 * AP_THRESHOLD, B.ap + AP_THRESHOLD + TOUR_BONUS_PAR_POINT * Math.max(0, vB - vA));
         while((A.ap >= AP_THRESHOLD || B.ap >= AP_THRESHOLD) && A.pv > 0 && B.pv > 0 && totalActions < MAX_ACTIONS){
             let aJoue = A.ap >= AP_THRESHOLD && (B.ap < AP_THRESHOLD || A.ap > B.ap || A.ap === B.ap && A.stats.spd >= B.stats.spd);
             if (dernierJoueur === (aJoue ? A : B) && serie >= MAX_TOURS_DAFFILEE) aJoue = !aJoue;

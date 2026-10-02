@@ -16,7 +16,7 @@ import {
   estimerAtkEquivalentAvecStance, appliquerBonusArmeStance, vueArmeSelonStance, valeurStat, niveauMaxPourRarete,
 } from "./formule-combat.gen.ts";
 
-export const VERSION_MOTEUR = "site-1.1.1";
+export const VERSION_MOTEUR = "site-1.2.0";
 
 // ---------------------------------------------------------------- contrat
 export interface Equipement { data: Record<string, any>; niveau: number; numero?: number }
@@ -46,6 +46,9 @@ export interface OptionsDuel {
 const AP_THRESHOLD = 100.0;
 // v1.1 — alternance + tour bonus : le plus rapide joue plus souvent, mais jamais plus de 2 tours d'affilée.
 const MAX_TOURS_DAFFILEE = 2;
+// v1.2 (décision du 02/10) — c'est l'ÉCART de vitesse qui compte, plus le rapport : chaque point
+// d'avance remplit la jauge du plus rapide de 1,2 % de tour en plus (+10 = un tour bonus tous les ~8 tours adverses).
+const TOUR_BONUS_PAR_POINT = CST.TOUR_BONUS_PAR_POINT;
 // v1.1 — un soin actif ne part que s'il manque au moins son montant, ou sous ce seuil de PV.
 const SEUIL_SOIN_URGENCE = 0.5;
 const MAX_ACTIONS = 45, ROPE_START_ACTION = 20, ROPE_CADENCE = 2;
@@ -438,8 +441,9 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
   // ======================================================= boucle principale (ResoudreCombatInterne)
   while (A.pv > 0 && B.pv > 0 && totalActions < MAX_ACTIONS) {
     // Plancher de 1 AP/tick : garantit la terminaison même avec une vitesse ≤ 0 (F13).
-    A.ap = Math.min(2 * AP_THRESHOLD, A.ap + Math.max(1, A.stats.spd + A.frenesieBonusSpd));
-    B.ap = Math.min(2 * AP_THRESHOLD, B.ap + Math.max(1, B.stats.spd + B.frenesieBonusSpd));
+    const vA = A.stats.spd + A.frenesieBonusSpd, vB = B.stats.spd + B.frenesieBonusSpd;
+    A.ap = Math.min(2 * AP_THRESHOLD, A.ap + AP_THRESHOLD + TOUR_BONUS_PAR_POINT * Math.max(0, vA - vB));
+    B.ap = Math.min(2 * AP_THRESHOLD, B.ap + AP_THRESHOLD + TOUR_BONUS_PAR_POINT * Math.max(0, vB - vA));
 
     while ((A.ap >= AP_THRESHOLD || B.ap >= AP_THRESHOLD) && A.pv > 0 && B.pv > 0 && totalActions < MAX_ACTIONS) {
       // Les deux jauges pleines : la plus remplie d'abord, puis le plus rapide, puis l'attaquant.

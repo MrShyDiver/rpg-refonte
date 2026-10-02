@@ -138,3 +138,9 @@ Après toute modification : `node outils/moteur-navigateur.mjs` (régénère `mo
 - **Saignement** : l'explosion se déclenche à **5 charges** (20 auparavant, elle n'arrivait presque jamais). Décision de MrShyDiver.
 - **Volto-Hache** : la purge du poison et de la brûlure au retour en première forme est un passif voulu (confirmé). Elle est maintenant écrite sur la fiche et annoncée dans le récit du combat (effet `purge`).
 - **Vitesse, mesure à build identique** (9 000 duels, N points en vitesse contre N points dans une autre stat) : avec la règle actuelle (rapport des vitesses) la vitesse gagne 72 % / 82 % / 87 % pour 5 / 10 / 20 points — trop forte. Règle proposée, pas encore appliquée : chaque point de vitesse d'avance = 1 % de tour en plus (47 % / 47 % / 49 %, donc équitable) ; à 2 % par point : 53 % / 59 % / 62 %.
+
+### 1.2.0 (02/10, soir) — vitesse à l'écart
+
+Décision de MrShyDiver : **chaque point de vitesse d'avance = 1,2 % de tour en plus** (`TOUR_BONUS_PAR_POINT = 1.2`, dans `formule-combat.js`). La jauge de chacun gagne 100 par échange, celle du plus rapide 100 + 1,2 × écart ; le plafond de 2 tours d'affilée reste. +10 d'avance : un tour bonus tous les ~8 tours adverses ; +25 : un tous les ~3 ; +83 : le plafond de 2 pour 1. La formule de puissance suit la même règle face à un adversaire de vitesse 20.
+
+Mesures : à build identique, N points en vitesse contre N points ailleurs → la vitesse gagne 48 % / 48 % / 49 % pour 5 / 10 / 20 points (72 % / 82 % / 87 % avec le rapport des vitesses). Sur builds aléatoires, le plus rapide gagne 61 % des duels (74 % avant). 6 000 duels sans anomalie, 15,9 tours en moyenne.
