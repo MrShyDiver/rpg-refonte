@@ -21,7 +21,8 @@ const CST = {
     // peu de crit des le premier tour).
     BASE_LUCK_MANNEQUIN: 10.0,
     BASE_PV: 100.0, BONUS_PV_PAR_STACK: 10.0,
-    BASE_SPD: 10.0, SPD_MAX_BONUS: 40.0, K_SPD: 40.0,
+    BASE_SPD: 10.0, SPD_MAX_BONUS: 40.0, K_SPD: 40.0, // SPD_MAX_BONUS / K_SPD : plus utilisés depuis la v1.1 (vitesse linéaire)
+    SPD_REFERENCE: 20.0, // vitesse d'un adversaire type (10 de base + ~10 investis), pour la puissance
     BASE_ESQUIVE: 15.0,
     BASE_CRIT: 15.0, LUCK_CRIT_MAX: 55.0, K_LUCK: 55.0,
     DEF_MITIGATION_MAX: 60.0, K_DEF_MITIGATION: 58.27,
@@ -166,7 +167,9 @@ function calculerStatsEffectives(stacks, equipement) {
         atk: CST.BASE_ATK + CST.BONUS_ATK_PAR_STACK * stacks.atk,
         def: CST.BASE_DEF + CST.BONUS_DEF_PAR_STACK * stacks.def,
         pv: CST.BASE_PV + CST.BONUS_PV_PAR_STACK * stacks.pv,
-        spd: CST.BASE_SPD + CST.SPD_MAX_BONUS * Math.tanh(stacks.spd / CST.K_SPD),
+        // v1.1 (02/10) : la vitesse est linéaire (1 point investi = +1). La courbe dégressive n'a plus
+        // lieu d'être : le moteur plafonne lui-même l'avantage à 2 tours d'affilée.
+        spd: CST.BASE_SPD + stacks.spd,
         spdLineaire: stacks.spd,
         luckLineaire: Math.max(0, stacks.luck), // deluck non simulable ici (dépend d'un adversaire réel)
         esquiveGear: 0,
@@ -414,7 +417,10 @@ function calculerPowerLevelSimule(s, atkEquivalent, critPct, esquivePct, arme, o
     const mitigationSelf = mitigation(s.def);
     const blocageMitig = (blocage / 100.0) * (blocageReduc / 100.0);
 
-    const fractionActionsPropres = s.spd / (s.spd + CST.BASE_SPD);
+    // v1.1 : part des tours jouée face à un adversaire de vitesse SPD_REFERENCE, ramenée à 1 pour un
+    // joueur sans vitesse (échelle de puissance inchangée pour lui), et qui sature comme le moteur.
+    const facteurVitesse = s.spd * (CST.BASE_SPD + CST.SPD_REFERENCE) / (CST.BASE_SPD * (s.spd + CST.SPD_REFERENCE));
+    const fractionActionsPropres = facteurVitesse / (facteurVitesse + 1.0);
     const tourDebutCroissance = CST.ROPE_START_ACTION * fractionActionsPropres;
     const toursParTickCroissance = Math.max(0.01, CST.ROPE_CADENCE * fractionActionsPropres);
 
@@ -437,7 +443,7 @@ function calculerPowerLevelSimule(s, atkEquivalent, critPct, esquivePct, arme, o
         regen, lifesteal, tourDebutCroissance, toursParTickCroissance);
     let survieTours = passeFinale.survieTours;
 
-    let totalDmg = passeFinale.totalDmgOffense * (s.spd / CST.BASE_SPD);
+    let totalDmg = passeFinale.totalDmgOffense * facteurVitesse;
 
     const coupsQuiTouchent = hitChance * survieTours;
     const facteurPoisonSoutenu = Math.min(80.0, 1.0 + coupsQuiTouchent * coupsQuiTouchent * 0.03);

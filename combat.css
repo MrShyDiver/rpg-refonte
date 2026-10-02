@@ -179,12 +179,12 @@
 .slot-arme.forme-2 > .carte { box-shadow: 0 0 0 1px var(--c), 0 0 26px -6px var(--c); }
 .slot-armure.protege::after { opacity: .9; --c-slot: var(--c-bouclier); box-shadow: 0 0 0 2px var(--c-bouclier), 0 0 22px -4px var(--c-bouclier); }
 /* Stratagème : la carte face visible, même taille que la main gauche ; recharge et usages par-dessus. */
-.deck > .carte, .deck > .case-vide { transition: filter .4s, opacity .3s; }
-.deck.en-vol > .carte { opacity: 0; }
-.deck.recharge > .carte { filter: brightness(.38) saturate(.6); }
-.deck.epuise > .carte { filter: grayscale(1) brightness(.35); }
-.deck.epuise::before { content: "Épuisé"; position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 3; font-family: var(--pixel); font-size: 11px; color: var(--encre-2); background: rgba(12,13,18,.8); padding: 2px 6px; border-radius: 5px; }
-.deck .cd { position: absolute; inset: 0; display: grid; place-items: center; z-index: 3; font-family: var(--titre); font-weight: 800; font-size: calc(var(--wc) * .3); color: var(--encre); text-shadow: 0 2px 8px #000; pointer-events: none; }
+.pile > .carte, .pile > .case-vide { transition: filter .4s, opacity .3s; }
+.pile.en-vol > .carte { opacity: 0; }
+.pile.recharge > .carte { filter: brightness(.38) saturate(.6); }
+.pile.epuise > .carte { filter: grayscale(1) brightness(.35); }
+.pile.epuise::before { content: "Épuisé"; position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 3; font-family: var(--pixel); font-size: 11px; color: var(--encre-2); background: rgba(12,13,18,.8); padding: 2px 6px; border-radius: 5px; }
+.pile .cd { position: absolute; inset: 0; display: grid; place-items: center; z-index: 3; font-family: var(--titre); font-weight: 800; font-size: calc(var(--wc) * .3); color: var(--encre); text-shadow: 0 2px 8px #000; pointer-events: none; }
 .pips { position: absolute; left: 0; right: 0; top: calc(100% + 5px); display: flex; justify-content: center; gap: 4px; }
 .pips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--trait-fort); }
 .pips i.plein { background: var(--legendaire); border-color: transparent; box-shadow: 0 0 6px rgba(255,197,61,.6); }

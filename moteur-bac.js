@@ -12,6 +12,7 @@ const CST = {
     BASE_SPD: 10.0,
     SPD_MAX_BONUS: 40.0,
     K_SPD: 40.0,
+    SPD_REFERENCE: 20.0,
     BASE_ESQUIVE: 15.0,
     BASE_CRIT: 15.0,
     LUCK_CRIT_MAX: 55.0,
@@ -156,7 +157,7 @@ function calculerStatsEffectives(stacks, equipement) {
         atk: CST.BASE_ATK + CST.BONUS_ATK_PAR_STACK * stacks.atk,
         def: CST.BASE_DEF + CST.BONUS_DEF_PAR_STACK * stacks.def,
         pv: CST.BASE_PV + CST.BONUS_PV_PAR_STACK * stacks.pv,
-        spd: CST.BASE_SPD + CST.SPD_MAX_BONUS * Math.tanh(stacks.spd / CST.K_SPD),
+        spd: CST.BASE_SPD + stacks.spd,
         spdLineaire: stacks.spd,
         luckLineaire: Math.max(0, stacks.luck),
         esquiveGear: 0
@@ -377,7 +378,8 @@ function calculerPowerLevelSimule(s, atkEquivalent, critPct, esquivePct, arme, o
     enemyHitChance *= (100.0 - parade) / 100.0;
     const mitigationSelf = mitigation(s.def);
     const blocageMitig = blocage / 100.0 * (blocageReduc / 100.0);
-    const fractionActionsPropres = s.spd / (s.spd + CST.BASE_SPD);
+    const facteurVitesse = s.spd * (CST.BASE_SPD + CST.SPD_REFERENCE) / (CST.BASE_SPD * (s.spd + CST.SPD_REFERENCE));
+    const fractionActionsPropres = facteurVitesse / (facteurVitesse + 1.0);
     const tourDebutCroissance = CST.ROPE_START_ACTION * fractionActionsPropres;
     const toursParTickCroissance = Math.max(0.01, CST.ROPE_CADENCE * fractionActionsPropres);
     const calculerPvTotaux = (horizon)=>{
@@ -392,7 +394,7 @@ function calculerPowerLevelSimule(s, atkEquivalent, critPct, esquivePct, arme, o
     const pvTotaux = calculerPvTotaux(passeInitiale.survieTours);
     const passeFinale = simulerSurvieEtOffense(pvTotaux, hitChance, atkEquivalent, critMulti, arme, penetrationTotal, enemyHitChance, mitigationSelf, blocageMitig, etourdissementTotal, reductionTirTotal, regen, lifesteal, tourDebutCroissance, toursParTickCroissance);
     let survieTours = passeFinale.survieTours;
-    let totalDmg = passeFinale.totalDmgOffense * (s.spd / CST.BASE_SPD);
+    let totalDmg = passeFinale.totalDmgOffense * facteurVitesse;
     const coupsQuiTouchent = hitChance * survieTours;
     const facteurPoisonSoutenu = Math.min(80.0, 1.0 + coupsQuiTouchent * coupsQuiTouchent * 0.03);
     totalDmg += poisonDmg * facteurPoisonSoutenu;
@@ -460,8 +462,10 @@ if (typeof module !== 'undefined') module.exports = {
 };
 
 
-const VERSION_MOTEUR = "site-1.0.0";
+const VERSION_MOTEUR = "site-1.1.0";
 const AP_THRESHOLD = 100.0;
+const MAX_TOURS_DAFFILEE = 2;
+const SEUIL_SOIN_URGENCE = 0.5;
 const MAX_ACTIONS = 45, ROPE_START_ACTION = 20, ROPE_CADENCE = 2;
 const FATIGUE_BASE = 10, FATIGUE_CROISSANCE = 1.30;
 const PROTECTION_REDUCTION = 0.20;
@@ -507,7 +511,7 @@ function creerRng(seed) {
     for(let i = 0; i < 12; i++)next();
     return next;
 }
-const CHAMPS_NUMERIQUES = ("bonus increment bonus2 increment2 bonus3 increment3 baseDegatsMin baseDegatsMax incrementBaseDegats dureeStance " + "stance2Bonus stance2IncrementBonus stance2Bonus2 stance2IncrementBonus2 stance2Bonus3 stance2IncrementBonus3 stance2BaseDegatsMin stance2BaseDegatsMax " + "stance2IncrementBaseDegats incrementPassif lifesteal poisonDegats poisonDuree precision critBonus etourdissementChance executionSeuil executionBonus " + "blocage blocageReduction reflection reductionDegatsTir resistancePoison resistanceFeu regeneration resistanceCrit usagesParCombat coupsParUsage " + "cooldownTours degatsDirects incrementDegatsDirects penetration delaiTours soinDirect saignementDegats saignementStacksParCoup antiHealPourcentage " + "antiHealDuree brulureDegats brulureDuree shieldMontant rageBonusMax rageSeuilMin marqueDegatsPourcentage marqueDuree paradeChance tenaciteChance " + "frenesieBonusSpd frenesieDuree rechargeTousLesCoups rechargeSacrificePourcentage reductionPvMaxPourcentage autoDegatsPourcentageDesDegats " + "amplificationSoinsPourcentage esquiveParadeBuffPourcentage esquiveParadeBuffDuree briseDefPoints briseDefDuree dernierSouffleFractionPv " + "bruleeReflectionDegats bruleeReflectionDuree amplificationDegatsFeuPourcentage saignementChanceParCoup etourdissementDureeTours paralysieChance " + "paralysieDuree riposteEtourdissementTousLesCoups").split(" ");
+const CHAMPS_NUMERIQUES = ("bonus increment bonus2 increment2 bonus3 increment3 baseDegatsMin baseDegatsMax incrementBaseDegats dureeStance " + "stance2Bonus stance2IncrementBonus stance2Bonus2 stance2IncrementBonus2 stance2Bonus3 stance2IncrementBonus3 stance2BaseDegatsMin stance2BaseDegatsMax " + "stance2IncrementBaseDegats incrementPassif lifesteal poisonDegats poisonDuree precision critBonus etourdissementChance executionSeuil executionBonus " + "blocage blocageReduction reflection reductionDegatsTir resistancePoison resistanceFeu regeneration resistanceCrit usagesParCombat coupsParUsage " + "cooldownTours degatsDirects incrementDegatsDirects penetration delaiTours soinDirect saignementDegats saignementStacksParCoup antiHealPourcentage " + "antiHealDuree brulureDegats brulureDuree shieldMontant rageBonusMax rageSeuilMin marqueDegatsPourcentage marqueDuree paradeChance tenaciteChance " + "frenesieBonusSpd frenesieDuree rechargeTousLesCoups rechargeSacrificePourcentage reductionPvMaxPourcentage autoDegatsPourcentageDesDegats " + "amplificationSoinsPourcentage esquiveParadeBuffPourcentage esquiveParadeBuffDuree briseDefPoints briseDefDuree dernierSouffleFractionPv " + "bruleeReflectionDegats bruleeReflectionDuree amplificationDegatsFeuPourcentage saignementChanceParCoup etourdissementDureeTours paralysieChance " + "paralysieDuree riposteEtourdissementTousLesCoups soinDureeTours").split(" ");
 const CHAMPS_LISTES = [
     "statsExtra",
     "passifsExtra",
@@ -606,11 +610,16 @@ function creerEtat(cb, cote) {
         actionsPropres: 0,
         usagesRestants: strategeme?.usagesParCombat ?? 0,
         prochainUsageAction: 0,
-        missileActionCible: -1,
+        missileTourCible: -1,
         missileEnVol: null,
+        tourOuvert: false,
+        soinContinuRestant: 0,
+        soinContinuMontant: 0,
+        soinContinuObjet: null,
         usagesSoinRestants: (offhand?.soinDirect ?? 0) > 0 ? offhand.usagesParCombat : 0,
         prochainSoinAction: 0,
         usagesOffhandActifRestants: 0,
+        usagesOffhandActifMax: 0,
         prochainOffhandActifAction: 0,
         poisonStack: 0,
         shield: (arme?.shieldMontant ?? 0) + (offhand?.shieldMontant ?? 0) + (torso?.shieldMontant ?? 0),
@@ -674,11 +683,12 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
     if (F.ronde11) for (const e of [
         A,
         B
-    ])e.usagesOffhandActifRestants = EstActionOffhand(e.offhand) ? e.offhand.usagesParCombat : 0;
+    ])e.usagesOffhandActifRestants = e.usagesOffhandActifMax = EstActionOffhand(e.offhand) ? e.offhand.usagesParCombat : 0;
     const protectionActive = !!opts?.protection_active;
     const autre = (e)=>e === A ? B : A;
     const rounds = [];
     let numeroRound = 0, totalActions = 0, premierRoundFatigue = -1, nDeclenchementsFatigue = 0;
+    let tourCourant = 1, dernierJoueur = null, serie = 0;
     let acc = {
         effets: new Set(),
         expl: {
@@ -784,6 +794,19 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
             o[x(e, "dernier_souffle")] = e.dernierSouffleDeclenche;
             o[x(e, "sons_dernier_souffle")] = e.dernierSouffleDeclenche ? SonDernierSouffle(e) : null;
         }
+        for (const e of [
+            A,
+            B
+        ]){
+            const fait = e.actionsPropres + (e.tourOuvert ? 1 : 0);
+            const attente = (prochain)=>Math.max(0, prochain - fait);
+            o[`strategeme_usages_${e.cote}`] = e.strategeme ? e.usagesRestants : null;
+            o[`strategeme_recharge_${e.cote}`] = e.strategeme ? attente(e.prochainUsageAction) : null;
+            const soin = (e.offhand?.soinDirect ?? 0) > 0, actif = e.usagesOffhandActifMax > 0;
+            o[`offhand_usages_${e.cote}`] = soin ? e.usagesSoinRestants : actif ? e.usagesOffhandActifRestants : null;
+            o[`offhand_recharge_${e.cote}`] = soin ? attente(e.prochainSoinAction) : actif ? attente(e.prochainOffhandActifAction) : null;
+            o[`missile_en_vol_${e.cote}`] = !!e.missileEnVol;
+        }
         const porteur = f ?? null;
         o.strategeme_usages_restants = porteur ? porteur.usagesRestants : null;
         return o;
@@ -818,6 +841,7 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
             ...etat(f)
         };
         r.round = numeroRound;
+        r.tour = tourCourant;
         r.evenement = evenement;
         r.anim_arme = anim;
         r.strategeme_derniere_utilisation = derniereUtilisation;
@@ -829,17 +853,28 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
         if (f && r.frappeur === f.nom && r.degats > f.plusGrosCoup && r.cible !== f.nom) f.plusGrosCoup = r.degats;
         return r;
     }
+    const FacteurSoin = (e)=>(1.0 - Math.min(1.0, e.antiHealPourcentage / 100.0)) * (1.0 + e.ampSoins / 100.0);
     function DeclencherSoinActifLocal(p, objet) {
+        const duree = Math.max(1, i(objet.soinDureeTours));
+        const part = objet.soinDirect / duree;
         const pvAvant = p.pv;
-        const montantBrut = objet.soinDirect * (1.0 - Math.min(1.0, p.antiHealPourcentage / 100.0)) * (1.0 + p.ampSoins / 100.0);
-        p.pv = Math.min(p.pvMax, p.pv + montantBrut);
+        p.pv = Math.min(p.pvMax, p.pv + part * FacteurSoin(p));
         const montant = i(p.pv - pvAvant);
+        if (duree > 1) {
+            p.soinContinuRestant = duree - 1;
+            p.soinContinuMontant = part;
+            p.soinContinuObjet = objet;
+        }
         acc.effets.add("soin");
         ajouterRound(p, p.nom, {
             soin_applique: montant > 0,
             soin_montant: montant,
             soin_sons: objet.sons ?? "",
             soin_image: objet.image ?? "",
+            offhand_action: true,
+            offhand_soin: true,
+            offhand_image: objet.image ?? "",
+            soin_tours: duree,
             offhand_cooldown_tours: objet.cooldownTours
         }, "soin", "soin");
     }
@@ -975,7 +1010,8 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
             poison_applique: objet.poisonDegats > 0,
             sons_override: objet.sons ?? null,
             offhand_image: objet.image ?? "",
-            offhand_cooldown_tours: objet.cooldownTours
+            offhand_cooldown_tours: objet.cooldownTours,
+            offhand_sur_soi: cibleNom === p.nom
         }, "offhand", "offhand");
     }
     function decrementerDurees(e) {
@@ -1004,11 +1040,23 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
         }
     }
     while(A.pv > 0 && B.pv > 0 && totalActions < MAX_ACTIONS){
-        A.ap += Math.max(1, A.stats.spd + A.frenesieBonusSpd);
-        B.ap += Math.max(1, B.stats.spd + B.frenesieBonusSpd);
+        A.ap = Math.min(2 * AP_THRESHOLD, A.ap + Math.max(1, A.stats.spd + A.frenesieBonusSpd));
+        B.ap = Math.min(2 * AP_THRESHOLD, B.ap + Math.max(1, B.stats.spd + B.frenesieBonusSpd));
         while((A.ap >= AP_THRESHOLD || B.ap >= AP_THRESHOLD) && A.pv > 0 && B.pv > 0 && totalActions < MAX_ACTIONS){
-            const aJoue = A.ap >= AP_THRESHOLD && (B.ap < AP_THRESHOLD || A.stats.spd >= B.stats.spd);
+            let aJoue = A.ap >= AP_THRESHOLD && (B.ap < AP_THRESHOLD || A.ap > B.ap || A.ap === B.ap && A.stats.spd >= B.stats.spd);
+            if (dernierJoueur === (aJoue ? A : B) && serie >= MAX_TOURS_DAFFILEE) aJoue = !aJoue;
             const f = aJoue ? A : B, c = aJoue ? B : A;
+            serie = dernierJoueur === f ? serie + 1 : 1;
+            dernierJoueur = f;
+            tourCourant = totalActions + 1;
+            f.tourOuvert = true;
+            c.tourOuvert = false;
+            const finTour = ()=>{
+                f.ap = Math.max(0, f.ap - AP_THRESHOLD);
+                f.actionsPropres++;
+                totalActions++;
+                f.tourOuvert = false;
+            };
             A.dernierSouffleDeclenche = false;
             B.dernierSouffleDeclenche = false;
             resetAcc();
@@ -1019,7 +1067,7 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                 const regen = (f.torso?.regeneration ?? 0) + (f.offhand?.regeneration ?? 0);
                 if (regen > 0) {
                     const pvAvant = f.pv;
-                    const montantBrut = f.pvMax * regen / 100.0 * (1.0 - Math.min(1.0, f.antiHealPourcentage / 100.0)) * (1.0 + f.ampSoins / 100.0);
+                    const montantBrut = f.pvMax * regen / 100.0 * FacteurSoin(f);
                     f.pv = Math.min(f.pvMax, f.pv + montantBrut);
                     soinMontant = i(f.pv - pvAvant);
                     soinApplique = soinMontant > 0;
@@ -1029,13 +1077,37 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                     if (soinApplique) acc.effets.add("regeneration");
                 }
             }
+            if (f.soinContinuRestant > 0) {
+                const pvAvant = f.pv;
+                f.pv = Math.min(f.pvMax, f.pv + f.soinContinuMontant * FacteurSoin(f));
+                f.soinContinuRestant--;
+                const gagne = i(f.pv - pvAvant);
+                if (gagne > 0) {
+                    soinMontant += gagne;
+                    soinApplique = true;
+                    soinSons = soinSons || (f.soinContinuObjet?.sons ?? "");
+                    soinImage = soinImage || (f.soinContinuObjet?.image ?? "");
+                    acc.effets.add("soin_continu");
+                }
+            }
             const effetsDebutTour = new Set(acc.effets);
             resetAcc();
-            if (f.missileActionCible === f.actionsPropres) {
-                const m = f.missileEnVol;
-                f.missileActionCible = -1;
-                f.missileEnVol = null;
-                DeclencherUsageStrategemeLocal(f, m, m?.sonsImpact ?? null, false);
+            for (const e of [
+                f,
+                c
+            ]){
+                if (e.missileEnVol && totalActions >= e.missileTourCible) {
+                    const m = e.missileEnVol;
+                    e.missileTourCible = -1;
+                    e.missileEnVol = null;
+                    DeclencherUsageStrategemeLocal(e, m, m?.sonsImpact ?? null, false);
+                    rounds[rounds.length - 1].impact_differe = true;
+                }
+            }
+            if (A.pv <= 0 || B.pv <= 0) {
+                totalActions++;
+                f.tourOuvert = false;
+                continue;
             }
             if (!stunActif && f.strategeme && f.usagesRestants > 0 && f.actionsPropres >= f.prochainUsageAction) {
                 if (F.ronde11) actionConsommeeParAbilite = true;
@@ -1047,14 +1119,16 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                     ajouterRound(f, c.nom, {
                         strategeme: true,
                         missile_lance: true,
+                        missile_delai: s.delaiTours,
+                        strategeme_cooldown_tours: s.cooldownTours,
                         sons_override: s.sons ?? null
                     }, "strategeme", s.anim || "explosion", derniere);
-                    f.missileActionCible = f.actionsPropres + s.delaiTours;
+                    f.missileTourCible = totalActions + s.delaiTours;
                     f.missileEnVol = s;
                 } else DeclencherUsageStrategemeLocal(f, s, null, derniere);
                 f.prochainUsageAction = f.actionsPropres + 1 + s.cooldownTours;
             }
-            if (!(F.ronde11 && actionConsommeeParAbilite) && !stunActif && f.offhand && f.offhand.soinDirect > 0 && f.usagesSoinRestants > 0 && f.actionsPropres >= f.prochainSoinAction && f.pv < f.pvMax) {
+            if (!(F.ronde11 && actionConsommeeParAbilite) && !stunActif && f.offhand && f.offhand.soinDirect > 0 && f.usagesSoinRestants > 0 && f.actionsPropres >= f.prochainSoinAction && f.soinContinuRestant <= 0 && (f.pvMax - f.pv >= f.offhand.soinDirect * FacteurSoin(f) || f.pv <= f.pvMax * SEUIL_SOIN_URGENCE)) {
                 DeclencherSoinActifLocal(f, f.offhand);
                 f.usagesSoinRestants--;
                 f.prochainSoinAction = f.actionsPropres + 1 + f.offhand.cooldownTours;
@@ -1066,8 +1140,7 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                 actionConsommeeParAbilite = true;
             }
             if (A.pv <= 0 || B.pv <= 0) {
-                f.actionsPropres++;
-                totalActions++;
+                finTour();
                 continue;
             }
             for (const e of effetsDebutTour)acc.effets.add(e);
@@ -1115,7 +1188,7 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
             }
             let fatigueTick = false, degatsFatigueAppliques = 0;
             if (totalActions >= ROPE_START_ACTION && (totalActions - ROPE_START_ACTION) % ROPE_CADENCE === 0) {
-                if (premierRoundFatigue === -1) premierRoundFatigue = numeroRound + 1;
+                if (premierRoundFatigue === -1) premierRoundFatigue = F.ronde11 && actionConsommeeParAbilite ? numeroRound : numeroRound + 1;
                 nDeclenchementsFatigue++;
                 degatsFatigueAppliques = i(FATIGUE_BASE * Math.pow(FATIGUE_CROISSANCE, nDeclenchementsFatigue - 1));
                 fatigueTick = true;
@@ -1124,7 +1197,26 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                 B.pv -= degatsFatigueAppliques;
             }
             verifierLesDeux();
+            const rattacher = ()=>{
+                const rr = rounds[rounds.length - 1];
+                const garde = {};
+                for (const k of Object.keys(rr))if (/^(saignement_explosion|degats_explosion_saignement|sons_explosion_saignement|dernier_souffle|sons_dernier_souffle)_/.test(k) && rr[k]) garde[k] = rr[k];
+                const { soin_applique: _s, soin_montant: _m, soin_sons: _so, soin_image: _i, ...autres } = ticks;
+                Object.assign(rr, autres, etat(f), garde, {
+                    regen_montant: soinMontant,
+                    regen_sons: soinSons,
+                    regen_image: soinImage
+                });
+                rr.effets = [
+                    ...new Set([
+                        ...rr.effets,
+                        ...acc.effets
+                    ])
+                ];
+                resetAcc();
+            };
             const ticks = {
+                regen_montant: soinMontant,
                 poison_tick: poisonTick,
                 degats_poison: degatsPoisonAppliques,
                 poison_tick_attaquant: aJoue,
@@ -1140,23 +1232,21 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
             };
             const evenementTick = fatigueTick ? "fatigue" : poisonTick ? "poison" : brulureTick ? "brulure" : "soin";
             if (A.pv <= 0 || B.pv <= 0) {
-                totalActions++;
-                ajouterRound(null, "", {
+                if (F.ronde11 && actionConsommeeParAbilite) rattacher();
+                else ajouterRound(null, "", {
                     ...ticks,
-                    strategeme: false
+                    strategeme: false,
+                    tour_de: f.nom
                 }, evenementTick, "");
+                finTour();
                 continue;
             }
             if (stunActif) f.etourdiDuree--;
             const paralysieActif = f.paralysieDuree > 0;
             if (paralysieActif) f.paralysieDuree--;
             if (F.ronde11 && actionConsommeeParAbilite) {
-                if (poisonTick || brulureTick || fatigueTick || soinApplique || acc.effets.size > 0) ajouterRound(null, "", {
-                    ...ticks
-                }, evenementTick, "");
-                f.ap -= AP_THRESHOLD;
-                f.actionsPropres++;
-                totalActions++;
+                finTour();
+                rattacher();
                 continue;
             }
             if (stunActif || paralysieActif) {
@@ -1168,9 +1258,7 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                     sons_paralysie: paralysieActif ? src?.sonsParalysie ?? "" : null,
                     message_paralysie: paralysieActif ? src?.messageParalysie ?? "" : null
                 }, stunActif ? "etourdi" : "paralysie", "");
-                f.ap -= AP_THRESHOLD;
-                f.actionsPropres++;
-                totalActions++;
+                finTour();
                 continue;
             }
             const statsFrappeur = f.stats;
@@ -1188,6 +1276,7 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
             let degats = 0, volDeVie = 0, degatsReflechis = 0, imageReflection = "";
             let degatsParBalle = [], critParBalle = [];
             let riposteStunSurFrappeur = false, paradeReussie = false, degatsRipostee = 0;
+            let sacrificePv = 0, rechargeStrat = false, rechargeOffhand = false, contrecoup = 0, erosionPvMax = 0;
             let sonsParadeDeclenchee = "", sonsRiposteImpact = "";
             let modeActif = null;
             if (touche) {
@@ -1268,7 +1357,7 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                 verifierLesDeux();
                 if (armeFrappeur && armeFrappeur.lifesteal > 0 && degats > 0) {
                     const antiHeal = F.antiHealVolDeVie ? 1.0 - Math.min(1.0, f.antiHealPourcentage / 100.0) : 1.0;
-                    volDeVie = i(degats * armeFrappeur.lifesteal / 100.0 * antiHeal);
+                    volDeVie = i(degats * armeFrappeur.lifesteal / 100.0 * antiHeal * (1.0 + f.ampSoins / 100.0));
                     f.pv = Math.min(f.pvMax, f.pv + volDeVie);
                     if (volDeVie > 0) acc.effets.add("vol_de_vie");
                 }
@@ -1302,19 +1391,32 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                     f.coupsPortesCompteur++;
                     if (f.coupsPortesCompteur >= armeFrappeur.rechargeTousLesCoups) {
                         f.coupsPortesCompteur = 0;
-                        DegatsBruts(f, f.pv * (armeFrappeur.rechargeSacrificePourcentage / 100.0), null);
-                        if (f.strategeme && f.usagesRestants < f.strategeme.usagesParCombat) f.usagesRestants++;
-                        else if (f.offhand && f.offhand.soinDirect > 0 && f.usagesSoinRestants < f.offhand.usagesParCombat) f.usagesSoinRestants++;
-                        acc.effets.add("recharge");
+                        const rStrat = !!f.strategeme && f.usagesRestants < f.strategeme.usagesParCombat;
+                        const rSoin = !!f.offhand && f.offhand.soinDirect > 0 && f.usagesSoinRestants < f.offhand.usagesParCombat;
+                        const rActif = f.usagesOffhandActifRestants < f.usagesOffhandActifMax;
+                        if (rStrat || rSoin || rActif) {
+                            sacrificePv = i(f.pv * (armeFrappeur.rechargeSacrificePourcentage / 100.0));
+                            DegatsBruts(f, f.pv * (armeFrappeur.rechargeSacrificePourcentage / 100.0), null);
+                            if (rStrat) f.usagesRestants++;
+                            if (rSoin) f.usagesSoinRestants++;
+                            if (rActif) f.usagesOffhandActifRestants++;
+                            rechargeStrat = rStrat;
+                            rechargeOffhand = rSoin || rActif;
+                            acc.effets.add("recharge");
+                        }
                         verifierLesDeux();
                     }
                 }
                 if (degats > 0 && armeFrappeur && armeFrappeur.reductionPvMaxPourcentage > 0) {
+                    const pvMaxAvant = c.pvMax;
                     c.pvMax *= 1.0 - Math.min(0.9, armeFrappeur.reductionPvMaxPourcentage / 100.0);
                     if (F.clampPvMaxErosion) c.pv = Math.min(c.pv, c.pvMax);
+                    erosionPvMax = i(pvMaxAvant) - i(c.pvMax);
                     acc.effets.add("erosion_pv_max");
                     if (armeFrappeur.autoDegatsPourcentageDesDegats > 0) {
-                        DegatsBruts(f, degats * (armeFrappeur.autoDegatsPourcentageDesDegats / 100.0), null);
+                        const perte = f.pv * (armeFrappeur.autoDegatsPourcentageDesDegats / 100.0);
+                        contrecoup = Math.max(1, i(perte));
+                        DegatsBruts(f, Math.min(perte, Math.max(0, f.pv - 1)), null);
                         acc.effets.add("auto_degats");
                         verifierLesDeux();
                     }
@@ -1372,9 +1474,7 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                     acc.effets.add("esquive_parade_buff");
                 }
             }
-            f.ap -= AP_THRESHOLD;
-            f.actionsPropres++;
-            totalActions++;
+            finTour();
             const stanceVientDeChanger = f.derniereStanceEnvoyee !== f.stanceActuelle;
             f.derniereStanceEnvoyee = f.stanceActuelle;
             if (stanceVientDeChanger && f.arme?.dureeStance > 0 && f.actionsPropres > 1) acc.effets.add("stance");
@@ -1402,7 +1502,12 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                 parade_reussie: paradeReussie,
                 degats_ripostee: degatsRipostee,
                 sons_parade: sonsParadeDeclenchee,
-                sons_riposte: sonsRiposteImpact
+                sons_riposte: sonsRiposteImpact,
+                sacrifice_pv: sacrificePv,
+                recharge_strategeme: rechargeStrat,
+                recharge_offhand: rechargeOffhand,
+                contrecoup,
+                erosion_pv_max: erosionPvMax
             }, "attaque", armeFrappeur?.anim || "smash");
         }
     }
@@ -1605,6 +1710,8 @@ function construireReplay(cbA, cbD, A, B, rounds, vainqueur, premierRoundFatigue
     r.compat_cs = !!opts?.compat_cs;
     r.strategeme_usages_max_attaquant = cbA.nivele.strategeme?.usagesParCombat ?? 0;
     r.strategeme_usages_max_defenseur = cbD.nivele.strategeme?.usagesParCombat ?? 0;
+    r.offhand_usages_max_attaquant = cbA.nivele.offhand?.usagesParCombat ?? 0;
+    r.offhand_usages_max_defenseur = cbD.nivele.offhand?.usagesParCombat ?? 0;
     r.armure_pv_max_attaquant = Math.trunc(cbA.stats.pv);
     r.armure_pv_max_defenseur = Math.trunc(cbD.stats.pv);
     return r;

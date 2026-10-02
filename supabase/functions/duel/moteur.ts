@@ -16,7 +16,7 @@ import {
   estimerAtkEquivalentAvecStance, appliquerBonusArmeStance, vueArmeSelonStance, valeurStat, niveauMaxPourRarete,
 } from "./formule-combat.gen.ts";
 
-export const VERSION_MOTEUR = "site-1.0.0";
+export const VERSION_MOTEUR = "site-1.1.0";
 
 // ---------------------------------------------------------------- contrat
 export interface Equipement { data: Record<string, any>; niveau: number; numero?: number }
@@ -44,6 +44,10 @@ export interface OptionsDuel {
 
 // ---------------------------------------------------------------- constantes (moteur-combat.cs)
 const AP_THRESHOLD = 100.0;
+// v1.1 — alternance + tour bonus : le plus rapide joue plus souvent, mais jamais plus de 2 tours d'affilée.
+const MAX_TOURS_DAFFILEE = 2;
+// v1.1 — un soin actif ne part que s'il manque au moins son montant, ou sous ce seuil de PV.
+const SEUIL_SOIN_URGENCE = 0.5;
 const MAX_ACTIONS = 45, ROPE_START_ACTION = 20, ROPE_CADENCE = 2;
 const FATIGUE_BASE = 10, FATIGUE_CROISSANCE = 1.30;
 const PROTECTION_REDUCTION = 0.20;
@@ -98,7 +102,7 @@ const CHAMPS_NUMERIQUES = ("bonus increment bonus2 increment2 bonus3 increment3 
   "frenesieBonusSpd frenesieDuree rechargeTousLesCoups rechargeSacrificePourcentage reductionPvMaxPourcentage autoDegatsPourcentageDesDegats " +
   "amplificationSoinsPourcentage esquiveParadeBuffPourcentage esquiveParadeBuffDuree briseDefPoints briseDefDuree dernierSouffleFractionPv " +
   "bruleeReflectionDegats bruleeReflectionDuree amplificationDegatsFeuPourcentage saignementChanceParCoup etourdissementDureeTours paralysieChance " +
-  "paralysieDuree riposteEtourdissementTousLesCoups").split(" ");
+  "paralysieDuree riposteEtourdissementTousLesCoups soinDureeTours").split(" ");
 const CHAMPS_LISTES = ["statsExtra", "passifsExtra", "scalingExtra", "stance2ScalingExtra", "modesTir"];
 
 export function normaliserObjet(data: Record<string, any> | null | undefined): Record<string, any> | null {
@@ -153,9 +157,10 @@ function creerEtat(cb: Combattant, cote: "attaquant" | "defenseur") {
     esquive: cb.esquive, luck: stats.luckLineaire,
     pv: stats.pv, pvMax: stats.pv, ap: 0, actionsPropres: 0,
     usagesRestants: strategeme?.usagesParCombat ?? 0, prochainUsageAction: 0,
-    missileActionCible: -1, missileEnVol: null as any,
+    missileTourCible: -1, missileEnVol: null as any, // v1.1 : impact compté en tours du combat, pas en tours du porteur
+    tourOuvert: false, soinContinuRestant: 0, soinContinuMontant: 0, soinContinuObjet: null as any,
     usagesSoinRestants: (offhand?.soinDirect ?? 0) > 0 ? offhand.usagesParCombat : 0, prochainSoinAction: 0,
-    usagesOffhandActifRestants: 0, prochainOffhandActifAction: 0,
+    usagesOffhandActifRestants: 0, usagesOffhandActifMax: 0, prochainOffhandActifAction: 0,
     poisonStack: 0,
     shield: (arme?.shieldMontant ?? 0) + (offhand?.shieldMontant ?? 0) + (torso?.shieldMontant ?? 0),
     saignementStacks: 0, saignementBanque: 0, saignementSonsSource: null as string | null,
@@ -196,11 +201,12 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
   const rnd = creerRng(seed);
   const cbA = construireCombattant(attaquantEntree), cbD = construireCombattant(defenseurEntree);
   const A = creerEtat(cbA, "attaquant"), B = creerEtat(cbD, "defenseur");
-  if (F.ronde11) for (const e of [A, B]) e.usagesOffhandActifRestants = EstActionOffhand(e.offhand) ? e.offhand.usagesParCombat : 0;
+  if (F.ronde11) for (const e of [A, B]) e.usagesOffhandActifRestants = e.usagesOffhandActifMax = EstActionOffhand(e.offhand) ? e.offhand.usagesParCombat : 0;
   const protectionActive = !!opts?.protection_active;
   const autre = (e: Etat) => (e === A ? B : A);
   const rounds: any[] = [];
   let numeroRound = 0, totalActions = 0, premierRoundFatigue = -1, nDeclenchementsFatigue = 0;
+  let tourCourant = 1, dernierJoueur: Etat | null = null, serie = 0;
 
   // Accumulateur du round en cours : effets + explosions de saignement, vidé à chaque round émis.
   let acc = { effets: new Set<string>(), expl: { attaquant: null as any, defenseur: null as any } };
@@ -267,6 +273,18 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
       o[x(e, "dernier_souffle")] = e.dernierSouffleDeclenche;
       o[x(e, "sons_dernier_souffle")] = e.dernierSouffleDeclenche ? SonDernierSouffle(e) : null;
     }
+    // v1.1 : charges et recharges des deux combattants (stratagème et main gauche), pour que l'écran
+    // n'ait rien à déduire. « recharge » = tours du porteur à attendre encore après ce round.
+    for (const e of [A, B]) {
+      const fait = e.actionsPropres + (e.tourOuvert ? 1 : 0);
+      const attente = (prochain: number) => Math.max(0, prochain - fait);
+      o[`strategeme_usages_${e.cote}`] = e.strategeme ? e.usagesRestants : null;
+      o[`strategeme_recharge_${e.cote}`] = e.strategeme ? attente(e.prochainUsageAction) : null;
+      const soin = (e.offhand?.soinDirect ?? 0) > 0, actif = e.usagesOffhandActifMax > 0;
+      o[`offhand_usages_${e.cote}`] = soin ? e.usagesSoinRestants : actif ? e.usagesOffhandActifRestants : null;
+      o[`offhand_recharge_${e.cote}`] = soin ? attente(e.prochainSoinAction) : actif ? attente(e.prochainOffhandActifAction) : null;
+      o[`missile_en_vol_${e.cote}`] = !!e.missileEnVol;
+    }
     const porteur = f ?? null;
     o.strategeme_usages_restants = porteur ? porteur.usagesRestants : null;
     return o;
@@ -280,7 +298,7 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
   function ajouterRound(f: Etat | null, cible: string, champs: Record<string, any>, evenement: string, anim: string, derniereUtilisation = false) {
     numeroRound++;
     const r: Record<string, any> = { ...base(f ? f.nom : "", cible), ...champs, ...etat(f) };
-    r.round = numeroRound;
+    r.round = numeroRound; r.tour = tourCourant; // tour = numéro du tour de jeu (un impact différé partage celui du tour où il tombe)
     r.evenement = evenement; r.anim_arme = anim;
     r.strategeme_derniere_utilisation = derniereUtilisation;
     r.effets = [...acc.effets];
@@ -289,15 +307,22 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
     return r;
   }
 
+  // Tout soin reçu : réduit par l'anti-soin, renforcé par les « soins renforcés » du porteur (Gourde).
+  const FacteurSoin = (e: Etat) => (1.0 - Math.min(1.0, e.antiHealPourcentage / 100.0)) * (1.0 + e.ampSoins / 100.0);
   function DeclencherSoinActifLocal(p: Etat, objet: any) {
+    // v1.1 : soinDureeTours > 1 = soin étalé. La 1re part tombe à l'utilisation, les suivantes au début
+    // des tours suivants du porteur (sans lui coûter d'action).
+    const duree = Math.max(1, i(objet.soinDureeTours));
+    const part = objet.soinDirect / duree;
     const pvAvant = p.pv;
-    const montantBrut = objet.soinDirect * (1.0 - Math.min(1.0, p.antiHealPourcentage / 100.0)) * (1.0 + p.ampSoins / 100.0);
-    p.pv = Math.min(p.pvMax, p.pv + montantBrut);
+    p.pv = Math.min(p.pvMax, p.pv + part * FacteurSoin(p));
     const montant = i(p.pv - pvAvant);
+    if (duree > 1) { p.soinContinuRestant = duree - 1; p.soinContinuMontant = part; p.soinContinuObjet = objet; }
     acc.effets.add("soin");
     ajouterRound(p, p.nom, {
       soin_applique: montant > 0, soin_montant: montant, soin_sons: objet.sons ?? "",
       soin_image: objet.image ?? "", // C# moteur-combat.cs envoyait "" (duel.cs local : ImageUrl)
+      offhand_action: true, offhand_soin: true, offhand_image: objet.image ?? "", soin_tours: duree,
       offhand_cooldown_tours: objet.cooldownTours,
     }, "soin", "soin");
   }
@@ -397,7 +422,7 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
     }
     ajouterRound(p, cibleNom, {
       offhand_action: true, poison_applique: objet.poisonDegats > 0, sons_override: objet.sons ?? null,
-      offhand_image: objet.image ?? "", offhand_cooldown_tours: objet.cooldownTours,
+      offhand_image: objet.image ?? "", offhand_cooldown_tours: objet.cooldownTours, offhand_sur_soi: cibleNom === p.nom,
     }, "offhand", "offhand");
   }
 
@@ -413,12 +438,18 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
   // ======================================================= boucle principale (ResoudreCombatInterne)
   while (A.pv > 0 && B.pv > 0 && totalActions < MAX_ACTIONS) {
     // Plancher de 1 AP/tick : garantit la terminaison même avec une vitesse ≤ 0 (F13).
-    A.ap += Math.max(1, A.stats.spd + A.frenesieBonusSpd);
-    B.ap += Math.max(1, B.stats.spd + B.frenesieBonusSpd);
+    A.ap = Math.min(2 * AP_THRESHOLD, A.ap + Math.max(1, A.stats.spd + A.frenesieBonusSpd));
+    B.ap = Math.min(2 * AP_THRESHOLD, B.ap + Math.max(1, B.stats.spd + B.frenesieBonusSpd));
 
     while ((A.ap >= AP_THRESHOLD || B.ap >= AP_THRESHOLD) && A.pv > 0 && B.pv > 0 && totalActions < MAX_ACTIONS) {
-      const aJoue = A.ap >= AP_THRESHOLD && (B.ap < AP_THRESHOLD || A.stats.spd >= B.stats.spd);
+      // Les deux jauges pleines : la plus remplie d'abord, puis le plus rapide, puis l'attaquant.
+      let aJoue = A.ap >= AP_THRESHOLD && (B.ap < AP_THRESHOLD || A.ap > B.ap || (A.ap === B.ap && A.stats.spd >= B.stats.spd));
+      // v1.1 : après 2 tours d'affilée, la main passe d'office à l'autre (même s'il n'a pas rempli sa jauge).
+      if (dernierJoueur === (aJoue ? A : B) && serie >= MAX_TOURS_DAFFILEE) aJoue = !aJoue;
       const f = aJoue ? A : B, c = aJoue ? B : A;
+      serie = dernierJoueur === f ? serie + 1 : 1; dernierJoueur = f;
+      tourCourant = totalActions + 1; f.tourOuvert = true; c.tourOuvert = false;
+      const finTour = () => { f.ap = Math.max(0, f.ap - AP_THRESHOLD); f.actionsPropres++; totalActions++; f.tourOuvert = false; };
       A.dernierSouffleDeclenche = false; B.dernierSouffleDeclenche = false;
       resetAcc();
       const stunActif = f.etourdiDuree > 0;
@@ -430,7 +461,7 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
         const regen = (f.torso?.regeneration ?? 0) + (f.offhand?.regeneration ?? 0);
         if (regen > 0) {
           const pvAvant = f.pv;
-          const montantBrut = f.pvMax * regen / 100.0 * (1.0 - Math.min(1.0, f.antiHealPourcentage / 100.0)) * (1.0 + f.ampSoins / 100.0);
+          const montantBrut = f.pvMax * regen / 100.0 * FacteurSoin(f);
           f.pv = Math.min(f.pvMax, f.pv + montantBrut);
           soinMontant = i(f.pv - pvAvant); soinApplique = soinMontant > 0;
           const viaTorse = (f.torso?.regeneration ?? 0) > 0;
@@ -439,13 +470,26 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
           if (soinApplique) acc.effets.add("regeneration");
         }
       }
+      // Soin étalé (Gourde) : la part du tour tombe ici, étourdi ou non, sans coûter l'action.
+      if (f.soinContinuRestant > 0) {
+        const pvAvant = f.pv;
+        f.pv = Math.min(f.pvMax, f.pv + f.soinContinuMontant * FacteurSoin(f));
+        f.soinContinuRestant--;
+        const gagne = i(f.pv - pvAvant);
+        if (gagne > 0) { soinMontant += gagne; soinApplique = true; soinSons = soinSons || (f.soinContinuObjet?.sons ?? ""); soinImage = soinImage || (f.soinContinuObjet?.image ?? ""); acc.effets.add("soin_continu"); }
+      }
       const effetsDebutTour = new Set(acc.effets); resetAcc();
 
-      // Missile en vol : atterrit sur ce tour du porteur (jamais bloqué par un étourdissement).
-      if (f.missileActionCible === f.actionsPropres) {
-        const m = f.missileEnVol; f.missileActionCible = -1; f.missileEnVol = null;
-        DeclencherUsageStrategemeLocal(f, m, m?.sonsImpact ?? null, false);
+      // Impact différé (Solo Silo, Éclair de Tomoe) : il tombe au début du Ne tour du COMBAT après le
+      // lancement, quel que soit celui qui joue, et ne prend le tour de personne.
+      for (const e of [f, c]) {
+        if (e.missileEnVol && totalActions >= e.missileTourCible) {
+          const m = e.missileEnVol; e.missileTourCible = -1; e.missileEnVol = null;
+          DeclencherUsageStrategemeLocal(e, m, m?.sonsImpact ?? null, false);
+          rounds[rounds.length - 1].impact_differe = true;
+        }
       }
+      if (A.pv <= 0 || B.pv <= 0) { totalActions++; f.tourOuvert = false; continue; }
 
       // Stratagème.
       if (!stunActif && f.strategeme && f.usagesRestants > 0 && f.actionsPropres >= f.prochainUsageAction) {
@@ -455,15 +499,16 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
         const derniere = f.usagesRestants === 0;
         if (s.delaiTours > 0) {
           acc.effets.add("missile_lance");
-          ajouterRound(f, c.nom, { strategeme: true, missile_lance: true, sons_override: s.sons ?? null }, "strategeme", s.anim || "explosion", derniere);
-          f.missileActionCible = f.actionsPropres + s.delaiTours; f.missileEnVol = s;
+          ajouterRound(f, c.nom, { strategeme: true, missile_lance: true, missile_delai: s.delaiTours, strategeme_cooldown_tours: s.cooldownTours, sons_override: s.sons ?? null }, "strategeme", s.anim || "explosion", derniere);
+          f.missileTourCible = totalActions + s.delaiTours; f.missileEnVol = s;
         } else DeclencherUsageStrategemeLocal(f, s, null, derniere);
         f.prochainUsageAction = f.actionsPropres + 1 + s.cooldownTours;
       }
 
       // Soin actif (Stimulant, Gourde) puis action offhand (Ronde 11).
       if (!(F.ronde11 && actionConsommeeParAbilite) && !stunActif && f.offhand && f.offhand.soinDirect > 0 && f.usagesSoinRestants > 0
-          && f.actionsPropres >= f.prochainSoinAction && f.pv < f.pvMax) {
+          && f.actionsPropres >= f.prochainSoinAction && f.soinContinuRestant <= 0
+          && (f.pvMax - f.pv >= f.offhand.soinDirect * FacteurSoin(f) || f.pv <= f.pvMax * SEUIL_SOIN_URGENCE)) {
         DeclencherSoinActifLocal(f, f.offhand);
         f.usagesSoinRestants--; f.prochainSoinAction = f.actionsPropres + 1 + f.offhand.cooldownTours;
         if (F.ronde11) actionConsommeeParAbilite = true;
@@ -474,7 +519,7 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
         actionConsommeeParAbilite = true;
       }
 
-      if (A.pv <= 0 || B.pv <= 0) { f.actionsPropres++; totalActions++; continue; }
+      if (A.pv <= 0 || B.pv <= 0) { finTour(); continue; }
       for (const e of effetsDebutTour) acc.effets.add(e);
 
       // Poison (dégressif, ignore le bouclier) — tique au tour du porteur.
@@ -515,7 +560,7 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
       // Corde / fatigue : frappe les deux, non mitigée.
       let fatigueTick = false, degatsFatigueAppliques = 0;
       if (totalActions >= ROPE_START_ACTION && (totalActions - ROPE_START_ACTION) % ROPE_CADENCE === 0) {
-        if (premierRoundFatigue === -1) premierRoundFatigue = numeroRound + 1;
+        if (premierRoundFatigue === -1) premierRoundFatigue = F.ronde11 && actionConsommeeParAbilite ? numeroRound : numeroRound + 1; // rattachée au round de la capacité
         nDeclenchementsFatigue++;
         degatsFatigueAppliques = i(FATIGUE_BASE * Math.pow(FATIGUE_CROISSANCE, nDeclenchementsFatigue - 1));
         fatigueTick = true; acc.effets.add("fatigue");
@@ -523,7 +568,18 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
       }
       verifierLesDeux();
 
+      // v1.1 : un tour = un round. Quand une capacité a pris le tour, ses effets de début de tour
+      // (poison, brûlure, fatigue, régénération) sont rattachés au round de la capacité.
+      const rattacher = () => {
+        const rr = rounds[rounds.length - 1];
+        const garde: Record<string, any> = {};
+        for (const k of Object.keys(rr)) if (/^(saignement_explosion|degats_explosion_saignement|sons_explosion_saignement|dernier_souffle|sons_dernier_souffle)_/.test(k) && rr[k]) garde[k] = rr[k];
+        const { soin_applique: _s, soin_montant: _m, soin_sons: _so, soin_image: _i, ...autres } = ticks;
+        Object.assign(rr, autres, etat(f), garde, { regen_montant: soinMontant, regen_sons: soinSons, regen_image: soinImage });
+        rr.effets = [...new Set([...rr.effets, ...acc.effets])]; resetAcc();
+      };
       const ticks = {
+        regen_montant: soinMontant,
         poison_tick: poisonTick, degats_poison: degatsPoisonAppliques, poison_tick_attaquant: aJoue,
         fatigue_tick: fatigueTick, degats_fatigue: degatsFatigueAppliques,
         soin_applique: soinApplique, soin_montant: soinMontant, soin_sons: soinSons, soin_image: soinImage,
@@ -532,8 +588,9 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
       const evenementTick = fatigueTick ? "fatigue" : poisonTick ? "poison" : brulureTick ? "brulure" : "soin";
 
       if (A.pv <= 0 || B.pv <= 0) {
-        totalActions++;
-        ajouterRound(null, "", { ...ticks, strategeme: false }, evenementTick, "");
+        if (F.ronde11 && actionConsommeeParAbilite) rattacher();
+        else ajouterRound(null, "", { ...ticks, strategeme: false, tour_de: f.nom }, evenementTick, "");
+        finTour();
         continue;
       }
 
@@ -545,9 +602,8 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
       // RONDE 11 : la capacité a remplacé l'attaque. Les ticks de ce tour sont publiés dans un round
       // « environnemental » (sinon l'overlay ne les verrait jamais).
       if (F.ronde11 && actionConsommeeParAbilite) {
-        if (poisonTick || brulureTick || fatigueTick || soinApplique || acc.effets.size > 0)
-          ajouterRound(null, "", { ...ticks }, evenementTick, "");
-        f.ap -= AP_THRESHOLD; f.actionsPropres++; totalActions++;
+        finTour();
+        rattacher();
         continue;
       }
 
@@ -558,7 +614,7 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
           sons_paralysie: paralysieActif ? src?.sonsParalysie ?? "" : null,
           message_paralysie: paralysieActif ? src?.messageParalysie ?? "" : null,
         }, stunActif ? "etourdi" : "paralysie", "");
-        f.ap -= AP_THRESHOLD; f.actionsPropres++; totalActions++;
+        finTour();
         continue;
       }
 
@@ -580,6 +636,7 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
       let degats = 0, volDeVie = 0, degatsReflechis = 0, imageReflection = "";
       let degatsParBalle: number[] = [], critParBalle: boolean[] = [];
       let riposteStunSurFrappeur = false, paradeReussie = false, degatsRipostee = 0;
+      let sacrificePv = 0, rechargeStrat = false, rechargeOffhand = false, contrecoup = 0, erosionPvMax = 0;
       let sonsParadeDeclenchee = "", sonsRiposteImpact = "";
       let modeActif: any = null;
 
@@ -654,7 +711,7 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
 
         if (armeFrappeur && armeFrappeur.lifesteal > 0 && degats > 0) {
           const antiHeal = F.antiHealVolDeVie ? (1.0 - Math.min(1.0, f.antiHealPourcentage / 100.0)) : 1.0;
-          volDeVie = i(degats * armeFrappeur.lifesteal / 100.0 * antiHeal);
+          volDeVie = i(degats * armeFrappeur.lifesteal / 100.0 * antiHeal * (1.0 + f.ampSoins / 100.0)); // v1.1 : soins renforcés (Gourde)
           f.pv = Math.min(f.pvMax, f.pv + volDeVie);
           if (volDeVie > 0) acc.effets.add("vol_de_vie");
         }
@@ -684,19 +741,35 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
           f.coupsPortesCompteur++;
           if (f.coupsPortesCompteur >= armeFrappeur.rechargeTousLesCoups) {
             f.coupsPortesCompteur = 0;
-            DegatsBruts(f, f.pv * (armeFrappeur.rechargeSacrificePourcentage / 100.0), null);
-            if (f.strategeme && f.usagesRestants < f.strategeme.usagesParCombat) f.usagesRestants++;
-            else if (f.offhand && f.offhand.soinDirect > 0 && f.usagesSoinRestants < f.offhand.usagesParCombat) f.usagesSoinRestants++;
-            acc.effets.add("recharge");
+            // v1.1 : le sacrifice rend 1 charge à CHAQUE objet à charges entamé (stratagème et main gauche,
+            // soin ou action). Rien à recharger : pas de sacrifice.
+            const rStrat = !!f.strategeme && f.usagesRestants < f.strategeme.usagesParCombat;
+            const rSoin = !!f.offhand && f.offhand.soinDirect > 0 && f.usagesSoinRestants < f.offhand.usagesParCombat;
+            const rActif = f.usagesOffhandActifRestants < f.usagesOffhandActifMax;
+            if (rStrat || rSoin || rActif) {
+              sacrificePv = i(f.pv * (armeFrappeur.rechargeSacrificePourcentage / 100.0));
+              DegatsBruts(f, f.pv * (armeFrappeur.rechargeSacrificePourcentage / 100.0), null);
+              if (rStrat) f.usagesRestants++;
+              if (rSoin) f.usagesSoinRestants++;
+              if (rActif) f.usagesOffhandActifRestants++;
+              rechargeStrat = rStrat; rechargeOffhand = rSoin || rActif;
+              acc.effets.add("recharge");
+            }
             verifierLesDeux();
           }
         }
         if (degats > 0 && armeFrappeur && armeFrappeur.reductionPvMaxPourcentage > 0) { // Lame de la mort
+          const pvMaxAvant = c.pvMax;
           c.pvMax *= (1.0 - Math.min(0.9, armeFrappeur.reductionPvMaxPourcentage / 100.0));
           if (F.clampPvMaxErosion) c.pv = Math.min(c.pv, c.pvMax);
+          erosionPvMax = i(pvMaxAvant) - i(c.pvMax);
           acc.effets.add("erosion_pv_max");
           if (armeFrappeur.autoDegatsPourcentageDesDegats > 0) {
-            DegatsBruts(f, degats * (armeFrappeur.autoDegatsPourcentageDesDegats / 100.0), null);
+            // v1.1 (décision du 02/10) : le contrecoup coûte X % des PV ACTUELS du porteur à chaque coup porté
+            // (il ne peut donc pas le tuer), et non plus X % des dégâts infligés.
+            const perte = f.pv * (armeFrappeur.autoDegatsPourcentageDesDegats / 100.0);
+            contrecoup = Math.max(1, i(perte));
+            DegatsBruts(f, Math.min(perte, Math.max(0, f.pv - 1)), null);
             acc.effets.add("auto_degats");
             verifierLesDeux();
           }
@@ -740,7 +813,7 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
         }
       }
 
-      f.ap -= AP_THRESHOLD; f.actionsPropres++; totalActions++;
+      finTour();
       const stanceVientDeChanger = f.derniereStanceEnvoyee !== f.stanceActuelle;
       f.derniereStanceEnvoyee = f.stanceActuelle;
       if (stanceVientDeChanger && f.arme?.dureeStance > 0 && f.actionsPropres > 1) acc.effets.add("stance");
@@ -755,6 +828,8 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
         execution_active: executionActive, execution_bonus: armeFrappeur ? armeFrappeur.executionBonus : 0,
         rage_bonus: i(rageBonus), parade_reussie: paradeReussie, degats_ripostee: degatsRipostee,
         sons_parade: sonsParadeDeclenchee, sons_riposte: sonsRiposteImpact,
+        sacrifice_pv: sacrificePv, recharge_strategeme: rechargeStrat, recharge_offhand: rechargeOffhand,
+        contrecoup, erosion_pv_max: erosionPvMax,
       }, "attaque", armeFrappeur?.anim || "smash");
     }
   }
@@ -867,6 +942,8 @@ function construireReplay(cbA: Combattant, cbD: Combattant, A: Etat, B: Etat, ro
   r.compat_cs = !!opts?.compat_cs;
   r.strategeme_usages_max_attaquant = cbA.nivele.strategeme?.usagesParCombat ?? 0;
   r.strategeme_usages_max_defenseur = cbD.nivele.strategeme?.usagesParCombat ?? 0;
+  r.offhand_usages_max_attaquant = cbA.nivele.offhand?.usagesParCombat ?? 0;
+  r.offhand_usages_max_defenseur = cbD.nivele.offhand?.usagesParCombat ?? 0;
   r.armure_pv_max_attaquant = Math.trunc(cbA.stats.pv); r.armure_pv_max_defenseur = Math.trunc(cbD.stats.pv);
   return r;
 }

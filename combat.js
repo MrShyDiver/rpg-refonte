@@ -64,6 +64,7 @@ function objetDe(x, slot, index) {
   if (!o) o = { numero: x.numero || "?", nom: x.nom, slot, rarete: x.rarete && App.RARETES[x.rarete] ? x.rarete : "commun", set: "", data: { image: x.image || "" }, image: x.image || "" };
   return { o, niveau: Math.min(Number(x.niveau) || 0, App.niveauMax(o.rarete)) };
 }
+const EFFETS_COURTS = [["poison", "POISON"], ["brulure", "BRÛLURE"], ["anti_heal", "SOINS RÉDUITS"], ["brise_def", "DÉFENSE BRISÉE"], ["marque", "MARQUÉ"], ["esquive_parade_buff", "ENVOL"]];
 function carteOuVide(it, libelle) {
   return it ? App.carte(it.o, { niveau: it.niveau, equipe: false }) : el("div", { class: "case-vide" }, el("span", { texte: libelle }), el("small", { texte: "Vide" }));
 }
@@ -287,6 +288,7 @@ function arene(main, ctx, opts) {
       profil: window.SFX ? SFX.profilArme(it.arme && it.arme.o) : "poing",
       profilStrat: window.SFX ? SFX.profilStrategeme(it.strategeme && it.strategeme.o) : "missile",
       usagesMax: R["strategeme_usages_max_" + c] || dStrat.usagesParCombat || null, cdTours: dStrat.cooldownTours || 0,
+      offUsagesMax: R["offhand_usages_max_" + c] || 0, // moteur 1.1 : main gauche à charges (soin ou action)
       imageBase: it.arme ? it.arme.o.image : "", image2: it.arme ? it.arme.o.data.stance2ImageUrl || "" : "",
     };
   }
@@ -296,7 +298,7 @@ function arene(main, ctx, opts) {
   const de = (login) => (login === R.attaquant ? F.attaquant : login === R.defenseur ? F.defenseur : null);
   function initialiser(X) {
     Object.assign(X, { pv: X.pvMax0, pvMax: X.pvMax0, pvVis: X.pvMax0, shield: R[X.c + "_shield_max"] || 0,
-      usages: X.usagesMax, cd: 0, pending: false, reticule: null, stance2: false, etourdi: false, souffleUtilise: false, rage: 0,
+      usages: X.usagesMax, cd: 0, offUsages: X.offUsagesMax, offCd: 0, pending: false, reticule: null, stance2: false, etourdi: false, souffleUtilise: false, rage: 0,
       r: null, ko: false, brisBouclier: false, saignement: 0, etats: {} });
   }
 
@@ -331,6 +333,13 @@ function arene(main, ctx, opts) {
       if (r.etourdi_applique) C.etourdi = true;
       if (r.riposte_stun_frappeur) A.etourdi = true;
     }
+    // Moteur 1.1 : charges, recharges et impact en vol publiés par le serveur pour les deux combattants.
+    for (const X of [F.attaquant, F.defenseur]) {
+      const s = X.c;
+      if (r["strategeme_recharge_" + s] != null) { X.usages = r["strategeme_usages_" + s]; X.cd = r["strategeme_recharge_" + s] + 1; }
+      if (r["offhand_recharge_" + s] != null) { X.offUsages = r["offhand_usages_" + s]; X.offCd = r["offhand_recharge_" + s] + 1; }
+      if (r["missile_en_vol_" + s] !== undefined) X.pending = r["missile_en_vol_" + s];
+    }
     for (const X of [F.attaquant, F.defenseur]) X.pvVis = X.pv;
   }
 
@@ -350,7 +359,9 @@ function arene(main, ctx, opts) {
     const sArme = slot("arme", "Mains nues"), sArmure = slot("armure", "Sans armure"), sOff = slot("offhand", "Main gauche");
     // Stratagème : la carte elle-même, face visible, à la taille de la main gauche.
     const pips = el("div", { class: "pips", role: "img" }), cd = el("span", { class: "cd num" });
-    const deck = el("div", { class: "slot deck", title: X.it.strategeme ? "Stratagème : " + X.it.strategeme.o.nom : "Pas de stratagème" },
+    const pipsOff = el("div", { class: "pips", role: "img" }), cdOff = el("span", { class: "cd num" });
+    if (X.offUsagesMax) { sOff.classList.add("pile"); sOff.append(cdOff, pipsOff); }
+    const deck = el("div", { class: "slot deck pile", title: X.it.strategeme ? "Stratagème : " + X.it.strategeme.o.nom : "Pas de stratagème" },
       carteOuVide(X.it.strategeme, "Stratagème"), cd, pips);
     const socle = el("div", { class: "socle" }, portrait, auras(graine(X.login + "aura")));
     const racine = el("div", { class: "cbt " + (X.g ? "gauche" : "droite") + (X.login === moi ? " moi" : "") },
@@ -359,7 +370,7 @@ function arene(main, ctx, opts) {
           X.puissance ? el("span", { class: "jauge-puissance num", texte: "Puissance " + fmt(X.puissance) }) : null),
         barre, el("div", { class: "jauge-pied" }, pvTxt, statuts)),
       el("div", { class: "corps" }, socle, el("div", { class: "main-cartes" }, sArme, sArmure, sOff, deck)));
-    X.dom = { racine, barre, plein, fantome, bouclier, erosion, pvTxt, statuts, portrait, vis, blessures, socle, sArme, sArmure, sOff, deck, pips, cd };
+    X.dom = { racine, barre, plein, fantome, bouclier, erosion, pvTxt, statuts, portrait, vis, blessures, socle, sArme, sArmure, sOff, deck, pips, cd, pipsOff, cdOff };
   }
   initialiser(F.attaquant); initialiser(F.defenseur);
   construire(G); construire(D);
@@ -385,12 +396,12 @@ function arene(main, ctx, opts) {
   const feed = el("ol", { class: "feed", "aria-label": "Déroulé du combat" });
   const blocFeed = el("section", { class: "bloc-feed", hidden: true }, el("h2", { class: "feed-titre" }, el("span", { texte: "Déroulé du combat" })), feed);
   main.replaceChildren(racine, blocFeed);
-  const lignes = rounds.map((r) => decrire(r, R, nomDe));
+  const lignes = rounds.map((r) => App.decrireTour(r, R, nomDe));
   let feedN = 0;
   function ajouterFeed(i) {
     for (; feedN <= i && feedN < n; feedN++) {
       const r = rounds[feedN], A = r.frappeur ? de(r.frappeur) : null;
-      const li = el("li", { class: A ? (A.g ? "g" : "d") : "neutre" }, el("span", { class: "no-tour num", texte: "T" + (r.round ?? feedN + 1) }),
+      const li = el("li", { class: A ? (A.g ? "g" : "d") : "neutre" }, el("span", { class: "no-tour num", texte: "T" + (r.tour ?? r.round ?? feedN + 1) }),
         el("span", { class: "lignes-tour" }, lignes[feedN].map((x) => el("span", { class: "evt " + x.genre, texte: x.texte }))));
       feed.querySelectorAll("[aria-current]").forEach((x) => x.removeAttribute("aria-current"));
       li.setAttribute("aria-current", "step");
@@ -443,16 +454,19 @@ function arene(main, ctx, opts) {
     // Pioche de stratagème
     rendreDeck(X);
   }
+  // Une pile = une carte à charges (stratagème, ou main gauche à utilisations) : pastilles, recharge, épuisement.
+  function rendrePile(pile, pips, cd, restant, max, attente) {
+    pile.classList.toggle("epuise", restant <= 0);
+    pips.replaceChildren(...(max ? Array.from({ length: Math.min(6, max) }, (_, i) => el("i", { class: i < restant ? "plein" : null })) : []));
+    pips.setAttribute("aria-label", max ? `${restant} utilisation${restant > 1 ? "s" : ""} restante${restant > 1 ? "s" : ""} sur ${max}` : "");
+    const enCd = attente > 1 && restant > 0;
+    cd.textContent = enCd ? String(attente - 1) : "";
+    pile.classList.toggle("recharge", enCd);
+  }
   function rendreDeck(X) {
     const d = X.dom;
-    if (!X.it.strategeme) return;
-    const restant = X.usages == null ? 1 : X.usages;
-    d.deck.classList.toggle("epuise", restant <= 0);
-    d.pips.replaceChildren(...(X.usagesMax ? Array.from({ length: Math.min(6, X.usagesMax) }, (_, i) => el("i", { class: i < restant ? "plein" : null })) : []));
-    d.pips.setAttribute("aria-label", X.usagesMax ? `${restant} utilisation${restant > 1 ? "s" : ""} restante${restant > 1 ? "s" : ""} sur ${X.usagesMax}` : "");
-    const enCd = X.cd > 1 && restant > 0;
-    d.cd.textContent = enCd ? String(X.cd - 1) : "";
-    d.deck.classList.toggle("recharge", enCd);
+    if (X.it.strategeme) rendrePile(d.deck, d.pips, d.cd, X.usages == null ? 1 : X.usages, X.usagesMax, X.cd);
+    if (X.offUsagesMax) rendrePile(d.sOff, d.pipsOff, d.cdOff, X.offUsages == null ? X.offUsagesMax : X.offUsages, X.offUsagesMax, X.offCd);
   }
   function etatsDe(X) {
     const r = X.r || {}, s = X.c;
@@ -748,17 +762,19 @@ function arene(main, ctx, opts) {
 
   // -------------------------------------------------------------- Stratagèmes
   // La carte quitte son emplacement face visible, s'envole au centre de l'arène et s'y illumine.
-  async function tirer(X) {
-    const src = X.dom.deck.querySelector(".carte") || X.dom.deck, d = pos(src);
+  async function tirer(X, quoi = "strategeme") {
+    const pile = quoi === "offhand" ? X.dom.sOff : X.dom.deck, it = X.it[quoi];
+    const src = pile.querySelector(".carte") || pile, d = pos(src);
     const w = Math.max(40, d.w), zone = pos(scene);
     const grand = Math.min(zone.w * 0.3, zone.h * 0.5 * (5 / 7), 210), echelle = grand / w;
     const cible = { x: zone.x, y: zone.y - zone.h * 0.02 };
-    const carte = el("div", { class: "f carte-vol", style: { width: w + "px" } }, el("div", { class: "cv-face" }, App.carte(X.it.strategeme.o, { niveau: X.it.strategeme.niveau, equipe: false })));
+    const carte = el("div", { class: "f carte-vol", style: { width: w + "px" } }, el("div", { class: "cv-face" }, App.carte(it.o, { niveau: it.niveau, equipe: false })));
+    carte._pile = pile;
     carte.style.transform = T(d.x, d.y);
     fx.append(carte);
-    X.dom.deck.classList.add("en-vol");
+    pile.classList.add("en-vol");
     son("carte", { pan: X.pan });
-    briller(X, "strategeme");
+    briller(X, quoi);
     const penche = X.g ? -10 : 10, haut = T(d.x, d.y - 30, `scale(1.15) rotate(${penche}deg)`);
     if (App.reduit) await fin(anime(carte, [{ opacity: 0, transform: T(cible.x, cible.y, `scale(${echelle})`) }, { opacity: 1, transform: T(cible.x, cible.y, `scale(${echelle})`) }], 250));
     else {
@@ -771,7 +787,7 @@ function arene(main, ctx, opts) {
     }
     carte._t = T(cible.x, cible.y, `scale(${echelle})`);
     carte.classList.add("active");
-    annonce(X.it.strategeme.o.nom, "strat");
+    annonce(it.o.nom, "strat");
     await dormir(520);
     return carte;
   }
@@ -779,12 +795,13 @@ function arene(main, ctx, opts) {
     if (!carte) return;
     carte.classList.remove("active");
     if (derniere) { await bruler(X, carte); return; }
-    const src = X.dom.deck.querySelector(".carte") || X.dom.deck, d = pos(src);
+    const pile = carte._pile || X.dom.deck;
+    const src = pile.querySelector(".carte") || pile, d = pos(src);
     son("carte_retour", { pan: X.pan });
     if (App.reduit) await fin(anime(carte, [{ opacity: 1 }, { opacity: 0 }], 250));
     else await fin(anime(carte, [{ transform: carte._t }, { transform: T(d.x, d.y, "scale(1)"), opacity: 0.9 }], 440, { ease: "cubic-bezier(.5,0,.7,.4)" }));
     carte.remove();
-    X.dom.deck.classList.remove("en-vol");
+    pile.classList.remove("en-vol");
   }
   async function bruler(X, carte) {
     const p = pos(carte);
@@ -801,8 +818,8 @@ function arene(main, ctx, opts) {
     }
     await fin(anime(carte, [{ transform: carte._t, opacity: 1 }, { transform: carte._t, opacity: 1, offset: 0.75 }, { transform: carte._t.replace(/scale\(([^)]*)\)/, "scale($1) translateY(-6%)"), opacity: 0 }], 1500, { ease: "linear" }));
     carte.remove();
-    X.dom.deck.classList.remove("en-vol");
-    X.dom.deck.classList.add("epuise");
+    (carte._pile || X.dom.deck).classList.remove("en-vol");
+    (carte._pile || X.dom.deck).classList.add("epuise");
   }
   function reticule(C) {
     const c = pos(C.dom.portrait);
@@ -995,7 +1012,7 @@ function arene(main, ctx, opts) {
 
   // -------------------------------------------------------------- Un tour
   async function tour(r, i) {
-    numTour.textContent = String(r.round ?? i + 1);
+    numTour.textContent = String(r.tour ?? r.round ?? i + 1);
     log.textContent = lignes[i].map((x) => x.texte).join(" ");
     ajouterFeed(i);
     const A = r.frappeur ? de(r.frappeur) : null, C = A ? autre(A) : null;
@@ -1029,15 +1046,41 @@ function arene(main, ctx, opts) {
       await dormir(250);
     }
 
-    // Soin actif (off-hand, armure) sur soi
-    if (r.soin_applique && r.soin_montant > 0 && !r.strategeme) {
+    // Soins de début de tour (régénération d'armure, soin étalé de la main gauche).
+    if (r.regen_montant !== undefined) {
+      if (r.regen_montant > 0) {
+        briller(A, (r.effets || []).includes("soin_continu") ? "offhand" : "armure");
+        soinFx(A, r.regen_montant, r.regen_sons || r.soin_sons);
+        await dormir(600);
+      }
+    } else if (r.soin_applique && r.soin_montant > 0 && !r.strategeme) { // replays d'avant le moteur 1.1
       briller(A, A.it.offhand && A.it.offhand.o.data.soinDirect ? "offhand" : "armure");
       soinFx(A, r.soin_montant, r.soin_sons);
       await dormir(600);
     }
 
+    // Main gauche à charges : la carte sort, agit et retourne à sa place, comme un stratagème.
+    if (r.offhand_action && A.it.offhand) {
+      const epuisee = r["offhand_usages_" + A.c] === 0;
+      const carte = await tirer(A, "offhand");
+      if (r.offhand_soin) soinFx(A, r.soin_montant || 0, r.soin_sons);
+      else {
+        const X = r.offhand_sur_soi ? A : C, p = pos(X.dom.portrait), eff = r.effets || [];
+        son(eff.includes("brulure") ? "feu" : eff.includes("poison") ? "gaz" : eff.includes("esquive_parade_buff") ? "bouclier" : "impact", { pan: X.pan, fichiers: r.sons_override });
+        onde(p.x, p.y, eff.includes("brulure") ? "feu" : r.offhand_sur_soi ? "bouclier" : "", 1.5, 520);
+        if (eff.includes("poison")) { bouffee(C, "poison", 6); dot(C, "poison"); }
+        if (eff.includes("brulure")) { flambee(C); dot(C, "brulure"); }
+        const mot = EFFETS_COURTS.filter(([k]) => eff.includes(k)).map(([, t]) => t).join(" · ");
+        if (mot) nombre(X, mot, "etat");
+      }
+      await dormir(650);
+      await ranger(A, carte, epuisee);
+      await apres({ ...r, poison_applique: false }, A, C);
+      return;
+    }
+
     if (r.strategeme) {
-      const impactDiffere = A.pending && !r.missile_lance;
+      const impactDiffere = r.impact_differe ?? (A.pending && !r.missile_lance);
       let carte = null, derniere = false;
       if (!impactDiffere && A.it.strategeme) {
         const restant = r.strategeme_usages_restants ?? (A.usages != null ? A.usages - 1 : null);
@@ -1093,6 +1136,18 @@ function arene(main, ctx, opts) {
       nombre(A, "+" + r.vol_de_vie, "soin vol"); soigne(A, r.vol_de_vie); attente = 450;
     }
     if (A && r.degats_reflechis > 0) { son("renvoi", { pan: A.pan }); frappe(A); nombre(A, "−" + r.degats_reflechis, "renvoi"); blesse(A, r.degats_reflechis); attente = 450; }
+    if (A && r.contrecoup > 0) { son("renvoi", { pan: A.pan, vol: 0.7 }); nombre(A, "−" + r.contrecoup, "renvoi"); blesse(A, r.contrecoup); attente = 450; }
+    if (C && r.erosion_pv_max > 0) nombre(C, "−" + r.erosion_pv_max + " PV max", "etat");
+    if (A && r.sacrifice_pv > 0) {
+      if (attente) { await dormir(attente); attente = 0; }
+      annonce("Sacrifice", "sang"); son("saignement", { pan: A.pan });
+      nombre(A, "−" + r.sacrifice_pv, "saignement"); blesse(A, r.sacrifice_pv);
+      if (r.recharge_strategeme) { A.usages = r["strategeme_usages_" + A.c]; briller(A, "strategeme"); }
+      if (r.recharge_offhand) { A.offUsages = r["offhand_usages_" + A.c]; briller(A, "offhand"); }
+      rendreDeck(A);
+      nombre(A, "+1 charge", "etat", 1, 2);
+      attente = 700;
+    }
     if (A && r.execution_active) { annonce("Exécution +" + (r.execution_bonus || 0) + " %", "sang"); son("execution", { pan: C.pan }); }
     if (C && r.etourdi_applique) { etoiles(C); son("etourdi", { pan: C.pan }); nombre(C, "ÉTOURDI", "etat stun"); C.etourdi = true; attente = 600; }
     if (A && r.riposte_stun_frappeur) { etoiles(A); son("etourdi", { pan: A.pan }); nombre(A, "ÉTOURDI", "etat stun"); A.etourdi = true; attente = 600; }
@@ -1169,7 +1224,7 @@ function arene(main, ctx, opts) {
     for (let i = prochain; i < n; i++) appliquer(rounds[i]);
     prochain = n;
     const r = rounds[n - 1];
-    if (r) { numTour.textContent = String(r.round ?? n); log.textContent = lignes[n - 1].map((x) => x.texte).join(" "); }
+    if (r) { numTour.textContent = String(r.tour ?? r.round ?? n); log.textContent = lignes[n - 1].map((x) => x.texte).join(" "); }
     ajouterFeed(n - 1);
     rendreTout(false);
     finale().catch((e) => { if (e !== ARRET) console.error(e); });
@@ -1351,52 +1406,4 @@ function auras(seed) {
   return d;
 }
 
-// ---------------------------------------------------------------------
-// Récit d'un tour (mêmes phrases que le lecteur de duels.html)
-// ---------------------------------------------------------------------
-function decrire(r, R, nom) {
-  const L = [], add = (texte, genre = "") => L.push({ texte, genre });
-  const F = r.frappeur ? nom(r.frappeur) : null, C = r.cible ? nom(r.cible) : null;
-  const cote = (estA) => nom(estA ? R.attaquant : R.defenseur);
-  const cibleEstA = r.cible === R.attaquant;
-  if (R.round_debut_fatigue > 0 && r.round === R.round_debut_fatigue) add("La fatigue s'installe : chaque tour coûte maintenant des PV aux deux combattants.", "etat");
-  if (F && r.etourdi) add(`${F} est étourdi et passe son tour.`, "etat");
-  else if (F && r.paralysie) add(`${F} est paralysé : son arme ne répond plus.`, "etat");
-  else if (F) {
-    if (r.missile_lance) add(`${F} lance son stratagème : l'impact arrive dans quelques tours.`, "strat");
-    if (r.strategeme_bouclier) add(`${F} déploie un bouclier${r.montant_bouclier ? " de " + r.montant_bouclier + " points" : ""}.`, "soin");
-    if (r.soin_applique && r.soin_montant > 0) add(`${F} se soigne : +${r.soin_montant} PV.`, "soin");
-    const surSoi = r.missile_lance || r.strategeme_bouclier || (r.soin_applique && r.frappeur === r.cible);
-    if (!surSoi) {
-      if (r.parade_reussie) add(`${C} pare le coup de ${F} et riposte : ${r.degats_ripostee || 0} dégâts !`, "parade");
-      else if (r.touche) {
-        const balles = r.degats_par_balle || [], crits = (r.crit_par_balle || []).filter(Boolean).length;
-        let t = r.strategeme ? `Le stratagème de ${F} frappe ${C} : ${r.degats} dégâts` : `${F} frappe ${C} : ${r.degats} dégâts`;
-        if (balles.length > 1) t += ` en ${balles.length} coups (${balles.join(" + ")})` + (crits ? `, dont ${crits} critique${crits > 1 ? "s" : ""}` : "");
-        else if (r.crit) t += " (critique !)";
-        if (r.bloque) t += ", en partie bloqués";
-        add(t + ".", r.crit || crits ? "crit" : "coup");
-      } else add(`${F} attaque, mais ${C} esquive.`, "rate");
-    }
-  }
-  if (r.vol_de_vie > 0) add(`${F} récupère ${r.vol_de_vie} PV en vol de vie.`, "soin");
-  if (r.degats_reflechis > 0) add(`${C} renvoie ${r.degats_reflechis} dégâts à ${F}.`, "coup");
-  if (r.execution_active) add(`Exécution : +${r.execution_bonus} % de dégâts sur une cible affaiblie.`, "crit");
-  if (r.etourdi_applique) add(`${C} est étourdi !`, "etat");
-  if (r.riposte_stun_frappeur) add(`${F} est étourdi en retour par l'armure de ${C}.`, "etat");
-  if (r.paralysie_applique) {
-    const k = cibleEstA ? r.paralysie_duree_attaquant : r.paralysie_duree_defenseur;
-    add(`${C} est paralysé${k ? " pour " + k + " tours" : ""} : plus d'attaque à l'arme.`, "etat");
-  }
-  if (r.poison_applique && C) add(`Le poison s'accumule sur ${C}.`, "poison");
-  if (r.saignement_explosion_attaquant) add(`Le saignement de ${cote(true)} explose : −${r.degats_explosion_saignement_attaquant} PV bruts !`, "saignement");
-  if (r.saignement_explosion_defenseur) add(`Le saignement de ${cote(false)} explose : −${r.degats_explosion_saignement_defenseur} PV bruts !`, "saignement");
-  if (r.poison_tick && r.degats_poison) add(`Le poison ronge ${cote(r.poison_tick_attaquant)} : −${r.degats_poison} PV.`, "poison");
-  if (r.brulure_tick && r.degats_brulure) add(`${cote(r.brulure_tick_attaquant)} brûle : −${r.degats_brulure} PV.`, "brulure");
-  if (r.fatigue_tick && r.degats_fatigue) add(`La fatigue frappe les deux combattants : −${r.degats_fatigue} PV chacun.`, "etat");
-  if (r.dernier_souffle_attaquant) add(`${cote(true)} refuse de tomber : dernier souffle !`, "parade");
-  if (r.dernier_souffle_defenseur) add(`${cote(false)} refuse de tomber : dernier souffle !`, "parade");
-  if (!L.length) add("Rien ne se passe ce tour-ci.", "etat");
-  return L;
-}
 })();

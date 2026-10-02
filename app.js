@@ -341,8 +341,8 @@ const REGLES_PASSIFS = [
   ["resistancePoison", (d) => [`<b>Antidote</b> : −${pct(d.resistancePoison)} de dégâts de poison subis.`, "Anti-poison " + pct(d.resistancePoison)]],
   ["resistanceFeu", (d) => [`<b>Ignifugé</b> : −${pct(d.resistanceFeu)} de dégâts de brûlure subis.`, "−" + pct(d.resistanceFeu) + " brûlure"]],
   ["regeneration", (d) => [`<b>Régénération</b> : rend ${pct(d.regeneration)} de tes PV max à chaque tour.`, "Régén " + pct(d.regeneration)]],
-  ["soinDirect", (d) => [`<b>Soin</b> : rend ${nombre(d.soinDirect)} PV${d.usagesParCombat ? " (" + d.usagesParCombat + " utilisations, recharge " + tours(d.cooldownTours || 0) + ")" : ""}. Ne se déclenche que s'il te manque des PV.`, "Soin " + nombre(d.soinDirect) + " PV"]],
-  ["amplificationSoinsPourcentage", (d) => [`<b>Soins renforcés</b> : +${pct(d.amplificationSoinsPourcentage)} sur les soins que tu te donnes.`, "Soins +" + pct(d.amplificationSoinsPourcentage)]],
+  ["soinDirect", (d) => [`<b>Soin</b> : rend ${nombre(d.soinDirect)} PV${d.soinDureeTours > 1 ? " en " + tours(d.soinDureeTours) + " (" + nombre(d.soinDirect / d.soinDureeTours) + " par tour)" : ""}${d.usagesParCombat ? " (" + d.usagesParCombat + " utilisations, recharge " + tours(d.cooldownTours || 0) + ")" : ""}. Prend ton tour. Se déclenche quand il te manque au moins ce montant, ou sous la moitié de tes PV.`, "Soin " + nombre(d.soinDirect) + " PV"]],
+  ["amplificationSoinsPourcentage", (d) => [`<b>Soins renforcés</b> : +${pct(d.amplificationSoinsPourcentage)} sur tous les soins que tu reçois (soin actif, régénération, vol de vie).`, "Soins +" + pct(d.amplificationSoinsPourcentage)]],
   ["shieldMontant", (d) => [`<b>Bouclier</b> : ${nombre(d.shieldMontant)} points de bouclier qui absorbent les dégâts avant tes PV.`, "Bouclier " + nombre(d.shieldMontant)]],
   ["antiHealPourcentage", (d) => [`<b>Anti-soin</b> : −${pct(d.antiHealPourcentage)} de soins reçus par la cible pendant ${tours(d.antiHealDuree || 1)}.`, "Anti-soin " + pct(d.antiHealPourcentage)]],
   ["marqueDegatsPourcentage", (d) => [`<b>Marque</b> : la cible subit +${pct(d.marqueDegatsPourcentage)} de dégâts de toutes sources pendant ${tours(d.marqueDuree || 1)}.`, "Marque +" + pct(d.marqueDegatsPourcentage)]],
@@ -350,9 +350,9 @@ const REGLES_PASSIFS = [
   ["tenaciteChance", (d) => [`<b>Ténacité</b> : ${pct(d.tenaciteChance)} de chance de résister à un étourdissement.`, "Ténacité " + pct(d.tenaciteChance)]],
   ["dernierSouffleActif", (d) => [`<b>Dernier souffle</b> : une fois par combat, tu survis au coup fatal${d.dernierSouffleFractionPv > 0 ? " et reviens à " + pct(d.dernierSouffleFractionPv * 100) + " de tes PV" : " avec 1 PV"}.`, "Dernier souffle"]],
   ["frenesieBonusSpd", (d) => [`<b>Frénésie</b> : chaque critique donne +${nombre(d.frenesieBonusSpd)} de vitesse pendant ${tours(d.frenesieDuree || 1)}.`, "Frénésie +" + nombre(d.frenesieBonusSpd)]],
-  ["rechargeTousLesCoups", (d) => [`<b>Sacrifice</b> : tous les ${d.rechargeTousLesCoups} coups, recharge un stratagème ou un soin en sacrifiant ${pct(d.rechargeSacrificePourcentage || 0)} de tes PV actuels.`, "Recharge / " + d.rechargeTousLesCoups + " coups"]],
+  ["rechargeTousLesCoups", (d) => [`<b>Sacrifice</b> : tous les ${d.rechargeTousLesCoups} coups portés, sacrifie ${pct(d.rechargeSacrificePourcentage || 0)} de tes PV actuels pour rendre 1 charge à ton stratagème et à ta main gauche. Rien à recharger : pas de sacrifice.`, "Recharge / " + d.rechargeTousLesCoups + " coups"]],
   ["reductionPvMaxPourcentage", (d) => [`<b>Érosion</b> : chaque coup retire ${pct(d.reductionPvMaxPourcentage)} des PV max adverses, jusqu'à la fin du combat.`, "−" + pct(d.reductionPvMaxPourcentage) + " PV max"]],
-  ["autoDegatsPourcentageDesDegats", (d) => [`<b>Contrecoup</b> : tu subis ${pct(d.autoDegatsPourcentageDesDegats)} des dégâts que tu infliges.`, "Contrecoup " + pct(d.autoDegatsPourcentageDesDegats)]],
+  ["autoDegatsPourcentageDesDegats", (d) => [`<b>Contrecoup</b> : chaque coup porté te coûte ${pct(d.autoDegatsPourcentageDesDegats)} de tes PV actuels.`, "Contrecoup " + pct(d.autoDegatsPourcentageDesDegats)]],
   ["esquiveParadeBuffPourcentage", (d) => [`<b>Envol</b> : +${pct(d.esquiveParadeBuffPourcentage)} d'esquive ou de parade pendant ${tours(d.esquiveParadeBuffDuree || 1)}.`, "Esquive/parade +" + pct(d.esquiveParadeBuffPourcentage)]],
   ["briseDefPoints", (d) => [`<b>Brise-défense</b> : −${nombre(d.briseDefPoints)} de défense adverse ${d.briseDefDuree >= 999 ? "jusqu'à la fin du combat" : "pendant " + tours(d.briseDefDuree || 1)}.`, "−" + nombre(d.briseDefPoints) + " DEF"]],
   ["bruleeReflectionDegats", (d) => [`<b>Chair ardente</b> : qui te frappe prend feu (${nombre(d.bruleeReflectionDegats)} dégâts, ${tours(d.bruleeReflectionDuree || 1)}).`, "Riposte de feu " + nombre(d.bruleeReflectionDegats)]],
@@ -974,6 +974,71 @@ App.demarrer = async (page, rendu, options = {}) => {
     const m = $("#contenu");
     if (m) m.replaceChildren(el("div", { class: "vide" }, el("b", { texte: "La page n'a pas pu se charger." }), "Vérifie ta connexion puis recharge la page."));
   }
+};
+
+// ---------------------------------------------------------------------
+// Récit d'un tour de duel : mêmes phrases sur l'écran de combat et dans le lecteur de la page Duels.
+// Lit les replays du moteur 1.1 (regen_montant, offhand_action, contrecoup…) comme les anciens.
+// ---------------------------------------------------------------------
+const EFFETS_MAIN_GAUCHE = { poison: "poison", brulure: "brûlure", anti_heal: "soins réduits", brise_def: "défense brisée", marque: "marque (dégâts subis augmentés)", esquive_parade_buff: "esquive ou parade renforcée" };
+App.decrireTour = (r, R, nom) => {
+  const L = [], add = (texte, genre = "") => L.push({ texte, genre });
+  const F = r.frappeur ? nom(r.frappeur) : null, C = r.cible ? nom(r.cible) : null;
+  const cote = (estA) => nom(estA ? R.attaquant : R.defenseur);
+  const cibleEstA = r.cible === R.attaquant;
+  const build = R[r.frappeur === R.attaquant ? "build_attaquant" : "build_defenseur"] || {};
+  const nomStrat = (build.strategeme && build.strategeme.nom) || "son stratagème", nomOff = (build.offhand && build.offhand.nom) || "sa main gauche";
+  const moteur11 = r.regen_montant !== undefined;
+  if (R.round_debut_fatigue > 0 && r.round === R.round_debut_fatigue) add("La fatigue s'installe : chaque tour coûte maintenant des PV aux deux combattants.", "etat");
+  if (F && r.regen_montant > 0) add(`${F} récupère ${r.regen_montant} PV.`, "soin");
+  if (F && r.etourdi) add(`${F} est étourdi et passe son tour.`, "etat");
+  else if (F && r.paralysie) add(`${F} est paralysé : son arme ne répond plus.`, "etat");
+  else if (F && r.offhand_action) {
+    if (r.offhand_soin) add(`${F} utilise ${nomOff} : +${r.soin_montant || 0} PV${r.soin_tours > 1 ? `, puis autant au début de ses ${r.soin_tours - 1} prochains tours` : ""}.`, "soin");
+    else {
+      const effets = (r.effets || []).map((e) => EFFETS_MAIN_GAUCHE[e]).filter(Boolean);
+      add(`${F} utilise ${nomOff}${r.offhand_sur_soi || !C ? "" : " sur " + C}${effets.length ? " : " + effets.join(", ") : ""}.`, "strat");
+    }
+  } else if (F) {
+    if (r.missile_lance) add(`${F} lance ${nomStrat} : l'impact ${r.missile_delai ? "tombe dans " + r.missile_delai + (r.missile_delai > 1 ? " tours" : " tour") : "arrive dans quelques tours"}.`, "strat");
+    if (r.strategeme_bouclier) add(`${F} déploie un bouclier${r.montant_bouclier ? " de " + r.montant_bouclier + " points" : ""}.`, "soin");
+    const soinAncien = !moteur11 && r.soin_applique && r.soin_montant > 0;
+    if (soinAncien) add(`${F} se soigne : +${r.soin_montant} PV.`, "soin");
+    const surSoi = r.missile_lance || r.strategeme_bouclier || r.evenement === "soin" || (soinAncien && r.frappeur === r.cible);
+    if (!surSoi) {
+      if (r.parade_reussie) add(`${C} pare le coup de ${F} et riposte : ${r.degats_ripostee || 0} dégâts !`, "parade");
+      else if (r.touche) {
+        const balles = r.degats_par_balle || [], crits = (r.crit_par_balle || []).filter(Boolean).length;
+        let t = r.impact_differe ? `${nomStrat} de ${F} s'abat sur ${C} : ${r.degats} dégâts` : r.strategeme ? `Le stratagème de ${F} frappe ${C} : ${r.degats} dégâts` : `${F} frappe ${C} : ${r.degats} dégâts`;
+        if (balles.length > 1) t += ` en ${balles.length} coups (${balles.join(" + ")})` + (crits ? `, dont ${crits} critique${crits > 1 ? "s" : ""}` : "");
+        else if (r.crit) t += " (critique !)";
+        if (r.bloque) t += ", en partie bloqués";
+        add(t + ".", r.crit || crits ? "crit" : "coup");
+      } else add(`${F} attaque, mais ${C} esquive.`, "rate");
+    }
+  } else if (!moteur11 && r.soin_applique && r.soin_montant > 0) add(`Régénération : +${r.soin_montant} PV.`, "soin");
+  if (r.vol_de_vie > 0) add(`${F} récupère ${r.vol_de_vie} PV en vol de vie.`, "soin");
+  if (r.degats_reflechis > 0) add(`${C} renvoie ${r.degats_reflechis} dégâts à ${F}.`, "coup");
+  if (r.erosion_pv_max > 0) add(`Érosion : ${C} perd ${r.erosion_pv_max} PV max.`, "etat");
+  if (r.contrecoup > 0) add(`Contrecoup : ${F} perd ${r.contrecoup} PV.`, "coup");
+  if (r.sacrifice_pv > 0) add(`Sacrifice : ${F} perd ${r.sacrifice_pv} PV et récupère une charge${r.recharge_strategeme && r.recharge_offhand ? " sur son stratagème et sa main gauche" : r.recharge_offhand ? " sur sa main gauche" : " sur son stratagème"}.`, "strat");
+  if (r.execution_active) add(`Exécution : +${r.execution_bonus} % de dégâts sur une cible affaiblie.`, "crit");
+  if (r.etourdi_applique) add(`${C} est étourdi !`, "etat");
+  if (r.riposte_stun_frappeur) add(`${F} est étourdi en retour par l'armure de ${C}.`, "etat");
+  if (r.paralysie_applique) {
+    const k = cibleEstA ? r.paralysie_duree_attaquant : r.paralysie_duree_defenseur;
+    add(`${C} est paralysé${k ? " pour " + k + " tours" : ""} : plus d'attaque à l'arme.`, "etat");
+  }
+  if (r.poison_applique && C && !r.offhand_action) add(`Le poison s'accumule sur ${C}.`, "poison");
+  if (r.saignement_explosion_attaquant) add(`Le saignement de ${cote(true)} explose : −${r.degats_explosion_saignement_attaquant} PV bruts !`, "saignement");
+  if (r.saignement_explosion_defenseur) add(`Le saignement de ${cote(false)} explose : −${r.degats_explosion_saignement_defenseur} PV bruts !`, "saignement");
+  if (r.poison_tick && r.degats_poison) add(`Le poison ronge ${cote(r.poison_tick_attaquant)} : −${r.degats_poison} PV.`, "poison");
+  if (r.brulure_tick && r.degats_brulure) add(`${cote(r.brulure_tick_attaquant)} brûle : −${r.degats_brulure} PV.`, "brulure");
+  if (r.fatigue_tick && r.degats_fatigue) add(`La fatigue frappe les deux combattants : −${r.degats_fatigue} PV chacun.`, "etat");
+  if (r.dernier_souffle_attaquant) add(`${cote(true)} refuse de tomber : dernier souffle !`, "parade");
+  if (r.dernier_souffle_defenseur) add(`${cote(false)} refuse de tomber : dernier souffle !`, "parade");
+  if (!L.length) add("Rien ne se passe ce tour-ci.", "etat");
+  return L;
 };
 
 Object.assign(App, { $, $$, el, icone, echapper, fmt, nombre, date, ilYa, attendre, reduit, RARETES, ORDRE_RARETE, SLOTS, STATS, PAGES, rangRarete, couleur, sousTitre, client });

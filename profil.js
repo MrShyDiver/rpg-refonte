@@ -363,7 +363,7 @@
       const r = s.res;
       if (!r || !r.stats) { sec.append(el("div", { class: "vide", texte: "Les statistiques ne sont pas disponibles pour le moment." })); return sec; }
       const st = r.stats, j = s.joueur, stk = (k) => j[k + "_stacks"] || 0;
-      const spdGear = st.spd - (10 + 40 * Math.tanh(stk("spd") / 40));
+      const spdGear = st.spd - (10 + stk("spd")); // vitesse linéaire depuis le moteur 1.1
       const tuiles = [
         { k: "atk", nom: STATS.atk, base: 10, pts: stk("atk"), gear: st.atk - 10 - stk("atk"), sous: null },
         { k: "def", nom: STATS.def, base: 10, pts: stk("def"), gear: st.def - 10 - stk("def"), sous: typeof mitigation === "function" ? nombre(mitigation(st.def) * 100) + " % des dégâts absorbés" : null },

@@ -417,51 +417,7 @@ App.demarrer("duels", async (main, ctx) => {
     arreter = lecteur(corps, pied, R, d, t);
   }
 
-  function decrire(r, R) {
-    const L = [], add = (texte, genre = "") => L.push({ texte, genre });
-    const F = r.frappeur ? nom(r.frappeur) : null, C = r.cible ? nom(r.cible) : null;
-    const cote = (estA) => nom(estA ? R.attaquant : R.defenseur);
-    const cibleEstA = r.cible === R.attaquant;
-    if (R.round_debut_fatigue > 0 && r.round === R.round_debut_fatigue) add("La fatigue s'installe : chaque tour coûte maintenant des PV aux deux combattants.", "etat");
-    if (F && r.etourdi) add(`${F} est étourdi et passe son tour.`, "etat");
-    else if (F && r.paralysie) add(`${F} est paralysé : son arme ne répond plus.`, "etat");
-    else if (F) {
-      if (r.missile_lance) add(`${F} lance son stratagème : l'impact arrive dans quelques tours.`, "strat");
-      if (r.strategeme_bouclier) add(`${F} déploie un bouclier${r.montant_bouclier ? " de " + r.montant_bouclier + " points" : ""}.`, "soin");
-      if (r.soin_applique && r.soin_montant > 0) add(`${F} se soigne : +${r.soin_montant} PV.`, "soin");
-      const surSoi = r.missile_lance || r.strategeme_bouclier || (r.soin_applique && r.frappeur === r.cible);
-      if (!surSoi) {
-        if (r.parade_reussie) add(`${C} pare le coup de ${F} et riposte : ${r.degats_ripostee || 0} dégâts !`, "parade");
-        else if (r.touche) {
-          const balles = r.degats_par_balle || [], crits = (r.crit_par_balle || []).filter(Boolean).length;
-          let t = r.strategeme ? `Le stratagème de ${F} frappe ${C} : ${r.degats} dégâts` : `${F} frappe ${C} : ${r.degats} dégâts`;
-          if (balles.length > 1) t += ` en ${balles.length} coups (${balles.join(" + ")})` + (crits ? `, dont ${crits} critique${crits > 1 ? "s" : ""}` : "");
-          else if (r.crit) t += " (critique !)";
-          if (r.bloque) t += ", en partie bloqués";
-          add(t + ".", r.crit || crits ? "crit" : "coup");
-        } else add(`${F} attaque, mais ${C} esquive.`, "rate");
-      }
-    }
-    if (r.vol_de_vie > 0) add(`${F} récupère ${r.vol_de_vie} PV en vol de vie.`, "soin");
-    if (r.degats_reflechis > 0) add(`${C} renvoie ${r.degats_reflechis} dégâts à ${F}.`, "coup");
-    if (r.execution_active) add(`Exécution : +${r.execution_bonus} % de dégâts sur une cible affaiblie.`, "crit");
-    if (r.etourdi_applique) add(`${C} est étourdi !`, "etat");
-    if (r.riposte_stun_frappeur) add(`${F} est étourdi en retour par l'armure de ${C}.`, "etat");
-    if (r.paralysie_applique) {
-      const n = cibleEstA ? r.paralysie_duree_attaquant : r.paralysie_duree_defenseur;
-      add(`${C} est paralysé${n ? " pour " + n + " tours" : ""} : plus d'attaque à l'arme.`, "etat");
-    }
-    if (r.poison_applique && C) add(`Le poison s'accumule sur ${C}.`, "poison");
-    if (r.saignement_explosion_attaquant) add(`Le saignement de ${cote(true)} explose : −${r.degats_explosion_saignement_attaquant} PV bruts !`, "saignement");
-    if (r.saignement_explosion_defenseur) add(`Le saignement de ${cote(false)} explose : −${r.degats_explosion_saignement_defenseur} PV bruts !`, "saignement");
-    if (r.poison_tick && r.degats_poison) add(`Le poison ronge ${cote(r.poison_tick_attaquant)} : −${r.degats_poison} PV.`, "poison");
-    if (r.brulure_tick && r.degats_brulure) add(`${cote(r.brulure_tick_attaquant)} brûle : −${r.degats_brulure} PV.`, "brulure");
-    if (r.fatigue_tick && r.degats_fatigue) add(`La fatigue frappe les deux combattants : −${r.degats_fatigue} PV chacun.`, "etat");
-    if (r.dernier_souffle_attaquant) add(`${cote(true)} refuse de tomber : dernier souffle !`, "parade");
-    if (r.dernier_souffle_defenseur) add(`${cote(false)} refuse de tomber : dernier souffle !`, "parade");
-    if (!L.length) add("Rien ne se passe ce tour-ci.", "etat");
-    return L;
-  }
+  const decrire = (r, R) => App.decrireTour(r, R, nom);
 
   function lecteur(corps, pied, R, d, tiroir) {
     const rounds = R.rounds || [], n = rounds.length;
@@ -578,7 +534,7 @@ App.demarrer("duels", async (main, ctx) => {
       compteur.textContent = pos === 0 ? "Début" : pos >= n ? "Fin" : "Tour " + rounds[pos - 1].round + " / " + n;
       curseur.setAttribute("aria-valuetext", compteur.textContent);
       journal.replaceChildren(...rounds.slice(0, pos).map((r, i) => el("li", { "aria-current": i === pos - 1 ? "step" : null },
-        el("button", { type: "button", onclick: () => { pause(); aller(i + 1); } }, el("span", { class: "no-tour num", texte: "T" + r.round }),
+        el("button", { type: "button", onclick: () => { pause(); aller(i + 1); } }, el("span", { class: "no-tour num", texte: "T" + (r.tour ?? r.round) }),
           el("span", { class: "lignes-tour" }, lignes[i].map((x) => el("span", { class: "evt " + x.genre, texte: x.texte })))))));
       journal.scrollTop = journal.scrollHeight;
       journal.hidden = pos === 0;

@@ -109,3 +109,26 @@ modifié et justifié · **[cosmétique]** replay/overlay seulement · **[robust
   `statut_*` sont calculés comme `duel.cs` (±30 % de PowerLevel), `id`/`date` via `opts`.
 - Build : `node moteur/build.mjs` (régénère `formule-combat.gen.ts` depuis `../formule-combat.js` — à relancer après toute
   modification de la formule), puis `node moteur/moteur.test.mjs`.
+
+---
+
+## 6. Moteur 1.1 (02/10) — décisions de MrShyDiver après revue en jeu
+
+Le site est le moteur de référence : ces règles n'existent pas dans le C#. `VERSION_MOTEUR = "site-1.1.0"`.
+
+| # | Règle | Avant | Maintenant |
+|---|---|---|---|
+| V1 | **Ordre des tours** | Le plus rapide jouait autant de fois que sa jauge le permettait (une Lame de la mort rapide : 4 tours d'affilée) | **Alternance + tour bonus** : même jauge, mais jamais plus de `MAX_TOURS_DAFFILEE = 2` tours d'affilée ; au-delà la main passe d'office. Deux jauges pleines : la plus remplie d'abord, puis le plus rapide, puis l'attaquant. 60 de vitesse contre 50 = 6 tours pour 5 |
+| V2 | **Vitesse** | `10 + 40·tanh(points/40)` + vitesse des objets hors courbe (50 points + Slip +25 = 71,9 battait 100 points = 49,5) | **Linéaire** : `10 + points + objets`. Le plafond de 2 tours d'affilée remplace la courbe dégressive. `formule-combat.js` : puissance multipliée par `spd·(10+REF)/(10·(spd+REF))`, `SPD_REFERENCE = 20` (1 pour un joueur sans vitesse, sature comme le moteur) |
+| V3 | **Un tour = un round** | Un tour pris par une capacité publiait ses effets de début de tour dans un round « d'environnement » séparé (sans texte quand il ne portait qu'une régénération : « Rien ne se passe ce tour-ci ») | Ces effets sont rattachés au round de la capacité. Il ne reste un round d'environnement que si un combattant meurt de ses effets avant d'agir. Chaque round porte `tour` (numéro du tour de jeu) |
+| V4 | **Impacts différés** (Solo Silo 2 tours, Éclair de Tomoe 1 tour) | Comptés en tours du porteur : avec un écart de vitesse, l'impact arrivait bien plus tard | Comptés en **tours du combat** : lancé au tour N, il tombe au début du tour N + délai, quel que soit le joueur, sans prendre le tour de personne (`impact_differe: true`, même numéro de `tour` que l'action qui suit) |
+| V5 | **Mains gauches à charges** | L'écran les jouait comme une attaque ratée, sans charges ni recharge visibles | Chaque round publie pour les deux côtés `strategeme_usages_*`, `strategeme_recharge_*`, `offhand_usages_*`, `offhand_recharge_*`, `missile_en_vol_*` ; le replay porte `offhand_usages_max_*`. Les soins actifs portent aussi `offhand_action` |
+| V6 | **Soins actifs** (Stimulant, Gourde) | Partaient dès qu'il manquait 1 PV (une Gourde de 262 PV gaspillée pour 6 PV) | Ne partent que s'il manque au moins leur montant, ou sous 50 % de PV |
+| V7 | **Gourde Médicinale** | Soin immédiat | `soinDureeTours = 3` (donnée d'objet) : 1/3 à l'utilisation, 1/3 au début des 2 tours suivants du porteur, sans lui coûter d'action (`regen_montant`, effet `soin_continu`) |
+| V8 | **Soins renforcés** (Gourde) | Soin actif et régénération seulement | Aussi le vol de vie |
+| V9 | **Tantô de Cérémonie** | Rechargeait le stratagème, sinon le soin ; jamais les mains gauches à action ; sacrifice même sans rien à recharger ; rien à l'écran | Tous les 3 coups portés : rend 1 charge à **chaque** objet entamé (stratagème et main gauche), sacrifice de 15 % des PV actuels seulement s'il y a quelque chose à recharger. Round : `sacrifice_pv`, `recharge_strategeme`, `recharge_offhand` |
+| V10 | **Lame de la mort** | Contrecoup = 5 % des dégâts infligés (83 dégâts = 4 PV), invisible à l'écran | Contrecoup = 5 % des **PV actuels** du porteur à chaque coup porté (ne peut pas le tuer). Round : `contrecoup`, `erosion_pv_max` |
+
+Mesures après changement (builds aléatoires du vrai catalogue) : 6 000 duels sans anomalie (PV ≤ PV max, charges dans leurs bornes, jamais 3 tours d'affilée, une seule action par tour, même graine = même combat), 15,3 tours en moyenne. Sur 12 000 duels, le plus puissant gagne 55 % / 71 % / 86 % / 97 % des fois pour un écart de puissance < 10 % / 10-30 % / 30-60 % / > 60 %. Le plus rapide gagne 74 % des duels : la vitesse pèse lourd, à surveiller.
+
+Après toute modification : `node outils/moteur-navigateur.mjs` (régénère `moteur-bac.js`), recopier `formule-combat.js` dans `formule-combat.gen.ts`, pousser, puis épingler le nouveau commit dans `index.ts` et redéployer la fonction `duel`.
