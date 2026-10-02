@@ -145,7 +145,7 @@ App.demarrer("lootbox", async (main, ctx) => {
   const zoneChiffres = el("div", { class: "lb-chiffres" });
   const zoneCollection = el("div", {});
   const blocCollection = el("section", { class: "panneau-b lb-bloc" },
-    el("div", { class: "lb-bloc-tete" }, el("h2", { texte: "Ta collection" }), el("a", { href: "collection.html", class: "lb-lien" }, "Tout voir", icone("i-fleche"))), zoneCollection);
+    el("div", { class: "lb-bloc-tete" }, el("h2", { texte: "Ton inventaire" }), el("a", { href: "collection.html", class: "lb-lien" }, "Tout voir", icone("i-fleche"))), zoneCollection);
   const cote = el("aside", { class: "lb-cote", "aria-label": "Taux et progression" }, blocTaux, zoneChiffres, blocCollection);
 
   main.append(entete, el("div", { class: "lb-grille" }, el("div", { class: "lb-principal" }, premiersPas, vide, scene, bilan, suite, sectionHisto), cote));
@@ -369,7 +369,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     const niv = l ? l.niveau : 0, trop = Math.max(0, niv - max);
     App.tiroir({ titre: o.nom, contenu: App.fiche(o, { niveau: Math.min(niv, max), possede: !!l }),
       pied: [trop ? el("a", { class: "btn-principal", href: "boutique.html", texte: "Revendre " + pluriel(trop, "doublon") + " en trop" }) : null,
-        el("a", { class: "btn-second", href: "collection.html", texte: "Voir ma collection" })] });
+        el("a", { class: "btn-second", href: "collection.html", texte: "Voir mon inventaire" })] });
   }
 
   function preparer(n) {
@@ -576,7 +576,7 @@ App.demarrer("lootbox", async (main, ctx) => {
   }
   const placer = (d, p, rot, echelle = 1) => { d.style.transform = "translate(" + p.x + "px," + p.y + "px) rotate(" + rot + "deg) scale(" + echelle + ")"; };
   function resultat(t, max) {
-    if (t.nouveau) return { cls: "nouveau", titre: "Nouveau !", texte: "nouveau dans ta collection" };
+    if (t.nouveau) return { cls: "nouveau", titre: "Nouveau !", texte: "nouveau dans ton inventaire" };
     if (t.niveau < max) return { cls: "monte", titre: "+" + (t.niveau - 1) + " → +" + t.niveau, texte: "amélioration +" + (t.niveau - 1) + " vers +" + t.niveau + " sur +" + max, jauge: t.niveau / max };
     if (t.niveau === max) return { cls: "max", titre: "MAX !", texte: "améliorations au maximum", jauge: 1 };
     return { cls: "trop", titre: "Doublon en trop", sous: "MAX · à revendre", texte: "déjà amélioré au maximum, doublon en trop à revendre" };

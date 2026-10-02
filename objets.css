@@ -1,4 +1,4 @@
-/* Collection & Arsenal : styles communs (le reste vient d'app.css). */
+/* Inventaire & Codex : styles communs (le reste vient d'app.css). */
 
 /* ---------- En-tête ---------- */
 .chiffre-lien { text-decoration: none; transition: border-color .2s; }
@@ -10,8 +10,10 @@
 .prog-rarete .tete b { color: var(--c); font-weight: 700; }
 .prog-rarete .tete span { color: var(--encre-2); }
 .prog-rarete .jauge-niv { height: 7px; }
-.repartition { display: flex; flex-wrap: wrap; gap: 4px 10px; font-variant-numeric: tabular-nums; }
-.repartition i { font-style: normal; font-family: var(--titre); font-weight: 800; font-size: 11px; color: var(--c); margin-right: 3px; }
+.repartition { display: grid; gap: 3px; margin-top: 6px; font-size: 13px; color: var(--encre-2); font-variant-numeric: tabular-nums; }
+.repartition span { display: flex; align-items: baseline; gap: 6px; }
+.repartition span::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); flex: none; align-self: center; }
+.chiffre .repartition b { font: inherit; color: var(--c); font-weight: 700; min-width: 1.4ch; text-align: right; }
 .plafonds { margin-top: 14px; font-size: 14px; color: var(--encre-2); }
 .plafonds span { color: var(--c); font-weight: 700; white-space: nowrap; }
 
@@ -31,7 +33,25 @@
 .bascule label { cursor: pointer; }
 .compte-resultats { margin-left: auto; font-size: 13px; color: var(--encre-3); }
 
+/* Filtres secondaires, repliés par défaut (Codex) */
+.plus-filtres summary { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; cursor: pointer; list-style: none; font-size: 14px; font-weight: 600; color: var(--encre-2); border-radius: 8px; }
+.plus-filtres summary::-webkit-details-marker { display: none; }
+.plus-filtres summary:hover { color: var(--encre); }
+.plus-filtres summary svg { width: 16px; height: 16px; transform: rotate(90deg); transition: transform .2s var(--ease); }
+.plus-filtres[open] summary svg { transform: rotate(-90deg); }
+.plus-filtres .n-filtres { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--legendaire); color: #16120a; font-size: 12px; font-weight: 800; display: inline-grid; place-items: center; }
+.plus-filtres .n-filtres:empty { display: none; }
+.plus-filtres .puces { margin-top: 10px; }
+
+/* ---------- Équipement (Inventaire) : même module que le profil, en plus compact ---------- */
+.inv-equip { margin-bottom: 26px; }
+.inv-equip .pf-slots { grid-template-columns: repeat(4, minmax(0, 168px)); }
+.inv-puissance { font-size: 14px; color: var(--encre-2); font-weight: 600; }
+.inv-puissance b { font-family: var(--titre); font-weight: 800; font-size: 26px; color: var(--encre); margin-left: 6px; }
+@media (max-width: 640px) { .inv-equip .pf-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; } .inv-equip .pf-slot-vide { font-size: 12px; text-align: center; } .inv-equip .pf-slot-niv { font-size: 11.5px; } }
+
 /* ---------- Cartes ---------- */
+.pl-objet { color: var(--encre-2); font-weight: 700; }
 .case-carte .jauge-niv i { background: var(--c); }
 .meta-carte { min-height: 1.5em; }
 .meta-carte .est-max { color: var(--c); font-weight: 700; }

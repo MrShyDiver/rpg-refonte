@@ -1,9 +1,10 @@
 "use strict";
-/* Arsenal : encyclopédie de tous les objets, en cartes ou en tableau comparatif. */
+/* Codex (arsenal.html) : encyclopédie de tous les objets du jeu, en cartes ou en tableau comparatif.
+   Rien de ce que le joueur possède n'y figure : c'est le rôle de l'inventaire. */
 (function () {
 const { el, icone, fmt, nombre, RARETES, ORDRE_RARETE, SLOTS, STATS, EFFETS, rangRarete } = App;
 const COLS = ["arme", "offhand", "armure", "strategeme"];
-const TRIS = [["numero", "Numéro"], ["rarete", "Rareté"], ["degats", "Dégâts max"]];
+const TRIS = [["rarete", "Rareté"], ["nom", "Nom"], ["puissance", "Puissance"]];
 const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const basculer = (set, v) => (set.has(v) ? set.delete(v) : set.add(v));
 // Set du jour : seul le set à l'honneur aujourd'hui a ses chances multipliées (rotation_lootbox).
@@ -19,7 +20,7 @@ App.demarrer("arsenal", async (main, ctx) => {
     raretes: liste("rarete", (r) => RARETES[r]),
     effets: liste("effet", (e) => EFFETS.some(([id]) => id === e)),
     q: p.get("q") || "",
-    tri: TRIS.some(([t]) => t === p.get("tri")) ? p.get("tri") : "numero",
+    tri: TRIS.some(([t]) => t === p.get("tri")) ? p.get("tri") : "rarete",
   };
   let objetOuvert = null;
 
@@ -34,14 +35,24 @@ App.demarrer("arsenal", async (main, ctx) => {
   const effetsDe = new Map(tous.map((o) => [o.numero, App.effetsDe(o)]));
   const max = (o) => App.niveauMax(o.rarete);
   const lvl = (o) => (f.niv === "max" ? max(o) : 0);
-  const possede = (o) => ctx.inventaire.get(o.numero);
-  const nivPossede = (o) => Math.min(possede(o).niveau, max(o));
+  // Puissance d'un objet : ce qu'il ajoute, équipé seul, à un personnage sans points investis.
+  const SANS_POINTS = {}, memoPl = new Map();
+  const plNu = App.puissance(SANS_POINTS, new Map(), {});
+  function puissanceDe(o) {
+    const k = o.numero + ":" + lvl(o);
+    if (!memoPl.has(k)) {
+      const r = App.puissance(SANS_POINTS, new Map([[o.numero, lvl(o)]]), { [SLOTS[o.slot].col]: o.numero });
+      memoPl.set(k, r && plNu ? Math.round(r.powerLevel - plNu.powerLevel) : null);
+    }
+    return memoPl.get(k);
+  }
   function degats(o, n) {
     const d = App.auNiveau(o, n);
     if (d.baseDegatsMax > 0) return { min: d.baseDegatsMin, max: d.baseDegatsMax, coups: d.coupsParUsage || 1 };
     if (d.degatsDirects > 0) return { min: d.degatsDirects, max: d.degatsDirects, coups: d.coupsParUsage || 1 };
     return null;
   }
+  const signePl = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + fmt(Math.abs(n));
   const texteDegats = (g) => (g ? (g.min === g.max ? nombre(g.max) : nombre(g.min) + "–" + nombre(g.max)) + (g.coups > 1 ? " ×" + g.coups : "") : "—");
 
   // ---------- En-tête ----------
@@ -49,19 +60,19 @@ App.demarrer("arsenal", async (main, ctx) => {
   const stats = el("div", { class: "stats-objets", id: "stats-objets" });
   const resume = el("button", { type: "button", class: "resume-objets", "aria-expanded": "false", "aria-controls": "stats-objets",
     onclick: () => resume.setAttribute("aria-expanded", String(stats.classList.toggle("ouvert"))) },
-    el("span", {}, el("b", { class: "num", texte: String(tous.length) }), " objets · ", el("b", { class: "num", texte: String(tous.filter(possede).length) }), " possédés · plafonds par rareté"), icone("i-fleche"));
+    el("span", {}, el("b", { class: "num", texte: String(tous.length) }), " objets · répartition et plafonds par rareté"), icone("i-fleche"));
   main.append(
     el("header", { class: "entete-page entete-objets" },
       el("div", {},
-        el("h1", { texte: "Arsenal" }),
-        el("p", { texte: `Les ${tous.length} objets de Stream RPG avec toutes leurs valeurs, où les trouver et qui les porte. Ce que tu possèdes est marqué.` })),
-      el("div", { class: "actions" }, el("a", { class: "btn-second", href: "collection.html" }, icone("i-cartes"), "Ma collection"))),
+        el("h1", { texte: "Codex" }),
+        el("p", { texte: `Les ${tous.length} objets de Stream RPG avec toutes leurs valeurs, où les trouver et qui les porte.` })),
+      el("div", { class: "actions" }, el("a", { class: "btn-second", href: "collection.html" }, icone("i-cartes"), "Mon inventaire"))),
     resume, stats);
   stats.append(
     el("div", { class: "grille-chiffres" }, Object.entries(SLOTS).map(([k, s]) => {
       const l = tous.filter((o) => o.slot === k);
       return el("div", { class: "chiffre" }, el("b", { class: "num", texte: l.length }), el("span", { texte: s.pluriel }),
-        el("small", { class: "repartition" }, parRarete(l).map(([r, n]) => el("span", { style: { "--c": `var(--${r})` }, title: RARETES[r].nom }, el("i", { texte: RARETES[r].lettre }), String(n)))));
+        el("small", { class: "repartition" }, parRarete(l).map(([r, n]) => el("span", { style: { "--c": `var(--${r})` } }, el("b", { class: "num", texte: String(n) }), " " + (n > 1 ? PLURIEL[r] : RARETES[r].nom.toLowerCase())))));
     })),
     el("p", { class: "plafonds" }, "Chaque doublon ajoute une amélioration (+1) à un objet, jusqu'à un plafond : ",
       ORDRE_RARETE.flatMap((r, i) => [i ? " · " : "", el("span", { style: { "--c": `var(--${r})` }, texte: `${RARETES[r].nom} +${RARETES[r].max}` })]), "."));
@@ -79,6 +90,10 @@ App.demarrer("arsenal", async (main, ctx) => {
   const recherche = el("input", { type: "search", placeholder: "Chercher un objet", value: f.q, "aria-label": "Chercher un objet par son nom", oninput: (e) => { f.q = e.target.value; rendre(); } });
   const tri = el("select", { "aria-label": "Trier", onchange: (e) => { f.tri = e.target.value; rendre(); } }, TRIS.map(([v, n]) => el("option", { value: v, texte: n, selected: v === f.tri })));
   const compte = el("p", { class: "compte-resultats", "aria-live": "polite" });
+  const nEffets = el("span", { class: "n-filtres num" });
+  const plusFiltres = el("details", { class: "plus-filtres repliable", open: f.effets.size > 0 },
+    el("summary", {}, icone("i-fleche"), "Voir plus de filtres", nEffets),
+    el("div", { class: "puces", role: "group", "aria-label": "Effets et set" }, btnEff));
   const zone = el("div");
   const nFiltres = el("span", { class: "n-filtres num" });
   const outils = el("div", { class: "outils-objets", id: "outils-arsenal" });
@@ -90,7 +105,7 @@ App.demarrer("arsenal", async (main, ctx) => {
       el("div", { class: "onglets-b", role: "group", "aria-label": "Valeurs affichées" }, btnNiv)),
     el("div", { class: "onglets-b defile repliable", role: "group", "aria-label": "Emplacement" }, btnSlots),
     el("div", { class: "puces repliable", role: "group", "aria-label": "Rareté" }, btnRar),
-    el("div", { class: "puces repliable", role: "group", "aria-label": "Effets et set" }, btnEff),
+    plusFiltres,
     el("div", { class: "rangee rangee-recherche" },
       el("label", { class: "champ recherche" }, icone("i-recherche"), recherche),
       btnFiltres,
@@ -104,11 +119,11 @@ App.demarrer("arsenal", async (main, ctx) => {
     && (sauf === "rarete" || !f.raretes.size || f.raretes.has(o.rarete))
     && (sauf === "effet" || !f.effets.size || effetsDe.get(o.numero).some((e) => f.effets.has(e)))
     && (!f.q || norm(o.nom).includes(norm(f.q)));
-  const valDeg = (o) => { const g = degats(o, lvl(o)); return g ? g.max * g.coups : -1; };
+  const parNom = (a, b) => a.nom.localeCompare(b.nom, "fr");
   const cle = {
-    numero: (a, b) => a.numero - b.numero,
-    rarete: (a, b) => rangRarete(b.rarete) - rangRarete(a.rarete) || a.numero - b.numero,
-    degats: (a, b) => valDeg(b) - valDeg(a) || a.numero - b.numero,
+    rarete: (a, b) => rangRarete(b.rarete) - rangRarete(a.rarete) || parNom(a, b),
+    nom: parNom,
+    puissance: (a, b) => (puissanceDe(b) ?? -Infinity) - (puissanceDe(a) ?? -Infinity) || parNom(a, b),
   };
 
   function majUrl() {
@@ -119,7 +134,7 @@ App.demarrer("arsenal", async (main, ctx) => {
     if (f.raretes.size) q.set("rarete", [...f.raretes].join(","));
     if (f.effets.size) q.set("effet", [...f.effets].join(","));
     if (f.q) q.set("q", f.q);
-    if (f.tri !== "numero") q.set("tri", f.tri);
+    if (f.tri !== "rarete") q.set("tri", f.tri);
     if (objetOuvert) q.set("objet", objetOuvert);
     const s = q.toString();
     history.replaceState(null, "", location.pathname + (s ? "?" + s : "") + location.hash);
@@ -139,6 +154,7 @@ App.demarrer("arsenal", async (main, ctx) => {
     btnEff.forEach((x) => { x.setAttribute("aria-pressed", String(f.effets.has(x.dataset.v))); x.lastChild.textContent = tous.filter((o) => effetsDe.get(o.numero).includes(x.dataset.v) && passe(o, "effet")).length; });
     const nf = (f.slot !== "tout") + f.raretes.size + f.effets.size + (f.niv === "max") + (f.vue === "tableau");
     nFiltres.textContent = nf || "";
+    nEffets.textContent = f.effets.size || "";
     btnFiltres.setAttribute("aria-label", nf ? `Filtres et affichage, ${nf} actif${nf > 1 ? "s" : ""}` : "Filtres et affichage");
     majUrl();
 
@@ -152,27 +168,27 @@ App.demarrer("arsenal", async (main, ctx) => {
     zone.replaceChildren(f.vue === "tableau" ? tableau(vis) : el("div", { class: "grille-cartes" }, vis.map(caseCarte)));
   }
 
-  const marque = (o) => (possede(o) ? el("span", { class: "possede" }, icone("i-coche"), "Possédé · " + (nivPossede(o) >= max(o) ? "MAX" : "+" + nivPossede(o))) : null);
-
   function caseCarte(o) {
     return el("div", { class: "case-carte" },
-      el("button", { type: "button", class: "zone", onclick: () => ouvrir(o) }, App.carte(o)),
-      el("div", { class: "meta-carte" }, marque(o) || el("span", { texte: RARETES[o.rarete].nom })));
+      el("button", { type: "button", class: "zone", onclick: () => ouvrir(o) }, App.carte(o, { niveau: lvl(o), equipe: false })),
+      el("div", { class: "meta-carte" }, el("span", { texte: RARETES[o.rarete].nom }),
+        puissanceDe(o) !== null ? el("span", { class: "num pl-objet", title: "Puissance ajoutée par l'objet équipé seul" }, signePl(puissanceDe(o))) : null));
   }
 
   function tableau(vis) {
     const th = (t) => el("th", { scope: "col", texte: t });
     return el("div", { class: "table-defile", tabindex: "0", role: "region", "aria-label": "Tableau comparatif des objets" },
       el("table", { class: "table-objets" },
-        el("thead", {}, el("tr", {}, ["Objet", "Emplacement", "Dégâts", "Statistiques", "Effets", "Scaling"].map(th))),
+        el("thead", {}, el("tr", {}, ["Objet", "Emplacement", "Puissance", "Dégâts", "Statistiques", "Effets", "Scaling"].map(th))),
         el("tbody", {}, vis.map((o) => {
           const n = lvl(o), d = App.auNiveau(o, n);
           const stats = App.lignesStats(o, n), pa = App.passifs(o, n), sc = App.scalingsDe(d);
           return el("tr", { style: { "--c": `var(--${o.rarete})` }, onclick: () => ouvrir(o) },
             el("th", { scope: "row" },
               el("button", { type: "button", class: "nom-objet" }, el("span", { texte: o.nom })),
-              el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom }), marque(o)),
+              el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom })),
             el("td", { texte: App.sousTitre(o) }),
+            el("td", { class: "num nowrap", texte: puissanceDe(o) !== null ? signePl(puissanceDe(o)) : "—" }),
             el("td", { class: "num nowrap", texte: texteDegats(degats(o, n)) }),
             el("td", {}, stats.length ? stats.map((s) => el("div", { class: s.negatif ? "negatif" : null }, el("b", { class: "num", texte: s.valeur }), " " + s.nom)) : "—"),
             el("td", { class: "effets" }, pa.length ? pa.map((x) => el("div", { texte: x.court })) : (App.usage(o, n)[0] ? App.usage(o, n).map(([k, v]) => el("div", { texte: `${k} : ${v}` })) : "—")),
@@ -187,16 +203,13 @@ App.demarrer("arsenal", async (main, ctx) => {
   const pctTxt = (x) => fmt(x * 100, x * 100 < 1 ? 2 : 1) + " %";
 
   function ouvrir(o) {
-    const l = possede(o);
     objetOuvert = o.numero;
     majUrl();
     const ouTrouver = bloc("Où l'obtenir", enAttente());
     const communaute = bloc("Dans la communauté", enAttente());
-    const contenu = [App.fiche(o, { niveau: l ? nivPossede(o) : 0, possede: !!l, curseur: true }), ouTrouver, communaute,
+    const contenu = [App.fiche(o, { niveau: lvl(o), curseur: true }), ouTrouver, communaute,
       o.contributeur ? bloc("Imaginé par", el("p", { class: "passif" }, el("b", { texte: o.contributeur }), ", membre de la communauté, a imaginé cet objet.")) : null];
-    const pied = l
-      ? [el("a", { class: "btn-principal", href: "collection.html?objet=" + o.numero }, icone("i-cartes"), "Voir dans ma collection")]
-      : [el("a", { class: "btn-principal", href: "lootbox.html" + (o.rarete === "legendaire" ? "?type=legendaire" : "") }, icone("i-coffre-ligne"), "Ouvrir une lootbox")];
+    const pied = [el("a", { class: "btn-principal", href: "lootbox.html" + (o.rarete === "legendaire" ? "?type=legendaire" : "") }, icone("i-coffre-ligne"), "Ouvrir une lootbox")];
     App.tiroir({ titre: o.nom, contenu, pied, surFermeture: () => { objetOuvert = null; majUrl(); } });
 
     donnees.then((D) => {
@@ -231,7 +244,7 @@ App.demarrer("arsenal", async (main, ctx) => {
     const pool = tous.filter((i) => i.rarete === o.rarete).length;
     if (bp && bp.en_etal > 0) l.push(lig("Boutique", `${fmt(bp.achat)} médailles · ${bp.en_etal} sur ${pool} / heure`));
     else l.push(lig("Boutique", "Jamais à l'étal", "eteint"));
-    const source = { normal: "commun", rare: "normal" }[o.rarete];
+    const source = { normal: "commun", rare: "normal", epique: "rare" }[o.rarete];
     const cout = (D.reglages.find((r) => r.cle === "troc_cout") || {}).valeur;
     if (source && cout) l.push(lig("Troc", `${cout} doublons ${PLURIEL[source]} · 1 sur ${pool}`));
     if (bp) l.push(lig("Revente", `${fmt(bp.vente)} médaille${bp.vente > 1 ? "s" : ""} l'exemplaire`));

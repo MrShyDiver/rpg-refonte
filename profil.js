@@ -229,10 +229,10 @@
       App.tiroir({
         titre: "Modifier la vitrine",
         contenu: el("div", { class: "pf-tiroir" },
-          possedes.length ? null : el("div", { class: "vide" }, el("b", { texte: "Ta collection est vide." }), "Ouvre une lootbox pour obtenir tes premières cartes. ", el("a", { href: "lootbox.html", texte: "Aller aux lootbox" })),
+          possedes.length ? null : el("div", { class: "vide" }, el("b", { texte: "Ton inventaire est vide." }), "Ouvre une lootbox pour obtenir tes premières cartes. ", el("a", { href: "lootbox.html", texte: "Aller aux lootbox" })),
           el("section", {}, el("h3", { class: "pf-h3" }, "Ta sélection ", compteur), zoneSel),
           possedes.length ? el("section", {},
-            el("h3", { class: "pf-h3", texte: "Ta collection" }),
+            el("h3", { class: "pf-h3", texte: "Ton inventaire" }),
             el("div", { class: "pf-filtres" }, pastilles, el("div", { class: "pf-filtres-ligne" }, el("label", { class: "champ" }, icone("i-recherche"), recherche), el("label", { class: "champ" }, selectSlot))),
             grille) : null),
         pied: [enregistrer, el("button", { class: "btn-second", type: "button", onclick: () => App.fermerTiroir() }, "Annuler")],
@@ -243,7 +243,8 @@
     function sectionEquipement() {
       const sec = el("section", { class: "section-page", id: "equipement", "aria-labelledby": "t-equipement" },
         el("div", { class: "pf-entete" }, el("div", {}, el("h2", { id: "t-equipement", texte: "Équipement" }),
-          el("p", { class: "sous", texte: proprio ? "Touche un emplacement pour changer d'objet : l'effet sur ta puissance s'affiche avant de valider." : "Le loadout avec lequel " + s.joueur.display_name + " se bat en ce moment." }))));
+          el("p", { class: "sous", texte: proprio ? "Le loadout avec lequel tu te bats en ce moment. Il se change depuis ton inventaire." : "Le loadout avec lequel " + s.joueur.display_name + " se bat en ce moment." })),
+          proprio ? el("a", { class: "btn-second", href: "collection.html#equipement" }, icone("i-cartes"), "Changer mon équipement") : null));
       const grille = el("div", { class: "pf-slots" });
       for (const [slot, def] of Object.entries(SLOTS)) {
         const n = s.loadout[def.col], o = n ? App.objet(n) : null;
@@ -255,8 +256,8 @@
         }
         const contenu = o ? App.carte(o, { niveau: niveauEffectif(n), ...autrui(o) })
           : el("div", { class: "pf-slot-vide" }, el("span", { class: "pf-plus", "aria-hidden": "true", texte: proprio ? "+" : "—" }), el("span", { texte: proprio ? "Choisir" : "Rien d'équipé" }));
-        const zone = proprio || o
-          ? el("button", { class: "zone", type: "button", "data-f": "slot-" + def.col, "aria-label": proprio ? def.nom + " : " + (o ? o.nom + ", changer" : "vide, choisir un objet") : "Voir la fiche : " + o.nom, onclick: () => (proprio ? tiroirEquiper(slot) : ficheObjet(o)) }, contenu)
+        const zone = o ? el("button", { class: "zone", type: "button", "aria-label": "Voir la fiche : " + o.nom, onclick: () => ficheObjet(o) }, contenu)
+          : proprio ? el("a", { class: "zone", href: "collection.html#equipement", "aria-label": def.nom + " : vide, choisir un objet dans l'inventaire" }, contenu)
           : el("div", { class: "zone" }, contenu);
         grille.append(el("div", { class: "pf-slot", style: o ? { "--c": `var(--${o.rarete})` } : null },
           el("h3", { class: "pf-slot-nom", texte: def.nom }), zone,
@@ -264,52 +265,6 @@
       }
       sec.append(grille);
       return sec;
-    }
-
-    function tiroirEquiper(slot) {
-      const def = SLOTS[slot], col = def.col, actuel = s.loadout[col] || null;
-      const base = pl();
-      const delta = (n) => { const r = calculer(s.joueur, { ...s.loadout, [col]: n }); return r ? r.powerLevel - base : 0; };
-      const candidats = [...s.niv.keys()].map(App.objet).filter((o) => o && o.slot === slot)
-        .map((o) => ({ o, d: o.numero === actuel ? 0 : delta(o.numero) }))
-        .sort((a, b) => (b.o.numero === actuel) - (a.o.numero === actuel) || b.d - a.d || rangRarete(b.o.rarete) - rangRarete(a.o.rarete));
-      const libDelta = (d) => { const r = Math.round(d); return el("span", { class: "pf-delta-choix num " + (r > 0 ? "plus" : r < 0 ? "moins" : "egal"), texte: r === 0 ? "±0" : signe(r) }); };
-
-      const liste = candidats.length
-        ? el("ul", { class: "pf-choix-liste" }, candidats.map(({ o, d }) => {
-          const equipe = o.numero === actuel, niv = niveauEffectif(o.numero);
-          return el("li", {}, el("button", { class: "pf-choix", type: "button", "aria-pressed": String(equipe), style: { "--c": `var(--${o.rarete})` },
-            "aria-label": o.nom + (equipe ? ", équipé" : ", puissance " + signe(Math.round(d))), onclick: () => (equipe ? App.fermerTiroir() : equiper(col, o.numero, o.nom)) },
-            el("div", { class: "pf-choix-carte-mini" }, App.carte(o, { niveau: niv })),
-            el("div", { class: "pf-choix-info" }, el("b", { texte: o.nom }),
-              el("span", { class: "pf-choix-meta" }, el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom }), el("span", { class: "num", texte: libNiveau(o, niv) })),
-              el("span", { class: "pf-choix-fait", texte: App.faitMarquant(o, niv) })),
-            equipe ? el("span", { class: "pf-equipe", texte: "Équipé" }) : libDelta(d)));
-        }))
-        : el("div", { class: "vide" }, el("b", { texte: "Aucun objet de ce type dans ta collection." }), "Les lootbox en regorgent. ", el("a", { href: "lootbox.html", texte: "Ouvrir une lootbox" }));
-
-      App.tiroir({
-        titre: def.nom,
-        contenu: el("div", { class: "pf-tiroir" },
-          el("p", { class: "mention", texte: "Les chiffres indiquent l'effet sur ta puissance (" + fmt(base) + ") si tu équipes l'objet." }), liste),
-        pied: actuel ? [el("button", { class: "btn-danger", type: "button", onclick: () => equiper(col, null, null) }, "Retirer l'objet (", signe(Math.round(delta(null))), ")")] : null,
-      });
-    }
-
-    async function equiper(col, numero, nom) {
-      const avant = pl();
-      try {
-        await App.rpc("equiper", { p_emplacement: col, p_numero: numero });
-        App.fermerTiroir();
-        await App.rafraichirCollection();
-        depuisCtx();
-        s.res = calculer();
-        rendre();
-        animerPuissance(avant, pl());
-        const b = main.querySelector(`[data-f="slot-${col}"]`); if (b) b.focus();
-        App.toast(numero ? nom + " équipé." : "Emplacement vidé.", { titre: "Puissance " + fmt(pl()) + " (" + signe(Math.round(pl() - avant)) + ")" });
-        await App.verifierSucces();
-      } catch (e) { App.erreur(e); }
     }
 
     // ---------- Points investis ----------

@@ -17,7 +17,8 @@ App.demarrer("boutique", async (main, ctx) => {
   // ---------- État ----------
   let etal = null, etalErreur = null;
   let prix = null, reglages = null, chances = null, vitrine = new Set(), baseErreur = null;
-  let journal = null, journalSale = true;
+  let journal = null, trocsTous = null, journalSale = true;
+  const panier = new Map(); // étal : numéro d'objet -> exemplaires à acheter d'un coup
   let courant = "etal";
   const troc = { rarete: "commun", choix: new Map() };
   const quantites = { lootbox: 1 };
@@ -90,7 +91,7 @@ App.demarrer("boutique", async (main, ctx) => {
   }
   const bourse = el("div", { class: "bourse" },
     icone("i-medaille", "bourse-ic"),
-    el("div", {}, el("span", { class: "bourse-lib" }, "Ta bourse", el("a", { class: "lien-aide", href: "aide.html#medailles", "aria-label": "Aide : les médailles", title: "Aide : les médailles", texte: "?" })), el("div", { class: "bourse-chiffre", "aria-live": "polite" }, soldeChiffre, el("span", { texte: " médailles" }))));
+    el("div", {}, el("span", { class: "bourse-lib" }, "Tu possèdes", el("a", { class: "lien-aide", href: "aide.html#medailles", "aria-label": "Aide : les médailles", title: "Aide : les médailles", texte: "?" })), el("div", { class: "bourse-chiffre", "aria-live": "polite" }, soldeChiffre, el("span", { texte: " médailles" }))));
   const cumulDuel = el("b", { class: "num" }), cumulRevente = el("b", { class: "num" });
   function majCumuls() { cumulDuel.textContent = fmt(ctx.joueur.medailles_duel || 0); cumulRevente.textContent = fmt(ctx.joueur.medailles_revente || 0); }
   majCumuls();
@@ -98,7 +99,7 @@ App.demarrer("boutique", async (main, ctx) => {
   const entete = el("header", { class: "entete-page entete-boutique" },
     el("div", { class: "entete-texte" },
       el("h1", {}, "La ", el("span", { class: "or", texte: "boutique" })),
-      el("p", { texte: "Le marchand de Super-Terre ne prend qu'une monnaie : les médailles. Dépense-les à l'étal, en lootbox ou en ticket de reset, et fais de la place en revendant ce qui dort dans ta collection." })),
+      el("p", { texte: "Le marchand de Super-Terre ne prend qu'une monnaie : les médailles. Dépense-les à l'étal, en lootbox ou en ticket de reset, et fais de la place en revendant ce qui dort dans ton inventaire." })),
     bourse);
   const sources = el("div", { class: "sources" },
     el("a", { class: "source", href: "duels.html" }, icone("i-epees"),
@@ -177,9 +178,9 @@ App.demarrer("boutique", async (main, ctx) => {
     const trop = Math.max(0, res.niveau - max);
     legende.replaceChildren(
       el("p", { class: "legende-titre" }, res.nouveau ? el("span", { class: "badge-nouveau", texte: "Nouveau" }) : null, el("b", { texte: o.nom })),
-      el("p", { texte: res.nouveau ? "rejoint ta collection. Équipe-le depuis ton arsenal."
+      el("p", { texte: res.nouveau ? "rejoint ton inventaire : tu peux l'équiper dès maintenant."
         : trop > 0 ? `était déjà amélioré au max : ce doublon part dans tes « en trop » (+${trop}), revends-le ou troque-le.`
-        : `passe ${res.niveau >= max ? "à MAX" : "à +" + res.niveau} dans ta collection.` }));
+        : `passe ${res.niveau >= max ? "à MAX" : "à +" + res.niveau} dans ton inventaire.` }));
     pied.replaceChildren(...actions);
     if (actions[0]) actions[0].focus();
   }
@@ -224,36 +225,101 @@ App.demarrer("boutique", async (main, ctx) => {
     const p = panneaux.etal;
     const tete = el("div", { class: "tete-rayon" },
       el("div", {}, el("h2", { texte: "Étal du moment" }),
-        el("p", { class: "sous", texte: "Le même pour tout le monde, renouvelé à chaque heure pile. Un objet acheté arrive comme un tirage : nouveau pour ta collection, ou une amélioration (+1) s'il y est déjà." })),
+        el("p", { class: "sous", texte: "Le même pour tout le monde, renouvelé à chaque heure pile. Un objet acheté arrive comme un tirage : nouveau pour ton inventaire, ou une amélioration (+1) s'il y est déjà." })),
       blocRebours);
     if (etalErreur) return p.replaceChildren(tete, etatErreur("Impossible de charger l'étal.", () => { p.replaceChildren(tete, chargement()); chargerEtal(); }));
     if (!etal) return p.replaceChildren(tete, chargement("Le marchand déballe sa marchandise…"));
     const offres = etal.map((e) => ({ e, o: App.objet(e.numero) })).filter((x) => x.o)
       .sort((a, b) => rangRarete(b.o.rarete) - rangRarete(a.o.rarete) || a.e.rang - b.e.rang);
     if (!offres.length) return p.replaceChildren(tete, el("div", { class: "vide" }, el("b", { texte: "L'étal est vide cette heure-ci." }), "Repasse à la prochaine rotation, ou jette un œil aux lootbox en attendant."));
+    // Sélection : une quantité par offre (jusqu'au plafond d'amélioration), puis un seul achat pour le tout.
+    for (const n of [...panier.keys()]) { const x = offres.find((y) => y.o.numero === n); if (!x) panier.delete(n); else panier.set(n, Math.min(panier.get(n), achetable(x.o))); if (!panier.get(n)) panier.delete(n); }
+    const resume = el("div", { class: "panier-texte", "aria-live": "polite" });
+    const btnPanier = el("button", { type: "button", class: "btn-principal", onclick: () => acheterSelection(offres.filter((x) => panier.get(x.o.numero))) }, "Acheter la sélection");
+    function majPanier() {
+      const choisis = offres.filter((x) => panier.get(x.o.numero));
+      const nb = choisis.reduce((s, x) => s + panier.get(x.o.numero), 0), total = choisis.reduce((s, x) => s + panier.get(x.o.numero) * x.e.prix, 0), reste = solde() - total;
+      resume.replaceChildren(...(!nb ? [el("b", { texte: "Aucun objet sélectionné" }), el("span", { texte: "Règle une quantité sous chaque objet pour en acheter plusieurs d'un coup." })]
+        : [el("b", {}, el("span", { class: "num", texte: fmt(nb) }), ` ${pluriel(nb, "exemplaire")} · `, medailles(total)),
+          reste >= 0 ? el("span", {}, "Il te restera ", el("span", { class: "num", texte: fmt(reste) }), " médailles")
+            : el("span", { class: "manque" }, "Il te manque ", el("span", { class: "num", texte: fmt(-reste) }), " médailles")]));
+      btnPanier.disabled = !nb || reste < 0;
+    }
     const grille = el("div", { class: "grille-cartes grille-etal" }, offres.map(({ e, o }) => {
-      const l = ctx.inventaire.get(o.numero), max = maxDe(o);
-      const auMax = !!l && l.niveau >= max, manque = e.prix - solde();
-      const raison = auMax ? "Déjà amélioré au max" : manque > 0 ? `Il te manque ${fmt(manque)} médailles` : null;
+      const l = ctx.inventaire.get(o.numero), max = maxDe(o), dispo = achetable(o);
+      const pas = dispo ? stepper({ min: 0, max: dispo, valeur: panier.get(o.numero) || 0, libelle: "Exemplaires de " + o.nom + " à acheter",
+        surChange: (v) => { if (v) panier.set(o.numero, v); else panier.delete(o.numero); majPanier(); } }) : null;
       return el("article", { class: "case-carte offre", style: { "--c": `var(--${o.rarete})` } },
         el("button", { type: "button", class: "zone", "aria-label": "Voir la fiche : " + o.nom, onclick: () => ficheAchat(e) }, App.carte(o, { niveau: l ? Math.min(l.niveau, max) : null })),
         el("div", { class: "infos-offre" },
           medailles(e.prix, "grand"),
           l ? el("span", { class: "possede" }, "Possédé · ", el("b", { class: "num", texte: niveauTexte(Math.min(l.niveau, max), max) }))
             : el("span", { class: "badge-nouveau", texte: "Nouveau pour toi" })),
-        el("button", { type: "button", class: "btn-principal", disabled: !!raison, "aria-describedby": raison ? "raison-" + o.numero : null, onclick: () => ficheAchat(e) }, "Acheter"),
-        raison ? el("p", { class: "raison", id: "raison-" + o.numero, texte: raison }) : null);
+        pas ? pas.el : el("p", { class: "raison", texte: "Déjà amélioré au max" }));
     }));
-    p.replaceChildren(tete, grille);
+    majPanier();
+    p.replaceChildren(tete, grille, el("div", { class: "panier" }, resume, btnPanier));
+  }
+
+  // Exemplaires encore utiles : le premier donne l'objet (+0), les suivants l'améliorent jusqu'au plafond.
+  function achetable(o) { const l = ctx.inventaire.get(o.numero); return l ? Math.max(0, maxDe(o) - l.niveau) : maxDe(o) + 1; }
+
+  function acheterSelection(choisis) {
+    const nb = choisis.reduce((s, x) => s + panier.get(x.o.numero), 0), total = choisis.reduce((s, x) => s + panier.get(x.o.numero) * x.e.prix, 0);
+    if (!nb) return;
+    const liste = el("div", { class: "lignes" }, choisis.map(({ e, o }) => el("div", { class: "ligne" },
+      el("span", {}, el("span", { class: "point-rarete", style: { "--c": `var(--${o.rarete})` } }), o.nom, " ", el("span", { class: "num mention", texte: "× " + panier.get(o.numero) })),
+      el("b", {}, medailles(panier.get(o.numero) * e.prix)))));
+    const recap = el("div", { class: "lignes recap" },
+      el("div", { class: "ligne" }, el("span", { texte: "Total" }), el("b", {}, medailles(total))),
+      el("div", { class: "ligne" }, el("span", { texte: "Il te restera" }), el("b", {}, medailles(solde() - total))));
+    const progres = el("div", { class: "progres-vente", hidden: true, role: "status" }, el("div", { class: "jauge-niv" }, el("i", { style: { transform: "scaleX(0)" } })), el("span", { class: "num" }));
+    const go = el("button", { type: "button", class: "btn-principal" }, "Acheter pour ", el("span", { class: "num", texte: fmt(total) }));
+    const annuler = el("button", { type: "button", class: "btn-second", onclick: () => App.fermerTiroir() }, "Annuler");
+    const corps = el("div", { class: "pile" }, liste, recap, progres);
+    const tir = App.tiroir({ titre: "Acheter la sélection", contenu: corps, pied: el("div", { class: "pied-actions" }, annuler, go) });
+    go.addEventListener("click", async () => {
+      if (sonsOk()) App.sons.demarrer();
+      go.disabled = true; annuler.disabled = true; progres.hidden = false;
+      const barre = $("i", progres), txt = $("span", progres), recus = new Map();
+      let fait = 0, paye = 0;
+      // ponytail: un appel par exemplaire, l'un après l'autre ; une fonction d'achat groupé côté base si les paniers grossissent.
+      boucle: for (const { o } of choisis) for (let i = panier.get(o.numero); i > 0; i--) {
+        txt.textContent = `Achat ${fait + 1} / ${nb}`;
+        try {
+          const r = await App.rpc("acheter", { p_article: "objet", p_numero: o.numero, p_quantite: 1 });
+          const avant = recus.get(o.numero);
+          recus.set(o.numero, { o, niveau: r.objet ? r.objet.niveau : 0, nouveau: avant ? avant.nouveau : !!(r.objet && r.objet.nouveau), n: (avant ? avant.n : 0) + 1 });
+          paye += r.prix || 0; fait++;
+          barre.style.transform = "scaleX(" + fait / nb + ")";
+        } catch (err) { App.erreur(err); break boucle; }
+      }
+      panier.clear();
+      await apresAction({ collection: true });
+      txt.textContent = `${fait} / ${nb} ${pluriel(fait, "acheté")} · ${fmt(paye)} médailles`;
+      const obtenus = [...recus.values()].sort((a, b) => rangRarete(b.o.rarete) - rangRarete(a.o.rarete));
+      if (obtenus.length && sonsOk()) App.sons.rarete(rangRarete(obtenus[0].o.rarete));
+      if (obtenus.length) {
+        $(".tiroir-tete h2", tir).textContent = "Marché conclu";
+        corps.replaceChildren(el("div", { class: "grille-cartes achats" }, obtenus.map((x) => {
+          const max = maxDe(x.o), niv = Math.min(x.niveau, max);
+          return el("div", { class: "case-carte", style: { "--c": `var(--${x.o.rarete})` } }, App.carte(x.o, { niveau: niv }),
+            el("div", { class: "meta-carte" }, x.nouveau ? el("span", { class: "badge-nouveau", texte: "Nouveau" }) : el("span", { texte: "Amélioré" }),
+              el("b", { class: "num", texte: x.n > 1 ? `× ${x.n} · ${niveauTexte(niv, max)}` : niveauTexte(niv, max) })));
+        })), progres);
+      }
+      annuler.disabled = false; annuler.textContent = "Fermer"; go.hidden = true;
+      annuler.after(el("a", { class: "btn-second", href: "collection.html" }, "Voir mon inventaire"));
+    });
   }
 
   function ficheAchat(e) {
     const o = App.objet(e.numero), l = ctx.inventaire.get(o.numero), max = maxDe(o);
     const auMax = !!l && l.niveau >= max, apres = solde() - e.prix;
-    const effet = !l ? "Nouvel objet pour ta collection" : auMax ? "Déjà amélioré au max" : `+${l.niveau} → ${l.niveau + 1 >= max ? "MAX" : "+" + (l.niveau + 1)}`;
+    const effet = !l ? "Nouvel objet pour ton inventaire" : auMax ? "Déjà amélioré au max" : `+${l.niveau} → ${l.niveau + 1 >= max ? "MAX" : "+" + (l.niveau + 1)}`;
     const recap = el("div", { class: "lignes recap" },
       el("div", { class: "ligne" }, el("span", { texte: "Prix" }), el("b", {}, medailles(e.prix))),
-      el("div", { class: "ligne" }, el("span", { texte: "Ta bourse après l'achat" }), el("b", { class: apres < 0 ? "negatif" : null }, medailles(apres))),
+      el("div", { class: "ligne" }, el("span", { texte: "Il te restera" }), el("b", { class: apres < 0 ? "negatif" : null }, medailles(apres))),
       el("div", { class: "ligne" }, el("span", { texte: "Effet" }), el("b", { texte: effet })));
     const acheter = el("button", { type: "button", class: "btn-principal", disabled: auMax || apres < 0 }, "Acheter pour ", el("span", { class: "num", texte: fmt(e.prix) }));
     const pied = [el("button", { type: "button", class: "btn-second", onclick: () => App.fermerTiroir() }, "Annuler"), acheter];
@@ -268,7 +334,7 @@ App.demarrer("boutique", async (main, ctx) => {
         apresAction({ collection: true });
         await reveler(t, res, { titre: "Marché conclu", actions: [
           el("button", { type: "button", class: "btn-principal", onclick: () => App.fermerTiroir() }, "Super"),
-          el("a", { class: "btn-second", href: "arsenal.html" }, "Voir mon arsenal")] });
+          el("a", { class: "btn-second", href: "collection.html?objet=" + o.numero }, "Voir dans mon inventaire")] });
       } catch (err) {
         App.erreur(err);
         acheter.disabled = false; acheter.replaceChildren("Acheter pour ", el("span", { class: "num", texte: fmt(e.prix) }));
@@ -376,7 +442,7 @@ App.demarrer("boutique", async (main, ctx) => {
 
   function consequence(x, q) {
     if (q <= x.trop) return { cls: "ok", texte: `Bénéfice pur : ${q > 1 ? "ces copies sont" : "cette copie est"} au-delà des améliorations max, ton objet reste MAX.` };
-    if (q >= x.copies) return { cls: "danger", texte: `Dernier exemplaire : l'objet quitte ta collection${equipe(x.o.numero) ? ", il sera déséquipé" : ""}${vitrine.has(x.o.numero) ? " et retiré de ta vitrine" : ""}.` };
+    if (q >= x.copies) return { cls: "danger", texte: `Dernier exemplaire : l'objet quitte ton inventaire${equipe(x.o.numero) ? ", il sera déséquipé" : ""}${vitrine.has(x.o.numero) ? " et retiré de ta vitrine" : ""}.` };
     const nouv = Math.min(x.l.niveau - q, x.max);
     return { cls: "attention", texte: `Ton objet passera de ${niveauTexte(x.eff, x.max)} à +${nouv}.` };
   }
@@ -401,7 +467,7 @@ App.demarrer("boutique", async (main, ctx) => {
       nbTrop ? el("div", { class: "recolte-action" }, medailles(valeurTrop, "grand gain"),
         el("button", { type: "button", class: "btn-principal", onclick: () => venteGroupee(enTrop) }, "Vendre tous les doublons en trop")) : null);
 
-    if (!tout.length) return p.replaceChildren(tete, recolte, el("div", { class: "vide" }, el("b", { texte: "Ta collection est vide." }), "Ouvre des lootbox pour avoir quelque chose à revendre. ", el("a", { href: "lootbox.html", texte: "Aller aux lootbox" })));
+    if (!tout.length) return p.replaceChildren(tete, recolte, el("div", { class: "vide" }, el("b", { texte: "Ton inventaire est vide." }), "Ouvre des lootbox pour avoir quelque chose à revendre. ", el("a", { href: "lootbox.html", texte: "Aller aux lootbox" })));
 
     const recherche = el("input", { type: "search", placeholder: "Chercher un objet", value: filtres.texte, "aria-label": "Chercher un objet" });
     const choixRarete = el("select", { "aria-label": "Filtrer par rareté" }, el("option", { value: "", texte: "Toutes les raretés" }),
@@ -462,7 +528,7 @@ App.demarrer("boutique", async (main, ctx) => {
         const r = await App.rpc("vendre", { p_numero: x.o.numero, p_quantite: q });
         qteVente.delete(x.o.numero);
         App.fermerTiroir();
-        App.toast(`${q} × ${x.o.nom} ${r.restant ? "vendu" + (q > 1 ? "s" : "") : "vendu, objet retiré de ta collection"}.`, { titre: `+${fmt(r.gain)} médailles`, icone: "i-medaille" });
+        App.toast(`${q} × ${x.o.nom} ${r.restant ? "vendu" + (q > 1 ? "s" : "") : "vendu, objet retiré de ton inventaire"}.`, { titre: `+${fmt(r.gain)} médailles`, icone: "i-medaille" });
         await apresAction({ collection: true });
       } catch (e) { App.erreur(e); bouton.disabled = false; }
     };
@@ -477,7 +543,7 @@ App.demarrer("boutique", async (main, ctx) => {
       confirmer.disabled = true;
       const coche = el("input", { type: "checkbox", id: "confirme-dernier" });
       coche.addEventListener("change", () => { confirmer.disabled = !coche.checked; });
-      contenu.append(el("label", { class: "case-confirm", for: "confirme-dernier" }, coche, el("span", { texte: `Je comprends que ${x.o.nom} disparaît de ma collection et qu'il faudra le reloot pour le récupérer.` })));
+      contenu.append(el("label", { class: "case-confirm", for: "confirme-dernier" }, coche, el("span", { texte: `Je comprends que ${x.o.nom} disparaît de mon inventaire et qu'il faudra le reloot pour le récupérer.` })));
     }
     confirmer.addEventListener("click", () => executer(confirmer));
     App.tiroir({ titre: c.cls === "danger" ? "Vendre le dernier exemplaire ?" : "Confirmer la vente", contenu,
@@ -516,12 +582,12 @@ App.demarrer("boutique", async (main, ctx) => {
   // ======================================================================
   // TROC
   // ======================================================================
-  const CIBLE = { commun: "normal", normal: "rare" };
+  const CIBLE = { commun: "normal", normal: "rare", rare: "epique" };
   function rendreTroc() {
     const p = panneaux.troc;
     const cout = reglage("troc_cout", 10);
     const tete = el("div", { class: "tete-rayon" }, el("div", {}, el("h2", { texte: "Troc" }),
-      el("p", { class: "sous", texte: `Donne ${cout} doublons d'une même rareté, reçois 1 objet au hasard de la rareté au-dessus. Tu peux mélanger les objets ou donner ${cout} copies du même. L'exemplaire de base reste toujours dans ta collection, et aucune médaille n'entre en jeu.` })));
+      el("p", { class: "sous", texte: `Donne ${cout} doublons d'une même rareté, reçois 1 objet au hasard de la rareté au-dessus. Tu peux mélanger les objets ou donner ${cout} copies du même. L'exemplaire de base reste toujours dans ton inventaire, et aucune médaille n'entre en jeu.` })));
     if (baseErreur) return p.replaceChildren(tete, etatErreur("Impossible de lire les règles du troc.", chargerBase));
     if (!reglages) return p.replaceChildren(tete, chargement());
     const tout = possessions();
@@ -646,11 +712,11 @@ App.demarrer("boutique", async (main, ctx) => {
     journalSale = false;
     const p = panneaux.journal;
     if (!journal) p.replaceChildren(teteJournal(), chargement());
-    try { journal = await App.api.journal(ctx.joueur.id); rendreJournal(); }
+    try { [journal, trocsTous] = await Promise.all([App.api.journal(ctx.joueur.id), App.api.trocsRecents().catch((e) => { console.error(e); return null; })]); rendreJournal(); }
     catch (e) { console.error(e); journalSale = true; p.replaceChildren(teteJournal(), etatErreur("Impossible de charger ton journal.", chargerJournal)); }
   }
   function teteJournal() {
-    return el("div", { class: "tete-rayon" }, el("div", {}, el("h2", { texte: "Journal" }), el("p", { class: "sous", texte: "Tes 30 dernières opérations chez le marchand. Il n'est visible que par toi." })));
+    return el("div", { class: "tete-rayon" }, el("div", {}, el("h2", { texte: "Journal" }), el("p", { class: "sous", texte: "Tes 30 dernières opérations chez le marchand, visibles par toi seul, puis les derniers trocs de toute la communauté." })));
   }
   function decrire(j) {
     const d = j.detail || {};
@@ -668,9 +734,9 @@ App.demarrer("boutique", async (main, ctx) => {
   }
   function rendreJournal() {
     const p = panneaux.journal;
-    if (!journal.length) return p.replaceChildren(teteJournal(), el("div", { class: "vide" }, el("b", { texte: "Aucune opération pour l'instant." }),
-      "Ton premier achat, ta première vente ou ton premier troc apparaîtra ici. ", el("button", { type: "button", class: "lien-max", onclick: () => ouvrir("etal", true) }, "Voir l'étal du moment")));
-    p.replaceChildren(teteJournal(), el("ol", { class: "journal" }, journal.map((j) => {
+    const miens = !journal.length ? el("div", { class: "vide" }, el("b", { texte: "Aucune opération pour l'instant." }),
+      "Ton premier achat, ta première vente ou ton premier troc apparaîtra ici. ", el("button", { type: "button", class: "lien-max", onclick: () => ouvrir("etal", true) }, "Voir l'étal du moment"))
+      : el("ol", { class: "journal" }, journal.map((j) => {
       const x = decrire(j), m = j.medailles || 0;
       return el("li", { class: "entree" },
         el("span", { class: "entree-ic" }, icone(x.ic)),
@@ -678,7 +744,23 @@ App.demarrer("boutique", async (main, ctx) => {
           x.objet ? el("span", {}, x.rarete ? el("span", { class: "point-rarete", style: { "--c": `var(--${x.rarete})` } }) : null, x.objet) : null,
           el("time", { datetime: j.cree_le, title: date(j.cree_le, true), texte: ilYa(j.cree_le) })),
         el("span", { class: "delta num " + (m > 0 ? "plus" : m < 0 ? "moins" : "nul") }, m ? (m > 0 ? "+" : "−") + fmt(Math.abs(m)) : "—", m ? icone("i-medaille") : null));
-    })));
+    }));
+    // Trocs de tout le monde : qui a troqué quoi, et ce que le marchand a sorti.
+    const autres = !trocsTous ? el("p", { class: "mention", texte: "Les trocs de la communauté ne sont pas disponibles pour l'instant." })
+      : !trocsTous.length ? el("div", { class: "vide" }, el("b", { texte: "Personne n'a encore troqué." }), "Le premier troc de la communauté s'affichera ici.")
+      : el("ol", { class: "journal" }, trocsTous.map((t) => {
+        const moi = t.login === ctx.joueur.twitch_login, source = RARETES[t.rarete_donnee];
+        return el("li", { class: "entree" },
+          el("span", { class: "entree-ic" }, icone("i-cartes")),
+          el("div", { class: "entree-texte" },
+            el("b", {}, moi ? "Toi" : el("a", { href: "profil.html?joueur=" + encodeURIComponent(t.login), texte: t.joueur })),
+            el("span", {}, `${t.nb} ${source ? adjRarete(t.rarete_donnee, t.nb) : "doublons"} → `, el("span", { class: "point-rarete", style: { "--c": `var(--${t.rarete})` } }), t.nom),
+            el("time", { datetime: t.cree_le, title: date(t.cree_le, true), texte: ilYa(t.cree_le) })),
+          RARETES[t.rarete] ? el("span", { class: "pilule " + t.rarete, texte: RARETES[t.rarete].nom }) : null);
+      }));
+    p.replaceChildren(teteJournal(),
+      el("h3", { class: "titre-journal", texte: "Tes opérations" }), miens,
+      el("h3", { class: "titre-journal", texte: "Trocs de la communauté" }), autres);
   }
 
   // ---------- Compteurs d'onglets ----------

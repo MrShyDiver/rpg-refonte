@@ -1,5 +1,5 @@
 "use strict";
-/* Collection : tout ce que le joueur possède, progression, équipement rapide. */
+/* Inventaire (collection.html) : équipement, tout ce que le joueur possède, progression. */
 (function () {
 const { el, icone, fmt, date, RARETES, ORDRE_RARETE, SLOTS, EFFETS, rangRarete } = App;
 const COLS = ["arme", "offhand", "armure", "strategeme"];
@@ -30,6 +30,75 @@ App.demarrer("collection", async (main, ctx) => {
   const equipes = () => new Set(COLS.map((c) => ctx.loadout[c]).filter((n) => n != null));
   const puissance = (lo) => { const r = App.puissance(ctx.joueur, App.niveaux(), lo); return r ? Math.round(r.powerLevel) : null; };
 
+
+  // ---------- Équipement : les quatre emplacements, changés d'un clic ----------
+  const signe = (n) => (n > 0 ? "+" : n < 0 ? "−" : "±") + fmt(Math.abs(n));
+  const brute = (lo) => { const r = App.puissance(ctx.joueur, App.niveaux(), lo); return r ? r.powerLevel : 0; };
+  const libNiveau = (o) => (eff(o) >= max(o) ? "MAX" : `+${eff(o)} / +${max(o)}`);
+  const zoneEquip = el("section", { class: "section-page inv-equip", id: "equipement", "aria-labelledby": "t-equipement" });
+
+  function rendreEquipement() {
+    const pl = puissance(ctx.loadout);
+    zoneEquip.replaceChildren(
+      el("div", { class: "pf-entete" },
+        el("div", {}, el("h2", { id: "t-equipement", texte: "Équipement" }),
+          el("p", { class: "sous", texte: "Touche un emplacement pour changer d'objet : l'effet sur ta puissance s'affiche avant de valider." })),
+        pl !== null ? el("p", { class: "inv-puissance" }, "Puissance ", el("b", { class: "num", texte: fmt(pl) })) : null),
+      el("div", { class: "pf-slots" }, Object.entries(SLOTS).map(([slot, def]) => {
+        const o = ctx.loadout[def.col] != null ? App.objet(ctx.loadout[def.col]) : null;
+        const prise = def.col === "offhand" && !o && App.deuxMains(ctx.loadout.arme);
+        const contenu = o && ligne(o) ? App.carte(o, { niveau: eff(o), equipe: false })
+          : el("div", { class: "pf-slot-vide" }, el("span", { class: "pf-plus", "aria-hidden": "true", texte: prise ? "—" : "+" }), el("span", { texte: prise ? "Occupée par l'arme à deux mains" : "Choisir" }));
+        return el("div", { class: "pf-slot", style: o ? { "--c": `var(--${o.rarete})` } : null },
+          el("h3", { class: "pf-slot-nom", texte: def.nom }),
+          prise ? el("div", { class: "zone" }, contenu)
+            : el("button", { class: "zone", type: "button", "data-f": "slot-" + def.col, "aria-label": def.nom + " : " + (o ? o.nom + ", changer" : "vide, choisir un objet"), onclick: () => tiroirEquiper(slot) }, contenu),
+          o && ligne(o) ? el("p", { class: "pf-slot-niv num", texte: libNiveau(o) }) : null);
+      })));
+  }
+
+  function tiroirEquiper(slot) {
+    const def = SLOTS[slot], col = def.col, actuel = ctx.loadout[col] || null;
+    const base = brute(ctx.loadout);
+    const delta = (n) => Math.round(brute({ ...ctx.loadout, [col]: n }) - base);
+    const candidats = App.objets.filter((o) => o.slot === slot && ligne(o))
+      .map((o) => ({ o, d: o.numero === actuel ? 0 : delta(o.numero) }))
+      .sort((a, b) => (b.o.numero === actuel) - (a.o.numero === actuel) || b.d - a.d || rangRarete(b.o.rarete) - rangRarete(a.o.rarete));
+    const liste = candidats.length
+      ? el("ul", { class: "pf-choix-liste" }, candidats.map(({ o, d }) => {
+        const equipe = o.numero === actuel;
+        return el("li", {}, el("button", { class: "pf-choix", type: "button", "aria-pressed": String(equipe), style: { "--c": `var(--${o.rarete})` },
+          "aria-label": o.nom + (equipe ? ", équipé" : ", puissance " + signe(d)), onclick: () => (equipe ? App.fermerTiroir() : equiper(col, o.numero, o.nom)) },
+          el("div", { class: "pf-choix-carte-mini" }, App.carte(o, { niveau: eff(o) })),
+          el("div", { class: "pf-choix-info" }, el("b", { texte: o.nom }),
+            el("span", { class: "pf-choix-meta" }, el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom }), el("span", { class: "num", texte: libNiveau(o) })),
+            el("span", { class: "pf-choix-fait", texte: App.faitMarquant(o, eff(o)) })),
+          equipe ? el("span", { class: "pf-equipe", texte: "Équipé" })
+            : el("span", { class: "pf-delta-choix num " + (d > 0 ? "plus" : d < 0 ? "moins" : "egal"), texte: signe(d) })));
+      }))
+      : el("div", { class: "vide" }, el("b", { texte: "Aucun objet de ce type dans ton inventaire." }), "Les lootbox en regorgent. ", el("a", { href: "lootbox.html", texte: "Ouvrir une lootbox" }));
+    App.tiroir({
+      titre: def.nom,
+      contenu: el("div", { class: "pf-tiroir" },
+        el("p", { class: "mention", texte: "Les chiffres indiquent l'effet sur ta puissance (" + fmt(base) + ") si tu équipes l'objet." }), liste),
+      pied: actuel ? [el("button", { class: "btn-danger", type: "button", onclick: () => equiper(col, null, null) }, "Retirer l'objet (", signe(delta(null)), ")")] : null,
+    });
+  }
+
+  async function equiper(col, numero, nom) {
+    const avant = brute(ctx.loadout);
+    try {
+      await App.rpc("equiper", { p_emplacement: col, p_numero: numero });
+      await Promise.all([App.rafraichirCollection(), App.rafraichirJoueur()]);
+      App.fermerTiroir();
+      rendreEquipement(); rendre();
+      const b = zoneEquip.querySelector(`[data-f="slot-${col}"]`); if (b) b.focus();
+      const apres = brute(ctx.loadout);
+      App.toast(numero ? nom + " équipé." : "Emplacement vidé.", { titre: "Puissance " + fmt(apres) + " (" + signe(Math.round(apres - avant)) + ")" });
+      App.verifierSucces();
+    } catch (e) { App.erreur(e); }
+  }
+
   // ---------- En-tête : progression ----------
   const possedes = App.objets.filter((o) => ctx.inventaire.has(o.numero));
   const nbActifs = actifs.filter((o) => ctx.inventaire.has(o.numero)).length;
@@ -47,10 +116,10 @@ App.demarrer("collection", async (main, ctx) => {
   main.append(
     el("header", { class: "entete-page entete-objets" },
       el("div", {},
-        el("h1", { texte: "Ma collection" }),
+        el("h1", { texte: "Inventaire" }),
         el("p", {}, `${nbActifs} objets différents sur ${actifs.length}. Chaque doublon ajoute une amélioration (+1) à un objet, jusqu'à son plafond.`, lienAide("doublons", "doublons et améliorations"))),
-      el("div", { class: "actions" }, el("a", { class: "btn-second", href: "arsenal.html" }, icone("i-livre"), "Tout l'arsenal"))),
-    resume, stats);
+      el("div", { class: "actions" }, el("a", { class: "btn-second", href: "arsenal.html" }, icone("i-livre"), "Codex"))),
+    zoneEquip, resume, stats);
   stats.append(
     el("div", { class: "grille-chiffres" },
       el("div", { class: "chiffre" }, el("b", { class: "num", texte: `${nbActifs} / ${actifs.length}` }), el("span", { texte: "Objets différents" }), el("small", { texte: `${pct} % du jeu` })),
@@ -149,7 +218,7 @@ App.demarrer("collection", async (main, ctx) => {
     if (!ctx.inventaire.size && !f.manquants) {
       grille.replaceChildren(el("div", { class: "vide vide-large" },
         icone("i-coffre", "coffre-vide"),
-        el("b", { texte: "Ta collection est vide" }),
+        el("b", { texte: "Ton inventaire est vide" }),
         "Ouvre ta première lootbox : chaque objet tiré atterrit ici, et chacun de ses doublons l'améliore de +1.",
         el("div", { class: "actions" },
           el("a", { class: "btn-principal", href: "lootbox.html" }, icone("i-coffre-ligne"), "Ouvrir une lootbox"),
@@ -223,7 +292,7 @@ App.demarrer("collection", async (main, ctx) => {
         await Promise.all([App.rafraichirCollection(), App.rafraichirJoueur()]);
         App.fermerTiroir();
         App.toast(apres !== null ? `Puissance : ${fmt(apres)}` : o.nom, { titre: estEquipe ? `${o.nom} retiré` : `${o.nom} équipé` });
-        rendre();
+        rendreEquipement(); rendre();
         App.verifierSucces();
       } catch (e) { App.erreur(e); btn.disabled = false; }
     } }, estEquipe ? "Retirer" : "Équiper");
@@ -232,7 +301,7 @@ App.demarrer("collection", async (main, ctx) => {
       el("a", { class: "btn-second", href: "boutique.html#vendre" }, "Vendre")];
   }
 
-  rendre();
+  rendreEquipement(); rendre();
   const demande = App.objet(p.get("objet"));
   if (demande) ouvrir(demande);
 });

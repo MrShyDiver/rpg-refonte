@@ -68,6 +68,20 @@
 .badge-nouveau { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #101116; background: var(--c, var(--normal)); }
 .offre .badge-nouveau { background: color-mix(in oklab, var(--c) 85%, #fff); }
 .offre .btn-principal { width: 100%; min-height: 44px; }
+.infos-offre > :last-child { min-height: 24px; display: inline-flex; align-items: center; gap: 4px; }
+.offre .stepper { width: 100%; }
+.offre .stepper input { flex: 1; width: auto; min-width: 0; }
+/* Sélection de l'étal : reste sous la main pendant qu'on règle les quantités */
+.panier { position: sticky; bottom: 14px; z-index: 5; margin-top: 18px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 14px 16px 14px 18px; border-radius: 16px; background: var(--sol-3); border: 1px solid var(--trait-fort); box-shadow: 0 14px 30px -14px rgba(0,0,0,.7); }
+.panier-texte { display: grid; gap: 2px; font-size: 14px; color: var(--encre-2); min-width: 0; }
+.panier-texte b { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 16px; color: var(--encre); }
+.panier-texte .manque { color: #ff8a8a; font-weight: 600; }
+.panier .btn-principal { min-height: 46px; }
+.grille-cartes.achats { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.achats .meta-carte { align-items: center; }
+.titre-journal { font-size: 16px; margin: 22px 0 10px; }
+.titre-journal:first-of-type { margin-top: 0; }
+.entree-texte a { color: inherit; }
 .raison { font-size: 12.5px; color: var(--encre-3); margin-top: -2px; }
 
 /* ---------- Tiroirs ---------- */
@@ -178,7 +192,7 @@
 .ligne-objet.troc { grid-template-areas: "mini infos controles"; }
 
 /* ---------- Troc ---------- */
-.recettes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.recettes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-bottom: 14px; }
 .recette { display: grid; gap: 8px; justify-items: start; text-align: left; padding: 14px 16px; border-radius: 14px; background: var(--sol-2); border: 1px solid var(--trait); transition: border-color .2s, background .2s; }
 .recette:hover { border-color: var(--trait-fort); }
 .recette[aria-checked="true"] { border-color: color-mix(in oklab, var(--legendaire) 60%, transparent); background: color-mix(in oklab, var(--legendaire) 6%, var(--sol-2)); }
@@ -215,6 +229,8 @@
 
 /* ---------- Mobile ---------- */
 @media (max-width: 900px) {
+  .panier { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .panier .btn-principal { flex: 1 1 100%; }
   .sources { grid-template-columns: 1fr; margin-top: -12px; }
   .comptoirs, .recettes { grid-template-columns: 1fr; }
   .grille-etal { grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 16px 10px; }

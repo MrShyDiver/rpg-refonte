@@ -35,10 +35,11 @@ const EFFETS = [
 ];
 
 const PAGES = [
-  { id: "lootbox", titre: "Lootbox", href: "lootbox.html", icone: "i-coffre-ligne", mobile: true },
-  { id: "collection", titre: "Collection", href: "collection.html", icone: "i-cartes", mobile: true },
-  { id: "arsenal", titre: "Arsenal", href: "arsenal.html", icone: "i-livre" },
   { id: "profil", titre: "Profil", href: "profil.html", icone: "i-profil", mobile: true },
+  { id: "lootbox", titre: "Lootbox", href: "lootbox.html", icone: "i-coffre-ligne", mobile: true },
+  // Les fichiers gardent leur nom d'origine (collection.html, arsenal.html) : seuls les intitulés ont changé.
+  { id: "collection", titre: "Inventaire", href: "collection.html", icone: "i-cartes", mobile: true },
+  { id: "arsenal", titre: "Codex", href: "arsenal.html", icone: "i-livre" },
   { id: "boutique", titre: "Boutique", href: "boutique.html", icone: "i-boutique" },
   { id: "duels", titre: "Duels", href: "duels.html", icone: "i-epees", mobile: true },
   { id: "succes", titre: "Succès", href: "succes.html", icone: "i-trophee" },
@@ -156,6 +157,7 @@ App.api = {
   lootboxRaretes: () => q(client().from("lootbox_raretes").select("*")),
   // Set du jour : { aujourdhui: "2026-10-02", semaine: [{ jour, set, multiplicateur } × 7] }, tirée chaque lundi par le serveur.
   rotationLootbox: () => App.rpc("rotation_lootbox"),
+  trocsRecents: () => App.rpc("trocs_recents"),
   lootboxSets: () => q(client().from("lootbox_sets").select("*")),
   // Replays des duels : fichiers statiques duels/<id>.json publiés par le snapshot GitHub.
   replay: async (fichier) => {
@@ -400,7 +402,7 @@ App.fiche = (o, { niveau = 0, possede = null, curseur = true } = {}) => {
       o.contributeur ? el("span", { class: "pilule auteur" }, "Imaginé par ", el("b", { texte: o.contributeur })) : null),
     el("p", {}, App.anim(o.data) ? App.anim(o.data) + ". " : "", "Améliorations max : ", el("b", { texte: "+" + max }), " (", String(max), " doublons).",
       o.contributeur ? el("span", { class: "fiche-auteur" }, " Un objet imaginé par ", el("b", { texte: o.contributeur }), ", membre de la communauté.") : null),
-    possede !== null ? el("p", {}, possede ? el("b", { texte: "Dans ta collection · " + (niveau >= max ? "amélioration MAX" : "+" + niveau + " / +" + max) }) : "Pas encore dans ta collection.") : null);
+    possede !== null ? el("p", {}, possede ? el("b", { texte: "Dans ton inventaire · " + (niveau >= max ? "amélioration MAX" : "+" + niveau + " / +" + max) }) : "Pas encore dans ton inventaire.") : null);
   const corps = el("div", { class: "fiche-details", style: { display: "grid", gap: "22px" } });
   racine.append(el("div", { class: "fiche-haut" }, zoneCarte, titre), corps);
 
