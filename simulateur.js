@@ -19,7 +19,7 @@ App.demarrer("simulateur", async (main, ctx) => {
   const f = { duels: 4000, points: 40, niveau: "moitie", slot: "tout", tri: "taux", sens: -1 };
   let res = null, enCours = false, arret = false;
 
-  const niveauDe = (o) => { const m = App.niveauMax(o.rarete); return f.niveau === "max" ? m : f.niveau === "moitie" ? Math.round(m / 2) : 0; };
+  const niveauDe = (o, mode = f.niveau) => { const m = App.niveauMax(o.rarete); return mode === "max" ? m : mode === "moitie" ? Math.round(m / 2) : 0; };
   const piece = (o) => (o ? { data: o.data, niveau: niveauDe(o), numero: o.numero } : null);
   const tirer = (l) => l[Math.floor(Math.random() * l.length)];
   const joueur = (login, stacks, equipement) => ({ login, display_name: login, avatar_url: null, stacks, equipement, infos: {} });
@@ -39,13 +39,14 @@ App.demarrer("simulateur", async (main, ctx) => {
   const groupe = (lib, cle, choix) => el("div", { class: "sim-reglage" }, el("span", { class: "mention", texte: lib }),
     el("div", { class: "onglets-b", role: "group", "aria-label": lib }, choix.map(([v, t]) => el("button", { type: "button", "data-c": cle, "data-v": String(v), onclick: () => { if (enCours) return; f[cle] = v; majReglages(); }, texte: t }))));
   const lancer = el("button", { type: "button", class: "btn-principal rc-lancer", onclick: () => (enCours ? (arret = true) : simuler()) });
+  const exporter = el("button", { type: "button", class: "btn-second", hidden: true, onclick: () => exporterCsv() }, "Exporter en CSV");
   const barre = el("i"), progres = el("div", { class: "jauge-niv sim-progres", hidden: true }, barre), etatTxt = el("p", { class: "mention", "aria-live": "polite" });
   const chiffres = el("div", { class: "grille-chiffres" }), zone = el("div");
   const reglages = el("div", { class: "panneau-b sim-reglages" },
     groupe("Duels simulés", "duels", [[1000, "1 000"], [4000, "4 000"], [12000, "12 000"], [40000, "40 000"]]),
     groupe("Points de stats par joueur", "points", [[0, "0"], [20, "20"], [40, "40"], [80, "80"], [150, "150"]]),
     groupe("Amélioration des objets", "niveau", [["base", "Base (+0)"], ["moitie", "À mi-chemin"], ["max", "Au max"]]),
-    el("div", { class: "sim-lancer" }, lancer, progres, etatTxt));
+    el("div", { class: "sim-lancer" }, lancer, exporter, progres, etatTxt));
   const onglets = el("div", { class: "onglets-b defile", role: "group", "aria-label": "Emplacement" },
     [["tout", "Tout"], ...Object.entries(SLOTS).map(([k, s]) => [k, s.pluriel])].map(([k, t]) => el("button", { type: "button", "data-c": "slot", "data-v": k, onclick: () => { f.slot = k; majReglages(); rendre(); }, texte: t })));
   main.append(
@@ -56,6 +57,7 @@ App.demarrer("simulateur", async (main, ctx) => {
   function majReglages() {
     for (const b of main.querySelectorAll("[data-c]")) b.setAttribute("aria-pressed", String(String(f[b.dataset.c]) === b.dataset.v));
     lancer.textContent = enCours ? "Arrêter" : res ? "Relancer la simulation" : "Lancer la simulation";
+    exporter.hidden = !res || enCours;
   }
 
   // ---------- Simulation, par petits lots pour laisser l'écran respirer ----------
@@ -136,6 +138,23 @@ App.demarrer("simulateur", async (main, ctx) => {
             el("td", {}, el("span", { class: "sim-verdict " + cls, texte: mot })));
         })))),
       el("p", { class: "mention sim-note", texte: "Victoires : part des duels gagnés par les builds qui portent l'objet (50 % = objet neutre). « À puissance comparable » ne garde que les duels où les deux puissances sont à 15 % près : un objet qui y gagne beaucoup est sous-évalué par la formule de puissance. ± : marge d'erreur à 95 %, elle se resserre avec plus de duels. Verdict : trop fort au-dessus de 55 %, trop faible sous 45 %, marge comprise." }));
+  }
+
+  // Export : une ligne par objet, avec les réglages de la simulation rappelés sur chaque ligne.
+  function exporterCsv() {
+    const { stat, tot, reglages: g, puissances } = res;
+    const d = (x, n = 2) => (x === null ? "" : x.toFixed(n)), champ = (v) => /[";\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
+    const lignes = [["numero", "objet", "emplacement", "rarete", "amelioration", "puissance_objet", "duels", "victoires_pct", "marge_pct", "duels_comparables", "victoires_comparables_pct", "marge_comparables_pct", "verdict",
+      "moteur", "duels_simules", "points_par_joueur", "niveau_objets", "tours_moyens", "attaquant_gagne_pct", "plus_puissant_gagne_pct"]];
+    for (const o of objets) {
+      const s = stat.get(o.numero), t = pct(s.v, s.n);
+      lignes.push([o.numero, o.nom, SLOTS[o.slot].nom, o.rarete, niveauDe(o, g.niveau), puissances.get(o.numero), s.n, d(t), d(marge(s.v, s.n)), s.nc, d(pct(s.vc, s.nc)), d(marge(s.vc, s.nc)), verdict(t, marge(s.v, s.n))[0],
+        MoteurDuel.VERSION_MOTEUR, tot.n, g.points, g.niveau, d(tot.n ? tot.tours / tot.n : 0), d(pct(tot.attaquant, tot.n)), d(pct(tot.fort, tot.nFort))]);
+    }
+    const lien = el("a", { href: URL.createObjectURL(new Blob(["\ufeff" + lignes.map((l) => l.map(champ).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" })),
+      download: `simulation-${g.points}pts-${g.niveau}-${tot.n}duels.csv` });
+    document.body.append(lien); lien.click(); lien.remove();
+    setTimeout(() => URL.revokeObjectURL(lien.href), 5000);
   }
 
   majReglages(); rendre();
