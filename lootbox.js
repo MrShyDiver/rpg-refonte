@@ -850,7 +850,9 @@ App.demarrer("lootbox", async (main, ctx) => {
       resteEncore.textContent = "il t'en reste " + fmt(reste);
       encore.hidden = false;
       btnEncore.focus({ preventScroll: true });
-      btnEncore.scrollIntoView({ block: "nearest", behavior: App.reduit ? "auto" : "smooth" });
+      // Amène le bouton à l'écran en faisant défiler la PAGE (scrollIntoView ferait défiler la table elle-même).
+      const bas = btnEncore.getBoundingClientRect().bottom, marge = innerWidth < 720 ? 190 : 24;
+      if (bas > innerHeight - marge) scrollBy({ top: bas - innerHeight + marge, behavior: App.reduit ? "auto" : "smooth" });
     }
   }
 
