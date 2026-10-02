@@ -132,3 +132,9 @@ Le site est le moteur de référence : ces règles n'existent pas dans le C#. `V
 Mesures après changement (builds aléatoires du vrai catalogue) : 6 000 duels sans anomalie (PV ≤ PV max, charges dans leurs bornes, jamais 3 tours d'affilée, une seule action par tour, même graine = même combat), 15,3 tours en moyenne. Sur 12 000 duels, le plus puissant gagne 55 % / 71 % / 86 % / 97 % des fois pour un écart de puissance < 10 % / 10-30 % / 30-60 % / > 60 %. Le plus rapide gagne 74 % des duels : la vitesse pèse lourd, à surveiller.
 
 Après toute modification : `node outils/moteur-navigateur.mjs` (régénère `moteur-bac.js`), recopier `formule-combat.js` dans `formule-combat.gen.ts`, pousser, puis épingler le nouveau commit dans `index.ts` et redéployer la fonction `duel`.
+
+### 1.1.1 (02/10, soir)
+
+- **Saignement** : l'explosion se déclenche à **5 charges** (20 auparavant, elle n'arrivait presque jamais). Décision de MrShyDiver.
+- **Volto-Hache** : la purge du poison et de la brûlure au retour en première forme est un passif voulu (confirmé). Elle est maintenant écrite sur la fiche et annoncée dans le récit du combat (effet `purge`).
+- **Vitesse, mesure à build identique** (9 000 duels, N points en vitesse contre N points dans une autre stat) : avec la règle actuelle (rapport des vitesses) la vitesse gagne 72 % / 82 % / 87 % pour 5 / 10 / 20 points — trop forte. Règle proposée, pas encore appliquée : chaque point de vitesse d'avance = 1 % de tour en plus (47 % / 47 % / 49 %, donc équitable) ; à 2 % par point : 53 % / 59 % / 62 %.

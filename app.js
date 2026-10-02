@@ -324,7 +324,7 @@ const tours = (n) => n + " tour" + (n > 1 ? "s" : "");
 const REGLES_PASSIFS = [
   ["lifesteal", (d) => [`<b>Vol de vie</b> : tu récupères ${pct(d.lifesteal)} des dégâts infligés.`, "Vol de vie " + pct(d.lifesteal)]],
   ["poisonDegats", (d) => [`<b>Poison</b> : ${nombre(d.poisonDegats)} dégâts de poison sur ${tours(d.poisonDuree || 1)}, qui ignorent la défense.`, "Poison " + nombre(d.poisonDegats)]],
-  ["saignementDegats", (d) => [`<b>Saignement</b> : chaque coup ajoute ${nombre(d.saignementDegats)} dégâts à la banque de saignement (+${d.saignementStacksParCoup || 1} stack). À 20 stacks, la banque explose en dégâts bruts.`, "Saignement " + nombre(d.saignementDegats)]],
+  ["saignementDegats", (d) => [`<b>Saignement</b> : chaque coup ajoute ${nombre(d.saignementDegats)} dégâts à la banque de saignement (+${d.saignementStacksParCoup || 1} stack). À 5 stacks, la banque explose en dégâts bruts (ils ignorent défense et bouclier).`, "Saignement " + nombre(d.saignementDegats)]],
   ["saignementChanceParCoup", (d) => [`<b>Lame saignante</b> : ${pct(d.saignementChanceParCoup)} de chance par coup d'infliger un saignement.`, "Saignement " + pct(d.saignementChanceParCoup)]],
   ["brulureDegats", (d) => [`<b>Brûlure</b> : ${nombre(d.brulureDegats)} dégâts par tour pendant ${tours(d.brulureDuree || 1)}, en ignorant la défense (le bouclier l'absorbe).`, "Brûlure " + nombre(d.brulureDegats) + " × " + (d.brulureDuree || 1)]],
   ["etourdissementChance", (d) => [`<b>Étourdissement</b> : ${pct(d.etourdissementChance)} de chance d'étourdir la cible${d.etourdissementDureeTours > 1 ? " pendant " + tours(d.etourdissementDureeTours) : ""}.`, "Stun " + pct(d.etourdissementChance)]],
@@ -429,7 +429,8 @@ App.fiche = (o, { niveau = 0, possede = null, curseur = true } = {}) => {
       blocs.push(bloc("Deuxième forme", el("div", { class: "passif", html:
         `<b>Change de forme tous les ${tours(d.dureeStance)}</b>. En forme 2 : ${nombre(d.stance2BaseDegatsMin)}–${nombre(d.stance2BaseDegatsMax)} dégâts`
         + (d.stance2Stat ? `, ${STATS[d.stance2Stat] || d.stance2Stat} ${signe(d.stance2Bonus)}` : "")
-        + (sc2.length ? `, scaling ${sc2.map((s) => (STATS[s.stat] || s.stat) + " " + s.lettre).join(", ")}` : "") + "." })));
+        + (sc2.length ? `, scaling ${sc2.map((s) => (STATS[s.stat] || s.stat) + " " + s.lettre).join(", ")}` : "") + "."
+        + "<br><b>Purge</b> : à chaque retour en première forme, le poison et la brûlure que tu subis sont effacés." })));
     }
     if ((d.modesTir || []).length) {
       blocs.push(bloc("Modes de tir (en alternance)", el("div", {}, d.modesTir.map((m, i) => el("div", { class: "passif", html:
@@ -1022,6 +1023,7 @@ App.decrireTour = (r, R, nom) => {
   if (r.erosion_pv_max > 0) add(`Érosion : ${C} perd ${r.erosion_pv_max} PV max.`, "etat");
   if (r.contrecoup > 0) add(`Contrecoup : ${F} perd ${r.contrecoup} PV.`, "coup");
   if (r.sacrifice_pv > 0) add(`Sacrifice : ${F} perd ${r.sacrifice_pv} PV et récupère une charge${r.recharge_strategeme && r.recharge_offhand ? " sur son stratagème et sa main gauche" : r.recharge_offhand ? " sur sa main gauche" : " sur son stratagème"}.`, "strat");
+  if ((r.effets || []).includes("purge")) add(`${F} revient en première forme : son poison et sa brûlure sont purgés.`, "soin");
   if (r.execution_active) add(`Exécution : +${r.execution_bonus} % de dégâts sur une cible affaiblie.`, "crit");
   if (r.etourdi_applique) add(`${C} est étourdi !`, "etat");
   if (r.riposte_stun_frappeur) add(`${F} est étourdi en retour par l'armure de ${C}.`, "etat");

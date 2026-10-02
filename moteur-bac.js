@@ -462,14 +462,14 @@ if (typeof module !== 'undefined') module.exports = {
 };
 
 
-const VERSION_MOTEUR = "site-1.1.0";
+const VERSION_MOTEUR = "site-1.1.1";
 const AP_THRESHOLD = 100.0;
 const MAX_TOURS_DAFFILEE = 2;
 const SEUIL_SOIN_URGENCE = 0.5;
 const MAX_ACTIONS = 45, ROPE_START_ACTION = 20, ROPE_CADENCE = 2;
 const FATIGUE_BASE = 10, FATIGUE_CROISSANCE = 1.30;
 const PROTECTION_REDUCTION = 0.20;
-const SAIGNEMENT_SEUIL_EXPLOSION = 20;
+const SAIGNEMENT_SEUIL_EXPLOSION = 5;
 const TRANCHE_LARGEUR_RELATIF = 0.30;
 const { BASE_ESQUIVE, BASE_CRIT, LUCK_CRIT_MAX, K_LUCK, DEF_MITIGATION_MAX, K_DEF_MITIGATION, COEF_ATK_BASE, PENALITE_HORS_ATK } = CST;
 const COEF_LETTRE_SCALING = CST.COEF_LETTRE_SCALING;
@@ -1180,6 +1180,7 @@ function simulerDuel(attaquantEntree, defenseurEntree, opts) {
                     f.stanceActuelle = 1 - f.stanceActuelle;
                     appliquerBonusArmeStance(f.stats, f.arme, f.stanceActuelle, 1.0);
                     if (f.stanceActuelle === 0) {
+                        if (f.poisonStack > 0 || f.bruleeLayers.length) acc.effets.add("purge");
                         f.poisonStack = 0;
                         f.bruleeLayers = [];
                         RecalcBrulee(f);

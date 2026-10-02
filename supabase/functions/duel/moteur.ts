@@ -16,7 +16,7 @@ import {
   estimerAtkEquivalentAvecStance, appliquerBonusArmeStance, vueArmeSelonStance, valeurStat, niveauMaxPourRarete,
 } from "./formule-combat.gen.ts";
 
-export const VERSION_MOTEUR = "site-1.1.0";
+export const VERSION_MOTEUR = "site-1.1.1";
 
 // ---------------------------------------------------------------- contrat
 export interface Equipement { data: Record<string, any>; niveau: number; numero?: number }
@@ -51,7 +51,7 @@ const SEUIL_SOIN_URGENCE = 0.5;
 const MAX_ACTIONS = 45, ROPE_START_ACTION = 20, ROPE_CADENCE = 2;
 const FATIGUE_BASE = 10, FATIGUE_CROISSANCE = 1.30;
 const PROTECTION_REDUCTION = 0.20;
-const SAIGNEMENT_SEUIL_EXPLOSION = 20;
+const SAIGNEMENT_SEUIL_EXPLOSION = 5; // décision du 02/10 (20 auparavant : l'explosion n'arrivait presque jamais)
 const TRANCHE_LARGEUR_RELATIF = 0.30; // duel.cs
 const { BASE_ESQUIVE, BASE_CRIT, LUCK_CRIT_MAX, K_LUCK, DEF_MITIGATION_MAX, K_DEF_MITIGATION, COEF_ATK_BASE, PENALITE_HORS_ATK } = CST;
 const COEF_LETTRE_SCALING: Record<string, number> = CST.COEF_LETTRE_SCALING;
@@ -553,7 +553,8 @@ export function simulerDuel(attaquantEntree: JoueurEntree, defenseurEntree: Joue
           appliquerBonusArmeStance(f.stats, f.arme, f.stanceActuelle, -1.0);
           f.stanceActuelle = 1 - f.stanceActuelle;
           appliquerBonusArmeStance(f.stats, f.arme, f.stanceActuelle, 1.0);
-          if (f.stanceActuelle === 0) { f.poisonStack = 0; f.bruleeLayers = []; RecalcBrulee(f); }
+          // Passif voulu de la Volto-Hache (confirmé le 02/10) : le retour en première forme purge poison et brûlure.
+          if (f.stanceActuelle === 0) { if (f.poisonStack > 0 || f.bruleeLayers.length) acc.effets.add("purge"); f.poisonStack = 0; f.bruleeLayers = []; RecalcBrulee(f); }
         }
       }
 
