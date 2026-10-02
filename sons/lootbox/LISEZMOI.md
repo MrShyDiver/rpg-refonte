@@ -10,6 +10,7 @@ Un nom absent de la liste, ou un fichier illisible, garde le son généré.
 | Nom | Quand | Remarque |
 |---|---|---|
 | `tension` | Le coffre tremble, après le clic | Joué en boucle (environ 1 s), coupé net à l'explosion |
+| `tic` | Boutique : la jauge d'un achat qui se charge | Accéléré d'un cran à chaque palier |
 | `explosion` | Le couvercle saute | Toujours le même : il ne doit pas trahir la rareté |
 | `indice-commun` … `indice-legendaire` | Survol d'une carte face cachée (ou juste avant son retournement au toucher) | Discret : c'est l'indice qui laisse deviner la rareté. `indice` seul sert pour toutes les raretés sans fichier dédié |
 | `rarete-commun` … `rarete-legendaire` | Quand une carte Rare ou mieux se retourne | Aussi utilisé pour les succès, la boutique et l'essai du son dans Paramètres |
