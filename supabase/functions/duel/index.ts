@@ -17,7 +17,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   construireCombattant, simulerDuel, type Equipement, type JoueurEntree,
-} from "https://raw.githubusercontent.com/MrShyDiver/rpg-refonte/014c420d86f1b2cd62663ea137550ee68bc3f77c/supabase/functions/duel/moteur.ts";
+} from "https://raw.githubusercontent.com/MrShyDiver/rpg-refonte/d07b595f9b5c9fe6db8369d686a5f47604671ccc/supabase/functions/duel/moteur.ts";
 
 const ORIGINES = /^(https:\/\/mrshydiver\.github\.io|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/;
 const COLONNES = "id,twitch_login,display_name,avatar_url,atk_stacks,def_stacks,pv_stacks,spd_stacks,luck_stacks," +
