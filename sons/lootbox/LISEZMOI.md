@@ -9,11 +9,10 @@ Un nom absent de la liste, ou un fichier illisible, garde le son généré.
 
 | Nom | Quand | Remarque |
 |---|---|---|
-| `tension` | Le coffre tremble | Joué en boucle, coupé net à l'explosion |
-| `tic` | Chaque palier de rareté franchi | Accéléré d'un cran à chaque palier |
-| `battement` | Faux calme avant un Épique ou un Légendaire, charge d'une carte Épique+ | |
-| `explosion` | Le couvercle saute | `explosion-<rareté>` est prioritaire s'il existe |
-| `rarete-commun` … `rarete-legendaire` | Juste après l'explosion (meilleure rareté), puis à chaque carte Rare+ d'une ouverture groupée | Aussi utilisé pour les succès, la boutique et l'essai du son dans Paramètres |
+| `tension` | Le coffre tremble, après le clic | Joué en boucle (environ 1 s), coupé net à l'explosion |
+| `explosion` | Le couvercle saute | Toujours le même : il ne doit pas trahir la rareté |
+| `indice-commun` … `indice-legendaire` | Survol d'une carte face cachée (ou juste avant son retournement au toucher) | Discret : c'est l'indice qui laisse deviner la rareté. `indice` seul sert pour toutes les raretés sans fichier dédié |
+| `rarete-commun` … `rarete-legendaire` | Quand une carte Rare ou mieux se retourne | Aussi utilisé pour les succès, la boutique et l'essai du son dans Paramètres |
 | `envol` | Les cartes jaillissent du coffre | Un par carte, à 70 ms d'écart |
 | `retournement` | Une carte se retourne | |
 | `combo` | Une carte se retourne | Monte d'une note à chaque carte : prends une note courte |

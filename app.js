@@ -640,6 +640,14 @@ function combo(i) {
   if (fichierLb(["combo"], { vitesse: Math.pow(2, Math.min(demi, 24) / 12) })) return;
   note(523.25 * Math.pow(2, demi / 12), 0, 0.24, "triangle", 0.08, 0.2);
 }
+// Indice de rareté au survol d'une carte face cachée : discret, plus riche à mesure que la carte est rare.
+const INDICES = [[330], [392], [523, 784], [659, 988, 1319], [784, 1175, 1568, 2349]];
+function indice(rang) {
+  if (!sonActif) return;
+  if (fichierLb(["indice-" + ORDRE_RARETE[rang], "indice"], { vol: 0.5 })) return;
+  INDICES[rang].forEach((f, i) => note(f, i * 0.05, 0.3 + rang * 0.12, "sine", 0.045, REVERB[rang]));
+  if (rang >= 3) coup(90, 50, 0, 0.25, 0.22);
+}
 function scintille() { if (fichierLb(["nouveau"])) return; [1568, 1976, 2349, 2637, 3136].forEach((f, i) => note(f, i * 0.045, 0.32, "sine", 0.06, 0.5)); }
 function cloche(niveau) {
   if (fichierLb(["amelioration"], { vitesse: Math.pow(2, Math.min(niveau, 24) / 24) })) return;
@@ -666,7 +674,7 @@ function sonRarete(rang) {
 
 App.sons = {
   demarrer: demarrerAudio, rarete: sonRarete, grondement: () => tension(2), tension, tic, battement, explosion,
-  envol, retournement, combo, scintille, cloche, accordMax, tinte,
+  envol, indice, retournement, combo, scintille, cloche, accordMax, tinte,
   get actif() { return sonActif; },
   set actif(v) { sonActif = !!v; },
 };

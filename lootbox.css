@@ -45,7 +45,32 @@
 /* Commandes */
 .lb-actions { margin-top: 14px; display: grid; gap: 10px; }
 .lb-actions .boutons-ouvrir { display: flex; gap: 8px; flex-wrap: wrap; }
-.lb-x { display: none; }
+.lb-combien { align-self: center; margin-right: 4px; font-size: 13.5px; font-weight: 600; color: var(--encre-2); }
+.btn-ouvrir[aria-pressed="true"] { cursor: default; }
+
+/* Le coffre se clique : bouton posé sur toute la table, sous les cartes. */
+.lb-ouvrir-coffre { position: absolute; inset: 0; z-index: 3; border-radius: inherit; cursor: pointer; }
+.lb-ouvrir-coffre:focus-visible { outline: 2px solid var(--legendaire); outline-offset: -4px; }
+.lb-table:has(.lb-ouvrir-coffre:hover) .coffre svg, .lb-table:has(.lb-ouvrir-coffre:focus-visible) .coffre svg { scale: 1.07; }
+.lb-table:has(.lb-ouvrir-coffre:hover) .coffre .halo { opacity: .35; scale: .8; }
+.lb-table:has(.lb-ouvrir-coffre:active) .coffre svg { scale: .97; }
+.lb-consigne { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 5; margin: 0; text-align: center; pointer-events: none; font-size: 14.5px; font-weight: 600; color: var(--encre); text-wrap: balance; }
+.lb-consigne:empty { display: none; }
+.lb-table.a-reveler .lb-consigne { right: 150px; text-align: left; color: var(--encre-2); font-weight: 500; }
+.lb-table.a-reveler .btn-passer { color: var(--encre); border-color: color-mix(in oklab, var(--legendaire) 55%, transparent); }
+.btn-passer:disabled { opacity: .5; cursor: progress; }
+
+/* Carte face cachée : l'aura (survol, focus ou juste avant le retournement) laisse deviner la rareté. */
+.dcarte .dos { transition: box-shadow .25s, border-color .25s; }
+.dcarte.aura:not(.retournee) { z-index: 5; }
+.dcarte.aura:not(.retournee) .dcarte-in { transform: translateY(-6px) scale(1.05); transition-duration: .25s; }
+.dcarte.aura:not(.retournee) .dos {
+  border-color: var(--c);
+  box-shadow: inset 0 0 0 5px #15121f, inset 0 0 0 6px var(--c),
+    0 0 calc(14px + var(--rang, 0) * 11px) -3px var(--c), 0 0 calc(30px + var(--rang, 0) * 28px) -16px var(--c);
+}
+.dcarte.aura[data-haut]:not(.retournee) .dos { animation: vibre .5s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .dcarte.aura .dos { animation: none !important; } .dcarte.aura:not(.retournee) .dcarte-in { transform: none; } }
 .btn-ouvrir[data-manque]:disabled { cursor: not-allowed; }
 .btn-ouvrir[hidden] { display: none; }
 .lb-sous-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -129,9 +154,9 @@
   }
   .lb-actions .boutons-ouvrir { flex-wrap: nowrap; gap: 6px; }
   .lb-actions .btn-ouvrir { flex: 1 1 0; min-width: 0; min-height: 48px; padding: 10px 4px; font-size: 13.5px; white-space: nowrap; }
-  .lb-actions .btn-ouvrir:first-child { flex-grow: 1.6; }
-  .lb-actions .btn-ouvrir:not(:first-child) .lb-verbe { display: none; }
-  .lb-actions .btn-ouvrir:not(:first-child) .lb-x { display: inline; }
+  .lb-combien { flex: none; }
+  .lb-consigne { font-size: 13.5px; bottom: 12px; }
+  .lb-table.a-reveler .lb-consigne { right: 128px; }
   .lb-aide { font-size: 13px; line-height: 1.35; }
   .lb-sous-actions .btn-son { padding: 8px 10px; min-height: 40px; min-width: 44px; justify-content: center; }
   .lb-son-libelle { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
