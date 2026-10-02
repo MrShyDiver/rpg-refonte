@@ -53,10 +53,10 @@
 .lb-table { overflow: clip; --lueur: #f4f2ec; --rang: 0; --charge: 0; transition: height .6s var(--ease), border-color .3s, --lueur .35s; }
 .lb-table .coffre { transition: translate .7s var(--ease), --lueur .35s; }
 
-/* Le coffre se maintient : bouton rond posé dessus, avec la jauge de charge autour. */
+/* Le coffre se clique : bouton rond posé dessus, avec la jauge de la montée de tension autour. */
 .lb-ouvrir-coffre {
   position: absolute; left: 50%; top: 50%; width: min(300px, 74%); aspect-ratio: 1; translate: -50% -50%; z-index: 3; border-radius: 50%;
-  cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 .lb-ouvrir-coffre:focus-visible { outline: 2px solid var(--legendaire); outline-offset: 4px; }
 .lb-table:has(.lb-ouvrir-coffre:hover) .coffre svg { scale: 1.06; }
@@ -70,9 +70,8 @@
 .lb-table.en-charge .coffre svg { scale: calc(1 + var(--charge) * .16); transition: none; }
 .lb-table.en-charge .coffre { --lueur: var(--legendaire); }
 .lb-table.en-charge .coffre .halo { opacity: calc(.15 + var(--charge) * .6); scale: calc(.6 + var(--charge) * .6); }
-.lb-table.charge-pleine .lb-jauge { animation: jauge-pleine .5s ease-in-out infinite alternate; filter: drop-shadow(0 0 10px var(--legendaire)); }
-@keyframes jauge-pleine { to { scale: 1.06; } }
-.lb-table.charge-pleine .lb-consigne { color: var(--legendaire); font-family: var(--titre); font-size: 18px; }
+
+.lb-consigne { color: var(--legendaire); font-family: var(--titre); font-size: 18px; }
 
 .lb-consigne { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 5; margin: 0; text-align: center; pointer-events: none; font-size: 14.5px; font-weight: 600; color: var(--encre); text-wrap: balance; }
 .lb-consigne:empty { display: none; }
@@ -84,23 +83,30 @@
 .lb-table.cartes .lb-voile { opacity: .55; }
 .lb-table.final .lb-voile { opacity: 1; }
 
-/* Le faisceau : une colonne de lumière qui s'élargit à chaque grade. */
-.lb-colonne {
-  position: absolute; left: 50%; top: -20px; bottom: 57%; width: 46px; transform: scaleX(calc(1 + var(--rang) * .65)); translate: -50% 0; z-index: 1; pointer-events: none;
-  background: linear-gradient(to top, #fff, var(--lueur) 22%, color-mix(in oklab, var(--lueur) 65%, transparent) 75%, color-mix(in oklab, var(--lueur) 30%, transparent));
-  filter: blur(5px); mix-blend-mode: screen; opacity: 0; transform-origin: 50% 100%; scale: 1 0;
-  transition: opacity .25s, scale .45s var(--ease), transform .45s var(--ease);
+/* Les faisceaux : ils partent de la bouche du coffre, en éventail. 1, 2, 3, 4… puis tout l'écran au Légendaire. */
+/* Ils passent devant le coffre (et son couvercle) : on doit pouvoir les compter. Le cône du coffre s'efface. */
+.lb-table.invocation .coffre .faisceau { opacity: 0; }
+.lb-rayons { position: absolute; left: 50%; top: 43%; width: 0; height: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .3s, scale .3s var(--ease); }
+.lb-table.invocation .lb-rayons { opacity: 1; }
+.lb-rayons i {
+  position: absolute; left: -40px; bottom: 0; width: 80px; height: 900px; transform-origin: 50% 100%; rotate: var(--a);
+  background:
+    linear-gradient(90deg, transparent 32%, rgba(255,255,255,.85) 50%, transparent 68%),
+    linear-gradient(to top, #fff, var(--lueur) 10%, color-mix(in oklab, var(--lueur) 85%, transparent) 60%, color-mix(in oklab, var(--lueur) 35%, transparent) 96%);
+  clip-path: polygon(41% 100%, 59% 100%, 100% 0, 0 0); filter: blur(2.5px); mix-blend-mode: screen;
+  animation: jaillit .42s var(--ease) var(--d) both, balance 1.9s ease-in-out calc(var(--d) + .42s) infinite alternate;
 }
-.lb-colonne::after { content: ""; position: absolute; left: 34%; right: 34%; top: 0; bottom: 0; background: #fff; filter: blur(3px); opacity: .9; }
-.lb-colonne i { position: absolute; inset: 0 -30%; background: linear-gradient(to top, #fff, var(--suivante, #fff) 25%, transparent); opacity: 0; }
-.lb-table.invocation .lb-colonne { opacity: .95; scale: 1 1; }
-.lb-table.hesite .lb-colonne { animation: hesite .1s steps(2) infinite; }
-.lb-table.hesite .lb-colonne i { animation: clignote .34s steps(1) infinite; }
-@keyframes hesite { 50% { scale: 1.3 1; } }
-@keyframes clignote { 0%, 55% { opacity: 0; } 20%, 70% { opacity: .85; } 35%, 100% { opacity: 0; } }
-.lb-table.calme .lb-colonne { scale: .3 1; opacity: .45; }
+@keyframes jaillit { from { scale: .3 0; opacity: 0; } to { scale: 1 1; opacity: 1; } }
+@keyframes balance { from { rotate: calc(var(--a) - 3deg); } to { rotate: calc(var(--a) + 3deg); } }
+.lb-rayons[data-rang="4"] i { left: -50px; width: 100px; }
+.lb-rayons[data-rang="4"] { animation: balaie 2.4s ease-in-out infinite alternate; }
+@keyframes balaie { from { rotate: -7deg; } to { rotate: 7deg; } }
+/* Hésitation avant le palier suivant : les faisceaux crépitent. */
+.lb-table.hesite .lb-rayons { animation: crepite .12s steps(2) infinite; }
+@keyframes crepite { 50% { opacity: .55; scale: 1.08 1; } }
+.lb-table.calme .lb-rayons { opacity: .3; scale: .5 1; }
 .lb-table.calme .lb-voile { opacity: .6; }
-.lb-table.cartes .lb-colonne { opacity: 0; scale: 2.4 1; transition: opacity .5s, scale .5s var(--ease); }
+.lb-table.cartes .lb-rayons { opacity: 0; scale: 1.6 1; transition: opacity .5s, scale .5s var(--ease); }
 .lb-table.invocation .coffre { z-index: 2; }
 .lb-table.invocation .echelle { z-index: 5; }
 
@@ -127,7 +133,7 @@
 .lb-encore .mention { text-shadow: 0 1px 6px #000; }
 
 @media (prefers-reduced-motion: reduce) {
-  .lb-colonne, .lb-table.hesite .lb-colonne, .lb-colonne i, .lb-btn-encore, .dcarte.vedette.charge .dos, .lb-jauge { animation: none !important; }
+  .lb-rayons, .lb-rayons i, .lb-table.hesite .lb-rayons, .lb-btn-encore, .dcarte.vedette.charge .dos { animation: none !important; }
 }
 .btn-ouvrir[data-manque]:disabled { cursor: not-allowed; }
 .btn-ouvrir[hidden] { display: none; }
@@ -272,8 +278,8 @@
 .echelle span.exclu { opacity: .3; text-decoration: line-through; }
 .table-jeu.secoue { animation: camera var(--secousse, .5s) cubic-bezier(.36, .07, .19, .97); }
 @keyframes camera {
-  10%, 90% { transform: translate(-2px, 1px); } 20%, 80% { transform: translate(4px, -2px); }
-  30%, 50%, 70% { transform: translate(-7px, 3px) rotate(-.4deg); } 40%, 60% { transform: translate(7px, -3px) rotate(.4deg); }
+  10%, 90% { transform: translate(calc(var(--amp, 1) * -2px), calc(var(--amp, 1) * 1px)); } 20%, 80% { transform: translate(calc(var(--amp, 1) * 4px), calc(var(--amp, 1) * -2px)); }
+  30%, 50%, 70% { transform: translate(calc(var(--amp, 1) * -7px), calc(var(--amp, 1) * 3px)) rotate(calc(var(--amp, 1) * -.4deg)); } 40%, 60% { transform: translate(calc(var(--amp, 1) * 7px), calc(var(--amp, 1) * -3px)) rotate(calc(var(--amp, 1) * .4deg)); }
 }
 .eclair { position: absolute; inset: 0; z-index: 6; pointer-events: none; background: radial-gradient(circle at 50% 45%, #fff, color-mix(in oklab, var(--flash) 55%, transparent) 30%, transparent 72%); animation: flash-table var(--df, .7s) ease-out forwards; }
 .coffre.inspire svg { scale: 1.14; transition: scale .14s ease-in; }

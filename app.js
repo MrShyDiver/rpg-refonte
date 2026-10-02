@@ -647,6 +647,49 @@ function impact(rang = 0) {
   if (fichierLb(["impact-" + ORDRE_RARETE[rang], "impact"], { vitesse: 1 - rang * 0.06 })) return;
   coup(170 - rang * 18, 42, 0, 0.14 + rang * 0.05, 0.55); souffle(1400, 300, 0.09, 0.18, "lowpass");
 }
+// Musique de l'ouverture : une boucle qui gagne une couche à chaque rareté atteinte.
+// Commun : basse. Normal : + arpège. Rare : + contretemps et charleston. Épique : + grosse caisse et mélodie.
+// Légendaire : + accords, caisse claire, un ton plus haut. Le tempo accélère à chaque palier.
+// Un fichier « musique-<rareté> » (boucle) remplace la musique générée pour ce palier.
+const ACCORDS = [[0, 4, 7], [7, 11, 14], [9, 12, 16], [5, 9, 12]]; // Do, Sol, La mineur, Fa (demi-tons depuis Do)
+function musique() {
+  let rang = 0, pas = 0, minuterie = 0, fichier = null, fini = false;
+  const hz = (demi, octave) => 261.63 * Math.pow(2, demi / 12 + octave);
+  const jouer = () => {
+    if (fini) return;
+    const acc = ACCORDS[Math.floor(pas / 8) % 4], k = pas % 8, ton = rang >= 4 ? 2 : 0;
+    const n = (i, o) => hz(acc[((i % 3) + 3) % 3] + ton, o + Math.floor(i / 3));
+    if (!fichier && audible()) {
+      if (k % 4 === 0) note(n(0, -2), 0, 0.34, "triangle", 0.17);
+      if (rang >= 1 && k % 2 === 0) note(n(k / 2, 0), 0, 0.2, "triangle", 0.07, 0.15);
+      if (rang >= 2) { if (k % 2) note(n((k + 1) / 2 + 1, 0), 0, 0.14, "triangle", 0.05, 0.15); souffle(9000, 7000, 0.035, k % 2 ? 0.05 : 0.025, "highpass"); }
+      if (rang >= 3) { if (k % 4 === 0) coup(120, 45, 0, 0.16, 0.5); if (k % 2 === 0) note(n(k / 2 + 1, 1), 0, 0.22, "square", 0.035, 0.35); }
+      if (rang >= 4) {
+        if (k === 0) acc.forEach((d) => note(hz(d + ton, 0), 0, 0.5, "sawtooth", 0.035, 0.4));
+        if (k === 2 || k === 6) souffle(2600, 900, 0.11, 0.2);
+        note(n(k, 1), 0, 0.12, "square", 0.03, 0.4);
+      }
+    }
+    pas++;
+    minuterie = setTimeout(jouer, 60000 / (116 + rang * 12) / 2);
+  };
+  jouer();
+  return {
+    palier(r) {
+      rang = r;
+      if (fichier) { fichier(); fichier = null; }
+      fichier = fichierLb(["musique-" + ORDRE_RARETE[r]], { boucle: true, vol: 0.8 });
+    },
+    // accord : termine sur un accord posé (fin normale) plutôt que net (Passer, carte vedette).
+    arreter(accord) {
+      if (fini) return;
+      fini = true;
+      clearTimeout(minuterie);
+      if (fichier) fichier();
+      else if (accord && audible()) [0, 4, 7, 12].forEach((d, i) => note(hz(d + (rang >= 4 ? 2 : 0), 0), i * 0.03, 0.9, "triangle", 0.07, 0.4));
+    },
+  };
+}
 function scintille() { if (fichierLb(["nouveau"])) return; [1568, 1976, 2349, 2637, 3136].forEach((f, i) => note(f, i * 0.045, 0.32, "sine", 0.06, 0.5)); }
 function cloche(niveau) {
   if (fichierLb(["amelioration"], { vitesse: Math.pow(2, Math.min(niveau, 24) / 24) })) return;
@@ -673,7 +716,7 @@ function sonRarete(rang) {
 
 App.sons = {
   demarrer: demarrerAudio, rarete: sonRarete, grondement: () => tension(2), tension, tic, battement, explosion,
-  envol, relache, faisceau, impact, retournement, combo, scintille, cloche, accordMax, tinte,
+  envol, relache, faisceau, impact, musique, retournement, combo, scintille, cloche, accordMax, tinte,
   get actif() { return sonActif; },
   set actif(v) { sonActif = !!v; },
 };
