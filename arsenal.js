@@ -6,9 +6,8 @@ const COLS = ["arme", "offhand", "armure", "strategeme"];
 const TRIS = [["numero", "Numéro"], ["rarete", "Rareté"], ["degats", "Dégâts max"]];
 const norm = (s) => String(s || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const basculer = (set, v) => (set.has(v) ? set.delete(v) : set.add(v));
-// ponytail: lootbox_sets n'est pas exposé par App.api ; repli sur la valeur du SQL (Sekiro ×3).
+// Set du jour : seul le set à l'honneur aujourd'hui a ses chances multipliées (rotation_lootbox).
 const PLURIEL = { commun: "communs", normal: "normaux", rare: "rares", epique: "épiques", legendaire: "légendaires" };
-const SETS_DEFAUT = [{ set_nom: "Sekiro", multiplicateur: 3 }];
 
 App.demarrer("arsenal", async (main, ctx) => {
   const p = new URLSearchParams(location.search);
@@ -27,8 +26,8 @@ App.demarrer("arsenal", async (main, ctx) => {
   // Données communautaires : chargées en fond, attendues seulement par le tiroir.
   const donnees = Promise.all([
     App.api.inventaires(), App.api.loadouts(), App.api.lootboxRaretes(), App.api.prixBoutique(), App.api.reglagesBoutique(),
-    App.api.lootboxSets ? App.api.lootboxSets() : SETS_DEFAUT,
-  ]).then(([inventaires, loadouts, raretes, prix, reglages, sets]) => ({ inventaires, loadouts, raretes, prix, reglages, sets }));
+    App.api.rotationLootbox().catch(() => null),
+  ]).then(([inventaires, loadouts, raretes, prix, reglages, rotation]) => ({ inventaires, loadouts, raretes, prix, reglages, setJour: App.setDuJour(rotation) }));
   donnees.catch(() => {});
 
   const tous = App.objets.filter((o) => o.actif);
@@ -214,7 +213,7 @@ App.demarrer("arsenal", async (main, ctx) => {
     const dispo = D.raretes.filter((r) => poids(r) > 0 && tous.some((i) => i.rarete === r.rarete));
     const r = dispo.find((x) => x.rarete === o.rarete);
     if (!r) return 0;
-    const mult = (i) => Number((D.sets.find((s) => s.set_nom === i.set) || {}).multiplicateur) || 1;
+    const mult = (i) => (D.setJour && i.set && i.set === D.setJour.set ? Number(D.setJour.multiplicateur) || 1 : 1);
     const pool = tous.filter((i) => i.rarete === o.rarete);
     return (poids(r) / dispo.reduce((s, x) => s + poids(x), 0)) * (mult(o) / pool.reduce((s, i) => s + mult(i), 0));
   }
@@ -225,8 +224,9 @@ App.demarrer("arsenal", async (main, ctx) => {
       const c = chance(o, D, leg);
       l.push(lig(nom, c ? `${pctTxt(c)} · 1 sur ${fmt(Math.round(1 / c))}` : "Jamais", c ? "" : "eteint"));
     }
-    const m = Number((D.sets.find((s) => s.set_nom === o.set) || {}).multiplicateur) || 1;
-    if (m > 1) l.push(el("div", { class: "ligne note" }, el("span", { texte: `Set ${o.set} : ×${m} de chances face aux autres objets ${PLURIEL[o.rarete]}.` })));
+    if (o.set && D.setJour) l.push(el("div", { class: "ligne note" }, el("span", { texte: o.set === D.setJour.set
+      ? `Set du jour (${o.set}) : ×${D.setJour.multiplicateur} de chances aujourd'hui face aux autres objets ${PLURIEL[o.rarete]}.`
+      : `Set ${o.set} : ses chances sont multipliées les jours où il est le set du jour (planning sur la page Lootbox).` })));
     const bp = D.prix.find((x) => x.rarete === o.rarete);
     const pool = tous.filter((i) => i.rarete === o.rarete).length;
     if (bp && bp.en_etal > 0) l.push(lig("Boutique", `${fmt(bp.achat)} médailles · ${bp.en_etal} sur ${pool} / heure`));

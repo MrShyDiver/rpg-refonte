@@ -47,6 +47,42 @@
 .lb-combien { align-self: center; margin-right: 4px; font-size: 13.5px; font-weight: 600; color: var(--encre-2); }
 .btn-ouvrir[aria-pressed="true"] { cursor: default; }
 
+/* ---------- Set du jour : bandeau au-dessus de la table, planning dans le tiroir ---------- */
+.lb-set-jour {
+  --c: var(--encre); margin-top: 12px; width: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; text-align: left;
+  padding: 11px 16px; border-radius: 14px; background: color-mix(in oklab, var(--c) 9%, var(--sol-2)); border: 1px solid color-mix(in oklab, var(--c) 45%, transparent);
+  transition: background .2s, border-color .2s;
+}
+.lb-set-jour[hidden] { display: none; }
+.lb-set-jour:hover { background: color-mix(in oklab, var(--c) 15%, var(--sol-2)); border-color: color-mix(in oklab, var(--c) 70%, transparent); }
+.lb-set-lib { font-family: var(--pixel); font-size: 13px; color: var(--encre-2); }
+.lb-set-nom { font-family: var(--titre); font-weight: 800; font-size: 17px; color: var(--c); }
+.lb-set-mult { font-family: var(--titre); font-weight: 800; font-size: 14px; color: #101116; background: var(--c); border-radius: 8px; padding: 2px 8px 3px; }
+.lb-set-detail { font-size: 14px; color: var(--encre-2); }
+.lb-set-voir { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; font-weight: 600; color: var(--encre); text-decoration: underline; text-underline-offset: 3px; }
+.lb-set-voir svg { width: 15px; height: 15px; }
+.lb-pl { display: grid; gap: 14px; }
+.lb-pl .sous { color: var(--encre-2); font-size: 14.5px; line-height: 1.5; }
+.lb-pl h3 { font-size: 16px; margin-top: 6px; }
+.lb-planning { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lb-planning li { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--trait); background: var(--sol-3); }
+.lb-planning li.passe { opacity: .45; }
+.lb-planning li.jour { border-color: color-mix(in oklab, var(--c) 65%, transparent); background: color-mix(in oklab, var(--c) 11%, var(--sol-3)); }
+.lb-pl-jour { display: grid; line-height: 1.2; }
+.lb-pl-jour b { font-size: 14.5px; } .lb-pl-jour small { font-size: 12px; color: var(--encre-3); }
+.lb-pl-set { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--c); min-width: 0; }
+.lb-pl-set i { width: 10px; height: 10px; border-radius: 3px; background: var(--c); flex: none; }
+.lb-pl-mult { font-family: var(--titre); font-weight: 700; font-size: 13px; color: var(--encre-2); }
+.lb-pl-auj { --c: var(--encre); }
+.lb-pl-objets { display: grid; gap: 8px; }
+.lb-pl-objets p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--encre-2); }
+@media (max-width: 720px) {
+  .lb-set-voir { margin-left: 0; width: 100%; }
+  .lb-set-detail { display: none; }
+  .lb-planning li { grid-template-columns: 84px minmax(0, 1fr) auto; }
+  .lb-pl-auj { grid-column: 1 / -1; justify-self: start; }
+}
+
 /* ---------- Invocation ---------- */
 @property --lueur { syntax: "<color>"; inherits: true; initial-value: #f4f2ec; }
 /* overflow: clip : la table ne doit jamais pouvoir défiler, même par script (focus, scrollIntoView). */

@@ -154,6 +154,8 @@ App.api = {
   reglagesBoutique: () => q(client().from("boutique_reglages").select("*")),
   journal: (pid) => q(client().from("journal_boutique").select("*").eq("player_id", pid).order("cree_le", { ascending: false }).limit(30)),
   lootboxRaretes: () => q(client().from("lootbox_raretes").select("*")),
+  // Set du jour : { aujourdhui: "2026-10-02", semaine: [{ jour, set, multiplicateur } × 7] }, tirée chaque lundi par le serveur.
+  rotationLootbox: () => App.rpc("rotation_lootbox"),
   lootboxSets: () => q(client().from("lootbox_sets").select("*")),
   // Replays des duels : fichiers statiques duels/<id>.json publiés par le snapshot GitHub.
   replay: async (fichier) => {
@@ -264,6 +266,11 @@ App.effetsDe = (o) => {
   return e;
 };
 App.EFFETS = EFFETS;
+// Sets d'objets : une couleur chacun (hors des couleurs de rareté, sauf le doré des objets imaginés par la communauté).
+const COULEURS_SETS = { "Sekiro": "#e2483d", "Helldivers": "#ff8a3d", "Elden Ring": "#7fd1b9", "Originaux": "#ff7eb6", "Objets forgés": "#ffc53d" };
+App.couleurSet = (nom) => COULEURS_SETS[nom] || "#c9cbd6";
+// Le set du jour dans une rotation (null si le planning n'a pas pu être lu).
+App.setDuJour = (rotation) => (rotation && (rotation.semaine || []).find((j) => j.jour === rotation.aujourdhui)) || null;
 
 // Données de l'objet au niveau donné (formule-combat.js : appliquerAmelioration).
 App.auNiveau = (o, niveau) => (typeof appliquerAmelioration === "function" && niveau > 0) ? appliquerAmelioration(o.data, niveau) : o.data;
@@ -389,9 +396,10 @@ App.fiche = (o, { niveau = 0, possede = null, curseur = true } = {}) => {
     el("div", { class: "pilules" },
       el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom }),
       el("span", { class: "pilule", texte: sousTitre(o) }),
-      o.set ? el("span", { class: "pilule", style: { "--c": "#e2483d" }, texte: "Set " + o.set }) : null),
+      o.set ? el("span", { class: "pilule", style: { "--c": App.couleurSet(o.set) }, texte: "Set " + o.set }) : null,
+      o.contributeur ? el("span", { class: "pilule auteur" }, "Imaginé par ", el("b", { texte: o.contributeur })) : null),
     el("p", {}, App.anim(o.data) ? App.anim(o.data) + ". " : "", "Améliorations max : ", el("b", { texte: "+" + max }), " (", String(max), " doublons).",
-      o.contributeur ? el("span", {}, " Imaginé par ", el("b", { texte: o.contributeur }), ".") : null),
+      o.contributeur ? el("span", { class: "fiche-auteur" }, " Un objet imaginé par ", el("b", { texte: o.contributeur }), ", membre de la communauté.") : null),
     possede !== null ? el("p", {}, possede ? el("b", { texte: "Dans ta collection · " + (niveau >= max ? "amélioration MAX" : "+" + niveau + " / +" + max) }) : "Pas encore dans ta collection.") : null);
   const corps = el("div", { class: "fiche-details", style: { display: "grid", gap: "22px" } });
   racine.append(el("div", { class: "fiche-haut" }, zoneCarte, titre), corps);
@@ -459,11 +467,14 @@ App.carte = (o, { niveau = null, verrouille = false, equipe } = {}) => {
   const eq = !verrouille && (equipe !== undefined ? !!equipe : !!(ctx.loadout && EMPLACEMENTS_LOADOUT.some((k) => ctx.loadout[k] === o.numero)));
   const tag = niv >= r.max ? "MAX" : niv > 0 ? "+" + niv : "";
   const c = el("div", { class: "carte " + o.rarete + (verrouille ? " verrouillee" : "") + (niv >= r.max ? " brillante" : ""), role: "img",
-    "aria-label": o.nom + ", " + r.nom + ", " + sousTitre(o) + (tag ? ", amélioration " + tag : "") + (eq ? ", équipé" : "") + (verrouille ? ", pas encore obtenu" : "") });
+    "aria-label": o.nom + ", " + r.nom + ", " + sousTitre(o) + (o.contributeur ? ", imaginé par " + o.contributeur : "") + (tag ? ", amélioration " + tag : "") + (eq ? ", équipé" : "") + (verrouille ? ", pas encore obtenu" : "") });
   c.innerHTML =
     '<div class="carte-haut"><span class="pastille-rarete">' + echapper(r.nom) + "</span>" + (tag ? '<span class="niveau-tag' + (niv >= r.max ? " max" : "") + '">' + tag + "</span>" : "") + "</div>" +
     '<div class="carte-art"><img src="' + echapper(App.image(o.image)) + '" alt="" loading="lazy" decoding="async"></div>' +
-    '<div class="carte-texte"><div class="carte-nom">' + echapper(o.nom) + '</div><div class="carte-sous">' + echapper(sousTitre(o)) + "</div></div>";
+    '<div class="carte-texte"><div class="carte-nom">' + echapper(o.nom) + '</div><div class="carte-sous">' + echapper(sousTitre(o)) + "</div></div>" +
+    // Objet imaginé par un membre de la communauté : son pseudo en doré, en pied de carte.
+    (o.contributeur ? '<div class="carte-auteur">Imaginé par <b>' + echapper(o.contributeur) + "</b></div>" : "");
+  if (o.contributeur) c.classList.add("forgee");
   if (eq) c.append(el("span", { class: "equipe-tag", texte: "Équipé" }));
   return c;
 };

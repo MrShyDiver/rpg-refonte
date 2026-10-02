@@ -67,6 +67,7 @@ App.demarrer("lootbox", async (main, ctx) => {
   let enCours = false, pret = false, choix = 1, charge = null, passer = false, reveils = [], tLance = 0, dernier = null, taux = null;
   const tactile = matchMedia("(hover: none)").matches;
   let histo = lireHisto();
+  let rotation = null; // planning des sets de la semaine (rotation_lootbox)
 
   // ---------- Construction ----------
   const entete = el("header", { class: "entete-page lb-entete" },
@@ -119,7 +120,9 @@ App.demarrer("lootbox", async (main, ctx) => {
     el("div", { class: "boutons-ouvrir", role: "group", "aria-label": "Nombre de lootbox à ouvrir" }, el("span", { class: "lb-combien", texte: "À ouvrir" }), boutons, btnTout),
     el("div", { class: "lb-sous-actions" }, aide, btnSon));
 
-  const scene = el("div", { class: "lb-scene" }, types, table, actions);
+  // Set du jour : annoncé au-dessus de la table, le planning de la semaine s'ouvre au clic.
+  const btnSet = el("button", { type: "button", class: "lb-set-jour", hidden: true, onclick: () => ouvrirPlanning() });
+  const scene = el("div", { class: "lb-scene" }, types, btnSet, table, actions);
   const bilan = el("p", { class: "lb-bilan", "aria-live": "polite" });
   const suite = el("div", { class: "lb-suite", hidden: true });
   const premiersPas = el("section", { class: "panneau-b lb-premiers-pas", "aria-labelledby": "t-premiers-pas", hidden: true });
@@ -228,9 +231,51 @@ App.demarrer("lootbox", async (main, ctx) => {
     const notes = el("ul", { class: "lb-notes" },
       !poids("commun") ? el("li", { texte: "Jamais de Commun dans cette lootbox." }) : null,
       !poids("legendaire") ? el("li", { texte: "Pas de Légendaire dans cette lootbox : ça, c'est le boss." }) : null,
-      actifs.some((o) => o.set === "Sekiro") ? el("li", { texte: "Set Sekiro : chances triplées dans sa rareté." }) : null,
+      setJour() ? el("li", {}, "Set du jour, ", el("b", { texte: setJour().set }), " : chances ×" + setJour().multiplicateur + " dans sa rareté.") : null,
       el("li", { texte: "Un doublon ajoute une amélioration (+1) à l'objet, jusqu'à son plafond." }));
     zoneTaux.replaceChildren(barre, liste, notes);
+  }
+
+  // ---------- Set du jour ----------
+  const setJour = () => App.setDuJour(rotation);
+  const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+  const objetsDuSet = (nom) => App.objets.filter((o) => o.actif && o.set === nom);
+  function rendreSetDuJour() {
+    const s = setJour();
+    btnSet.hidden = !s;
+    if (!s) return;
+    btnSet.style.setProperty("--c", App.couleurSet(s.set));
+    btnSet.replaceChildren(
+      el("span", { class: "lb-set-lib", texte: "Set du jour" }),
+      el("b", { class: "lb-set-nom", texte: s.set }),
+      el("span", { class: "lb-set-mult num", texte: "×" + s.multiplicateur }),
+      el("span", { class: "lb-set-detail", texte: "de chances dans sa rareté" }),
+      el("span", { class: "lb-set-voir" }, "Voir la semaine", icone("i-fleche")));
+    btnSet.setAttribute("aria-label", `Set du jour : ${s.set}, chances multipliées par ${s.multiplicateur} dans sa rareté. Voir le planning de la semaine`);
+  }
+  function ouvrirPlanning() {
+    const s = setJour();
+    if (!s) return;
+    const jours = el("ol", { class: "lb-planning" }, rotation.semaine.map((j, i) => {
+      const etat = j.jour < rotation.aujourdhui ? "passe" : j.jour === rotation.aujourdhui ? "jour" : "avenir";
+      return el("li", { class: etat, style: { "--c": App.couleurSet(j.set) }, "aria-current": etat === "jour" ? "date" : null },
+        el("span", { class: "lb-pl-jour" }, el("b", { texte: JOURS[i] }), el("small", { class: "num", texte: j.jour.slice(8, 10) + "/" + j.jour.slice(5, 7) })),
+        el("span", { class: "lb-pl-set" }, el("i", { "aria-hidden": "true" }), j.set),
+        el("span", { class: "lb-pl-mult num", texte: "×" + j.multiplicateur }),
+        etat === "jour" ? el("span", { class: "pilule lb-pl-auj", texte: "Aujourd'hui" }) : null);
+    }));
+    // Les objets du set du jour, par rareté : ce sont eux qui tombent plus souvent aujourd'hui.
+    const objets = objetsDuSet(s.set);
+    const parRarete = ORDRE_RARETE.map((r) => [r, objets.filter((o) => o.rarete === r)]).filter(([, l]) => l.length);
+    const liste = el("div", { class: "lb-pl-objets" }, parRarete.map(([r, l]) => el("p", {},
+      el("span", { class: "pilule " + r, texte: RARETES[r].nom }), " ", l.map((o) => o.nom).join(", "))));
+    App.tiroir({ titre: "Sets de la semaine", contenu: el("div", { class: "lb-pl" },
+      el("p", { class: "sous" }, "Chaque jour, un set d'objets est à l'honneur : dans sa rareté, chacun de ses objets a ",
+        el("b", { texte: s.multiplicateur + " fois plus de chances" }), " de tomber qu'un autre. Les chances d'obtenir chaque rareté ne changent pas."),
+      jours,
+      el("p", { class: "mention", texte: "Le planning est tiré au hasard chaque lundi. Le set change à minuit, heure de Paris." }),
+      el("h3", { texte: "Aujourd'hui : set " + s.set }),
+      objets.length ? liste : el("p", { class: "mention", texte: "Aucun objet de ce set n'est disponible pour l'instant." })) });
   }
 
   function rendreProgression() {
@@ -931,5 +976,6 @@ App.demarrer("lootbox", async (main, ctx) => {
   majSon();
   majTout();
   App.api.lootboxRaretes().then((l) => { taux = l || []; rendreTaux(); }).catch((e) => { console.warn(e); taux = false; rendreTaux(); });
+  App.api.rotationLootbox().then((r) => { rotation = r; rendreSetDuJour(); rendreTaux(); }).catch((e) => console.warn(e));
 });
 })();

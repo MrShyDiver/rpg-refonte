@@ -72,6 +72,20 @@ h1, h2, h3 { font-family: var(--titre); font-weight: 700; letter-spacing: -.02em
 .carte-texte { padding: 1cqi 7cqi 14cqi; text-align: center; }
 .carte-nom { font-weight: 600; font-size: 9.6cqi; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.3em; text-wrap: balance; }
 .carte-sous { color: var(--encre-3); font-size: 7cqi; margin-top: 1.2cqi; }
+/* « Imaginé par » : bandeau doré en pied de carte pour les objets créés par la communauté. */
+.carte-auteur {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 2.6cqi 5cqi 3cqi; text-align: center;
+  font-size: 6.2cqi; line-height: 1.15; font-weight: 500; color: #e9c466; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: linear-gradient(180deg, rgba(255,197,61,.05), rgba(255,197,61,.2)); border-top: 1px solid rgba(255,197,61,.45);
+}
+.carte-auteur b { font-weight: 800; color: var(--legendaire); }
+/* Le pied de carte est pris par le bandeau : « Équipé » monte en haut à droite, sous le niveau. */
+.carte.forgee .equipe-tag { left: auto; right: 6cqi; bottom: auto; top: 19cqi; }
+.carte.forgee .carte-texte { padding-bottom: 16cqi; }
+.carte.verrouillee .carte-auteur { opacity: .55; }
+.pilule.auteur { --c: var(--legendaire); color: var(--legendaire); }
+.pilule.auteur b { color: #fff3cf; }
+.fiche-auteur b { color: var(--legendaire); }
 /* Reflet holographique des légendaires : une bande de lumière qui balaie la carte. */
 .carte.legendaire::after, .carte.brillante::after {
   content: ""; position: absolute; inset: -40%; z-index: 3; pointer-events: none;
