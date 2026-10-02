@@ -43,9 +43,11 @@
 .choix button:hover { color: var(--encre); border-color: var(--encre-3); }
 .choix button[aria-pressed="true"] { background: var(--encre); color: #101116; border-color: transparent; }
 .devoiler { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
-.devoiler .btn-second svg { width: 16px; height: 16px; }
-.devoile-ok { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--victoire); }
-.devoile-ok svg { width: 17px; height: 17px; }
+.devoiler > svg { width: 16px; height: 16px; flex: none; color: var(--encre-3); }
+.devoiler b { color: var(--encre); font-weight: 600; }
+.b-devoiler { gap: 7px; }
+.b-devoiler[aria-disabled="true"] { color: var(--encre-3); border-style: dashed; cursor: not-allowed; }
+.estimation:focus { outline: none; }
 .btn-second.petit[aria-disabled="true"] { color: var(--encre-2); border-style: dashed; cursor: not-allowed; }
 .barre-filtres .compte { margin-left: auto; }
 code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1px 6px; border-radius: 6px; background: var(--sol-3); border: 1px solid var(--trait-fort); color: var(--encre); }

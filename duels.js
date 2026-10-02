@@ -125,34 +125,33 @@ App.demarrer("duels", async (main, ctx) => {
       zoneDevoiler),
     zoneAdv));
 
-  // Estimations : verrouillées, dévoilées par les abonnés (3 fois par jour), jusqu'à la fermeture de l'onglet.
+  // Estimations : verrouillées. Un abonné en dévoile une à la fois (un adversaire), 3 par jour ;
+  // celles déjà dévoilées restent visibles sur cet appareil jusqu'à la fin de la journée.
   const CLE_DEVOILE = "duels-estimations", aujourdhui = new Date().toDateString();
-  let devoile = false;
-  try { devoile = sessionStorage.getItem(CLE_DEVOILE) === aujourdhui; } catch (e) { /* navigation privée */ }
+  const devoiles = new Set();
+  try { const c = JSON.parse(localStorage.getItem(CLE_DEVOILE) || "null"); if (c && c.jour === aujourdhui) c.logins.forEach((l) => devoiles.add(l)); } catch (e) { /* navigation privée */ }
+  const blocage = () => (!abonne ? "Dévoiler une estimation est réservé aux abonnés de la chaîne."
+    : statut.devoilements_restants < 1 ? "Tu as déjà dévoilé 3 estimations aujourd'hui : reviens demain." : null);
   function rendreDevoiler() {
     const reste = statut.devoilements_restants;
-    if (devoile) {
-      zoneDevoiler.replaceChildren(el("span", { class: "devoile-ok" }, icone("i-coche"), "Estimations dévoilées"),
-        el("span", { class: "mention" }, `jusqu'à la fermeture de l'onglet · ${reste} restant${reste > 1 ? "s" : ""} aujourd'hui`, lienAide("estimations", "les estimations")));
-      return;
-    }
-    const bloque = !abonne ? "Dévoiler les estimations est réservé aux abonnés de la chaîne." : reste < 1 ? "Tu as déjà dévoilé les estimations 3 fois aujourd'hui : reviens demain." : null;
-    const b = el("button", { type: "button", class: "btn-second petit", "aria-disabled": bloque ? "true" : null,
-      onclick: () => (bloque ? App.toast(bloque, { titre: abonne ? "Limite du jour atteinte" : "Réservé aux abonnés", icone: "i-cadenas" }) : devoiler(b)) },
-    icone("i-cadenas"), "Dévoiler les estimations");
-    zoneDevoiler.replaceChildren(b,
-      el("span", { class: "mention" }, !abonne ? "Réservé aux abonnés" : reste < 1 ? "0 restant aujourd'hui, retour demain" : null, ...(reste < 1 || !abonne ? [] : [`${reste} restant${reste > 1 ? "s" : ""} aujourd'hui`, el("span", { class: "detail-large", texte: " · dure jusqu'à la fermeture de l'onglet" })]),
+    zoneDevoiler.replaceChildren(icone("i-cadenas"),
+      el("span", { class: "mention" }, "Estimations : ", !abonne ? "dévoilement réservé aux abonnés"
+        : el("b", { class: "num", texte: reste < 1 ? "0 dévoilement restant, retour demain" : `${reste} dévoilement${reste > 1 ? "s" : ""} restant${reste > 1 ? "s" : ""} aujourd'hui` }),
+        el("span", { class: "detail-large", texte: abonne && reste > 0 ? " · un adversaire à la fois" : "" }),
         lienAide("estimations", "les estimations")));
   }
-  async function devoiler(b) {
+  async function devoiler(login, b) {
+    const bloque = blocage();
+    if (bloque) { App.toast(bloque, { titre: abonne ? "Limite du jour atteinte" : "Réservé aux abonnés", icone: "i-cadenas" }); return; }
     b.disabled = true;
     try {
       const r = await App.rpc("devoiler_estimations");
       if (r && r.devoilements_restants != null) statut.devoilements_restants = r.devoilements_restants;
-      devoile = true;
-      try { sessionStorage.setItem(CLE_DEVOILE, aujourdhui); } catch (e) { /* navigation privée */ }
+      devoiles.add(login);
+      try { localStorage.setItem(CLE_DEVOILE, JSON.stringify({ jour: aujourdhui, logins: [...devoiles] })); } catch (e) { /* navigation privée */ }
       rendreDevoiler(); rendreAdversaires();
-      zoneDevoiler.focus({ preventScroll: true });
+      const ligne = zoneAdv.querySelector(`[data-login="${login}"] .estimation`);
+      if (ligne) ligne.focus({ preventScroll: true });
     } catch (e) { App.erreur(e); b.disabled = false; }
   }
   rendreDevoiler();
@@ -281,7 +280,7 @@ App.demarrer("duels", async (main, ctx) => {
     const pct = !echo && puissance && maPuissance ? Math.round((puissance / maPuissance - 1) * 100) : null;
     const restants = statut.entrainements_restants;
     const lienProfil = el("a", { href: "profil.html?joueur=" + encodeURIComponent(j.twitch_login), texte: nomJ });
-    return el("li", { class: "adversaire" + (echo ? " echo" : "") },
+    return el("li", { class: "adversaire" + (echo ? " echo" : ""), "data-login": echo ? null : j.twitch_login },
       App.avatar(j, 44),
       el("div", { class: "ident" },
         echo ? el("b", {}, "Écho de ", lienProfil) : lienProfil,
@@ -290,8 +289,10 @@ App.demarrer("duels", async (main, ctx) => {
       el("div", { class: "puissance" }, echo ? el("span", { class: "ajustee", title: "Sa puissance est ajustée à la tienne", texte: "Ajustée" }) : el("b", { class: "num", texte: puissance ? fmt(puissance) : "—" }),
         echo ? null : el("span", { class: "num", texte: pct == null ? "puissance" : pct === 0 ? "comme toi" : Math.abs(pct) + " % de " + (pct > 0 ? "plus" : "moins") })),
       echo ? el("div", { class: "estimation cale", title: "Pas d'estimation : l'écho est ramené à ton niveau" })
-        : !devoile ? el("div", { class: "estimation verrou" }, icone("i-cadenas"), el("span", { texte: "Verrouillée" }))
-        : est ? el("div", { class: "estimation", "data-niveau": est[1] },
+        : !devoiles.has(j.twitch_login) ? el("div", { class: "estimation verrou" },
+          el("button", { type: "button", class: "btn-second petit b-devoiler", "aria-disabled": blocage() ? "true" : null, title: blocage() || "Utilise 1 de tes dévoilements du jour",
+            "aria-label": "Dévoiler l'estimation contre " + nomJ, onclick: (e) => devoiler(j.twitch_login, e.currentTarget) }, icone("i-cadenas"), "Dévoiler"))
+        : est ? el("div", { class: "estimation", "data-niveau": est[1], tabindex: "-1" },
           el("span", { class: "jauge-est", "aria-hidden": "true" }, [1, 2, 3, 4, 5].map((k) => el("i", { class: k <= est[1] ? "plein" : null }))),
           el("span", { texte: est[2] })) : el("div", { class: "estimation mention", texte: "Indisponible" }),
       el("div", { class: "actions" },
