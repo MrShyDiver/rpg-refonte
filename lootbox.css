@@ -16,7 +16,6 @@
 .type-lootbox:disabled { opacity: .7; }
 
 /* Table de jeu */
-.lb-table { transition: height .6s var(--ease), border-color .3s; }
 .lb-table.leg {
   background: radial-gradient(55% 60% at 50% 100%, rgba(255,197,61,.11), transparent 70%), var(--sol-2);
   border-color: color-mix(in oklab, var(--legendaire) 26%, transparent);
@@ -48,29 +47,87 @@
 .lb-combien { align-self: center; margin-right: 4px; font-size: 13.5px; font-weight: 600; color: var(--encre-2); }
 .btn-ouvrir[aria-pressed="true"] { cursor: default; }
 
-/* Le coffre se clique : bouton posé sur toute la table, sous les cartes. */
-.lb-ouvrir-coffre { position: absolute; inset: 0; z-index: 3; border-radius: inherit; cursor: pointer; }
-.lb-ouvrir-coffre:focus-visible { outline: 2px solid var(--legendaire); outline-offset: -4px; }
-.lb-table:has(.lb-ouvrir-coffre:hover) .coffre svg, .lb-table:has(.lb-ouvrir-coffre:focus-visible) .coffre svg { scale: 1.07; }
-.lb-table:has(.lb-ouvrir-coffre:hover) .coffre .halo { opacity: .35; scale: .8; }
-.lb-table:has(.lb-ouvrir-coffre:active) .coffre svg { scale: .97; }
+/* ---------- Invocation ---------- */
+@property --lueur { syntax: "<color>"; inherits: true; initial-value: #f4f2ec; }
+.lb-table { --lueur: #f4f2ec; --rang: 0; --charge: 0; transition: height .6s var(--ease), border-color .3s, --lueur .35s; }
+.lb-table .coffre { transition: translate .7s var(--ease), --lueur .35s; }
+
+/* Le coffre se maintient : bouton rond posé dessus, avec la jauge de charge autour. */
+.lb-ouvrir-coffre {
+  position: absolute; left: 50%; top: 50%; width: min(300px, 74%); aspect-ratio: 1; translate: -50% -50%; z-index: 3; border-radius: 50%;
+  cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+.lb-ouvrir-coffre:focus-visible { outline: 2px solid var(--legendaire); outline-offset: 4px; }
+.lb-table:has(.lb-ouvrir-coffre:hover) .coffre svg { scale: 1.06; }
+.lb-table:has(.lb-ouvrir-coffre:hover) .coffre .halo { opacity: .3; scale: .8; }
+.lb-jauge {
+  position: absolute; inset: 0; border-radius: 50%; opacity: 0; transition: opacity .2s;
+  background: conic-gradient(var(--legendaire) calc(var(--charge) * 360deg), rgba(255,255,255,.09) 0);
+  -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 7px), #000 calc(100% - 6px)); mask: radial-gradient(circle closest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+}
+.lb-table.en-charge .lb-jauge { opacity: 1; }
+.lb-table.en-charge .coffre svg { scale: calc(1 + var(--charge) * .16); transition: none; }
+.lb-table.en-charge .coffre { --lueur: var(--legendaire); }
+.lb-table.en-charge .coffre .halo { opacity: calc(.15 + var(--charge) * .6); scale: calc(.6 + var(--charge) * .6); }
+.lb-table.charge-pleine .lb-jauge { animation: jauge-pleine .5s ease-in-out infinite alternate; filter: drop-shadow(0 0 10px var(--legendaire)); }
+@keyframes jauge-pleine { to { scale: 1.06; } }
+.lb-table.charge-pleine .lb-consigne { color: var(--legendaire); font-family: var(--titre); font-size: 18px; }
+
 .lb-consigne { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 5; margin: 0; text-align: center; pointer-events: none; font-size: 14.5px; font-weight: 600; color: var(--encre); text-wrap: balance; }
 .lb-consigne:empty { display: none; }
-.lb-table.a-reveler .lb-consigne { right: 150px; text-align: left; color: var(--encre-2); font-weight: 500; }
-.lb-table.a-reveler .btn-passer { color: var(--encre); border-color: color-mix(in oklab, var(--legendaire) 55%, transparent); }
-.btn-passer:disabled { opacity: .5; cursor: progress; }
 
-/* Carte face cachée : l'aura (survol, focus ou juste avant le retournement) laisse deviner la rareté. */
-.dcarte .dos { transition: box-shadow .25s, border-color .25s; }
-.dcarte.aura:not(.retournee) { z-index: 5; }
-.dcarte.aura:not(.retournee) .dcarte-in { transform: translateY(-6px) scale(1.05); transition-duration: .25s; }
-.dcarte.aura:not(.retournee) .dos {
-  border-color: var(--c);
-  box-shadow: inset 0 0 0 5px #15121f, inset 0 0 0 6px var(--c),
-    0 0 calc(14px + var(--rang, 0) * 11px) -3px var(--c), 0 0 calc(30px + var(--rang, 0) * 28px) -16px var(--c);
+/* La scène s'assombrit et prend la couleur du faisceau. */
+.lb-voile { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity .5s; background: radial-gradient(circle at 50% 50%, transparent 25%, rgba(4,4,9,.8) 100%); }
+.lb-voile::before { content: ""; position: absolute; inset: 0; background: radial-gradient(70% 80% at 50% 55%, var(--lueur), transparent 72%); opacity: calc(.1 + var(--rang) * .055); transition: opacity .4s; }
+.lb-table.invocation .lb-voile { opacity: 1; }
+.lb-table.cartes .lb-voile { opacity: .55; }
+.lb-table.final .lb-voile { opacity: 1; }
+
+/* Le faisceau : une colonne de lumière qui s'élargit à chaque grade. */
+.lb-colonne {
+  position: absolute; left: 50%; top: -20px; bottom: 57%; width: 46px; transform: scaleX(calc(1 + var(--rang) * .65)); translate: -50% 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(to top, #fff, var(--lueur) 22%, color-mix(in oklab, var(--lueur) 65%, transparent) 75%, color-mix(in oklab, var(--lueur) 30%, transparent));
+  filter: blur(5px); mix-blend-mode: screen; opacity: 0; transform-origin: 50% 100%; scale: 1 0;
+  transition: opacity .25s, scale .45s var(--ease), transform .45s var(--ease);
 }
-.dcarte.aura[data-haut]:not(.retournee) .dos { animation: vibre .5s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .dcarte.aura .dos { animation: none !important; } .dcarte.aura:not(.retournee) .dcarte-in { transform: none; } }
+.lb-colonne::after { content: ""; position: absolute; left: 34%; right: 34%; top: 0; bottom: 0; background: #fff; filter: blur(3px); opacity: .9; }
+.lb-colonne i { position: absolute; inset: 0 -30%; background: linear-gradient(to top, #fff, var(--suivante, #fff) 25%, transparent); opacity: 0; }
+.lb-table.invocation .lb-colonne { opacity: .95; scale: 1 1; }
+.lb-table.hesite .lb-colonne { animation: hesite .1s steps(2) infinite; }
+.lb-table.hesite .lb-colonne i { animation: clignote .34s steps(1) infinite; }
+@keyframes hesite { 50% { scale: 1.3 1; } }
+@keyframes clignote { 0%, 55% { opacity: 0; } 20%, 70% { opacity: .85; } 35%, 100% { opacity: 0; } }
+.lb-table.calme .lb-colonne { scale: .3 1; opacity: .45; }
+.lb-table.calme .lb-voile { opacity: .6; }
+.lb-table.cartes .lb-colonne { opacity: 0; scale: 2.4 1; transition: opacity .5s, scale .5s var(--ease); }
+.lb-table.invocation .coffre { z-index: 2; }
+.lb-table.invocation .echelle { z-index: 5; }
+
+.lb-particules { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 7; pointer-events: none; }
+.onde-choc { position: absolute; left: var(--x); top: var(--y); width: 26px; height: 26px; margin: -13px; border-radius: 50%; border: 3px solid var(--c); pointer-events: none; z-index: 3; animation: onde .65s var(--ease) forwards; }
+
+/* Les cartes : impact, charge, vedette finale. */
+.dcarte.impact .dcarte-in { animation: impact .32s var(--ease); }
+@keyframes impact { 0% { scale: 1.16 .9; } 45% { scale: .96 1.04; } 100% { scale: 1; } }
+.dcarte.vedette { z-index: 8; }
+.dcarte.vedette.charge .dos { animation: vibre .13s linear infinite; }
+.dcarte.lente .dcarte-in { transition: transform 1.2s cubic-bezier(.5, 0, .15, 1); }
+.dcarte.vedette.retournee .face { box-shadow: 0 0 0 2px var(--c), 0 0 70px -6px var(--c), 0 30px 60px -20px #000; }
+.lb-table.cartes .coffre .rayons { opacity: .22; }
+.lb-table.final .coffre .rayons { opacity: .85; }
+.lb-table.final .coffre .halo { opacity: .8; scale: 2; }
+
+/* Bouton « Encore » : sur la table, là où le regard est déjà. */
+.lb-encore { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 9; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.lb-encore[hidden] { display: none; }
+.lb-btn-encore { scroll-margin-block: 90px 190px; display: inline-flex; align-items: center; gap: 9px; padding: 12px 22px; animation: encore 1.5s ease-in-out infinite; }
+.lb-btn-encore svg { width: 19px; height: 19px; }
+@keyframes encore { 50% { box-shadow: 0 10px 22px -12px rgba(0,0,0,.9), inset 0 -2px 0 rgba(0,0,0,.18), 0 0 0 7px color-mix(in oklab, var(--legendaire) 22%, transparent); } }
+.lb-encore .mention { text-shadow: 0 1px 6px #000; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-colonne, .lb-table.hesite .lb-colonne, .lb-colonne i, .lb-btn-encore, .dcarte.vedette.charge .dos, .lb-jauge { animation: none !important; }
+}
 .btn-ouvrir[data-manque]:disabled { cursor: not-allowed; }
 .btn-ouvrir[hidden] { display: none; }
 .lb-sous-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -156,7 +213,7 @@
   .lb-actions .btn-ouvrir { flex: 1 1 0; min-width: 0; min-height: 48px; padding: 10px 4px; font-size: 13.5px; white-space: nowrap; }
   .lb-combien { flex: none; }
   .lb-consigne { font-size: 13.5px; bottom: 12px; }
-  .lb-table.a-reveler .lb-consigne { right: 128px; }
+  .lb-encore { flex-direction: column; gap: 4px; bottom: 8px; }
   .lb-aide { font-size: 13px; line-height: 1.35; }
   .lb-sous-actions .btn-son { padding: 8px 10px; min-height: 40px; min-width: 44px; justify-content: center; }
   .lb-son-libelle { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -229,7 +286,7 @@
 .dcarte.pop .dcarte-in { animation: pop .55s var(--ease); }
 @keyframes pop { 35% { scale: var(--pop, 1.1); } }
 .table-jeu.focus .dcarte:not(.vedette) { filter: brightness(.3) saturate(.5); }
-.dcarte.vedette { z-index: 5; }
+.dcarte.vedette { z-index: 8; }
 .piece {
   position: absolute; top: -12px; left: var(--x); width: 8px; height: 8px; z-index: 7; pointer-events: none;
   background: var(--legendaire); box-shadow: inset -2px -2px 0 #b8841f, inset 2px 2px 0 #fff1c2;

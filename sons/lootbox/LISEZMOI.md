@@ -9,12 +9,15 @@ Un nom absent de la liste, ou un fichier illisible, garde le son généré.
 
 | Nom | Quand | Remarque |
 |---|---|---|
-| `tension` | Le coffre tremble, après le clic | Joué en boucle (environ 1 s), coupé net à l'explosion |
-| `tic` | Boutique : la jauge d'un achat qui se charge | Accéléré d'un cran à chaque palier |
-| `explosion` | Le couvercle saute | Toujours le même : il ne doit pas trahir la rareté |
-| `indice-commun` … `indice-legendaire` | Survol d'une carte face cachée (ou juste avant son retournement au toucher) | Discret : c'est l'indice qui laisse deviner la rareté. `indice` seul sert pour toutes les raretés sans fichier dédié |
-| `rarete-commun` … `rarete-legendaire` | Quand une carte Rare ou mieux se retourne | Aussi utilisé pour les succès, la boutique et l'essai du son dans Paramètres |
-| `envol` | Les cartes jaillissent du coffre | Un par carte, à 70 ms d'écart |
+| `tension` | Le coffre se charge pendant qu'on le maintient ; puis la meilleure carte qui descend au ralenti | Joué en boucle, coupé net au lancement |
+| `relache` | Coffre relâché avant la fin de la charge ; le faisceau qui retombe après sa dernière hésitation | |
+| `explosion` | Le couvercle saute, puis à chaque grade franchi | `explosion-<rareté>` est prioritaire s'il existe |
+| `faisceau` | Le faisceau part du coffre | |
+| `tic` | Le faisceau hésite avant de monter d'un grade (3 fois par palier) ; coffre chargé à bloc | Accéléré d'un cran à chaque palier. Sert aussi à la boutique |
+| `battement` | Faux calme avant un Épique ou un Légendaire ; charge d'une carte Épique ou mieux | |
+| `rarete-commun` … `rarete-legendaire` | Chaque grade atteint par le faisceau, puis chaque carte Rare ou mieux qui se retourne | Aussi utilisé pour les succès, la boutique et l'essai du son dans Paramètres |
+| `impact` | Une carte s'abat sur la table | `impact-<rareté>` est prioritaire s'il existe |
+| `envol` | Une carte tombe vers la table | Un par carte |
 | `retournement` | Une carte se retourne | |
 | `combo` | Une carte se retourne | Monte d'une note à chaque carte : prends une note courte |
 | `nouveau` | Badge « Nouveau ! » | |

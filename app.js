@@ -640,13 +640,12 @@ function combo(i) {
   if (fichierLb(["combo"], { vitesse: Math.pow(2, Math.min(demi, 24) / 12) })) return;
   note(523.25 * Math.pow(2, demi / 12), 0, 0.24, "triangle", 0.08, 0.2);
 }
-// Indice de rareté au survol d'une carte face cachée : discret, plus riche à mesure que la carte est rare.
-const INDICES = [[330], [392], [523, 784], [659, 988, 1319], [784, 1175, 1568, 2349]];
-function indice(rang) {
-  if (!sonActif) return;
-  if (fichierLb(["indice-" + ORDRE_RARETE[rang], "indice"], { vol: 0.5 })) return;
-  INDICES[rang].forEach((f, i) => note(f, i * 0.05, 0.3 + rang * 0.12, "sine", 0.045, REVERB[rang]));
-  if (rang >= 3) coup(90, 50, 0, 0.25, 0.22);
+// Invocation : le coffre qu'on relâche trop tôt, le faisceau qui part, une carte qui s'abat.
+function relache() { if (fichierLb(["relache"])) return; souffle(1800, 200, 0.28, 0.22, "lowpass"); coup(180, 60, 0, 0.25, 0.3); }
+function faisceau() { if (fichierLb(["faisceau"])) return; souffle(300, 5200, 0.55, 0.4); note(110, 0, 1.1, "sawtooth", 0.05, 0.4); }
+function impact(rang = 0) {
+  if (fichierLb(["impact-" + ORDRE_RARETE[rang], "impact"], { vitesse: 1 - rang * 0.06 })) return;
+  coup(170 - rang * 18, 42, 0, 0.14 + rang * 0.05, 0.55); souffle(1400, 300, 0.09, 0.18, "lowpass");
 }
 function scintille() { if (fichierLb(["nouveau"])) return; [1568, 1976, 2349, 2637, 3136].forEach((f, i) => note(f, i * 0.045, 0.32, "sine", 0.06, 0.5)); }
 function cloche(niveau) {
@@ -674,7 +673,7 @@ function sonRarete(rang) {
 
 App.sons = {
   demarrer: demarrerAudio, rarete: sonRarete, grondement: () => tension(2), tension, tic, battement, explosion,
-  envol, indice, retournement, combo, scintille, cloche, accordMax, tinte,
+  envol, relache, faisceau, impact, retournement, combo, scintille, cloche, accordMax, tinte,
   get actif() { return sonActif; },
   set actif(v) { sonActif = !!v; },
 };

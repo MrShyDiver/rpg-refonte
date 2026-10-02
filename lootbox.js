@@ -1,13 +1,21 @@
 "use strict";
-// Lootbox : la page d'arrivée. Le joueur choisit combien de lootbox ouvrir, clique sur le coffre,
-// puis retourne lui-même chaque carte : au survol, une aura et un son discret laissent deviner la
-// rareté. « Tout révéler » les retourne une par une, dans un ordre aléatoire.
-// Le tirage est fait par ouvrir_lootbox au clic sur le coffre : l'animation ne fait que le révéler.
+// Lootbox : la page d'arrivée. L'ouverture est une invocation :
+//   1. le joueur maintient le coffre pour le charger (un simple clic le charge tout seul) ;
+//   2. le couvercle saute, un faisceau part et « monte en grade » de rareté en rareté, en hésitant
+//      à chaque palier, jusqu'à la meilleure rareté du tirage ;
+//   3. les cartes s'abattent une à une, de la moins rare à la plus rare ; la meilleure (Épique ou
+//      Légendaire) arrive en dernier, en grand, au ralenti ;
+//   4. bilan et bouton « Encore ».
+// Le tirage est fait par ouvrir_lootbox au lancement : l'animation ne fait que révéler le résultat.
 (function () {
 const { $, $$, el, icone, fmt, nombre, RARETES, ORDRE_RARETE, SLOTS, rangRarete, couleur } = App;
 
-const INDICE_MS = 420; // l'aura se montre ce temps-là avant un retournement sans survol (toucher, clavier, Tout révéler)
-const ECART = [260, 300, 480, 700, 950]; // « Tout révéler » : pause après chaque carte, par rareté (ms)
+const DUREE_CHARGE = 1100;  // maintien nécessaire pour charger le coffre (ms)
+const CLIC_MS = 250;        // relâché avant : c'était un simple clic, la charge continue seule
+const TENUE_MAX = 2500;     // coffre chargé à bloc : il part tout seul après ce délai
+const CHARGE = [0, 0, 260, 520, 800];     // une carte posée se charge de sa couleur avant de se retourner (ms, par rareté)
+const ECART = [90, 130, 320, 520, 800];   // pause avant la carte suivante : les communes tombent en rafale
+const BLANC = "#f4f2ec";
 const VIBRATIONS = [null, null, [25], [40, 40, 90], [70, 50, 70, 50, 260]]; // mobile, par rareté (ms)
 const MAX_PAR_OUVERTURE = 10; // limite de ouvrir_lootbox
 const CLE_HISTO = "lootbox-session";
@@ -50,14 +58,14 @@ App.demarrer("lootbox", async (main, ctx) => {
   const stock = (t) => Number((t === "legendaire" ? ctx.joueur.lootbox_legendaire : ctx.joueur.lootbox) || 0);
   const demande = new URLSearchParams(location.search).get("type");
   let type = demande === "legendaire" || (demande !== "standard" && stock("standard") === 0 && stock("legendaire") > 0) ? "legendaire" : "standard";
-  let enCours = false, pret = false, choix = 1, etatCourant = null, dernier = null, taux = null;
+  let enCours = false, pret = false, choix = 1, charge = null, passer = false, reveils = [], tLance = 0, dernier = null, taux = null;
   const tactile = matchMedia("(hover: none)").matches;
   let histo = lireHisto();
 
   // ---------- Construction ----------
   const entete = el("header", { class: "entete-page lb-entete" },
     el("div", {}, el("h1", { texte: "Lootbox" }),
-      el("p", { texte: "Une lootbox, un objet. Choisis combien en ouvrir, clique sur le coffre, puis retourne tes cartes : leur aura trahit leur rareté." })));
+      el("p", { texte: "Une lootbox, un objet. Charge le coffre, lâche tout : plus le faisceau monte en couleur, plus ce qui tombe est rare." })));
 
   const typesBtns = ["standard", "legendaire"].map((t) => {
     const b = el("button", { type: "button", class: "type-lootbox" + (t === "legendaire" ? " version-legendaire" : ""), "data-type": t, onclick: () => choisirType(t) });
@@ -74,11 +82,27 @@ App.demarrer("lootbox", async (main, ctx) => {
   const table = el("div", { class: "table-jeu lb-table" });
   table.innerHTML = COFFRE;
   const coffre = $(".coffre", table);
-  // Le coffre se clique : le bouton couvre la table tant qu'aucune carte n'y est posée.
-  const btnCoffre = el("button", { type: "button", class: "lb-ouvrir-coffre", onclick: () => ouvrir(choix) });
+  const voile = el("span", { class: "lb-voile", "aria-hidden": "true" });
+  const colonne = el("span", { class: "lb-colonne", "aria-hidden": "true" }, el("i"));
+  const toile = el("canvas", { class: "lb-particules", "aria-hidden": "true" });
+  const echelle = el("div", { class: "echelle", hidden: true, "aria-hidden": "true" });
+  // Le coffre se maintient (ou se clique) : bouton rond posé dessus, avec la jauge de charge.
+  const btnCoffre = el("button", { type: "button", class: "lb-ouvrir-coffre" }, el("span", { class: "lb-jauge", "aria-hidden": "true" }));
   const consigne = el("p", { class: "lb-consigne", "aria-live": "polite" });
-  const btnPasser = el("button", { type: "button", class: "btn-passer", hidden: true, texte: "Tout révéler", onclick: toutReveler });
-  table.append(btnCoffre, consigne, btnPasser);
+  const btnPasser = el("button", { type: "button", class: "btn-passer", hidden: true, texte: "Passer", onclick: (e) => { e.stopPropagation(); toutPasser(); } });
+  const btnEncore = el("button", { type: "button", class: "btn-ouvrir lb-btn-encore", onclick: () => { preparer(choix); debutCharge(true); } });
+  const resteEncore = el("span", { class: "mention num" });
+  const encore = el("div", { class: "lb-encore", hidden: true }, btnEncore, resteEncore);
+  table.append(voile, colonne, echelle, btnCoffre, toile, consigne, btnPasser, encore);
+  table.addEventListener("click", (e) => { if (!e.target.closest(".dcarte, button")) toutPasser(); });
+  btnCoffre.addEventListener("pointerdown", (e) => { if (e.button) return; try { btnCoffre.setPointerCapture(e.pointerId); } catch (x) { /* pointeur déjà relâché */ } debutCharge(false); });
+  btnCoffre.addEventListener("pointerup", () => finCharge());
+  btnCoffre.addEventListener("pointercancel", () => annulerCharge());
+  btnCoffre.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); debutCharge(false); } });
+  btnCoffre.addEventListener("keyup", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); finCharge(); } });
+  btnCoffre.addEventListener("blur", () => { if (charge && !charge.auto) annulerCharge(); });
+  btnCoffre.addEventListener("click", (e) => { if (e.detail === 0 && !charge) debutCharge(true); }); // activation par un lecteur d'écran
+  btnCoffre.addEventListener("contextmenu", (e) => e.preventDefault());
 
   // Choix du nombre : les boutons préparent l'ouverture, c'est le clic sur le coffre qui la lance.
   const boutons = [1, 5, 10].map((n) => el("button", { type: "button", class: "btn-ouvrir", "aria-describedby": "lb-aide", onclick: () => preparer(n) }, "×" + n));
@@ -153,8 +177,8 @@ App.demarrer("lootbox", async (main, ctx) => {
     choisir(btnTout, tout && choix === n);
     compteTout.textContent = fmt(n);
     btnCoffre.hidden = !pret || n < 1;
-    btnCoffre.setAttribute("aria-label", "Ouvrir " + pluriel(choix, nom, nom === "lootbox" ? "lootbox" : "lootbox légendaires"));
-    if (pret) consigne.textContent = n < 1 ? "" : (tactile ? "Touche" : "Clique sur") + " le coffre pour ouvrir " + pluriel(choix, "lootbox", "lootbox");
+    btnCoffre.setAttribute("aria-label", "Invoquer " + pluriel(choix, nom, nom === "lootbox" ? "lootbox" : "lootbox légendaires") + " (maintenir, ou activer une fois)");
+    if (pret && !charge) consigne.textContent = n < 1 ? "" : (tactile ? "Maintiens le coffre" : "Maintiens le clic sur le coffre") + " pour invoquer " + pluriel(choix, "lootbox", "lootbox");
     let texte;
     if (n === 0 && autre === 0) texte = "Tu n'as plus de lootbox : gagne-les en live.";
     else if (n === 0) texte = type === "legendaire" ? `Aucune lootbox légendaire, mais ${pluriel(autre, "lootbox standard", "lootbox standard")} t'attend${autre > 1 ? "ent" : ""}.` : `Aucune lootbox standard, mais ${pluriel(autre, "lootbox légendaire", "lootbox légendaires")} t'attend${autre > 1 ? "ent" : ""}.`;
@@ -303,7 +327,7 @@ App.demarrer("lootbox", async (main, ctx) => {
   }
 
   function preparer(n) {
-    if (enCours) return;
+    if (enCours || charge) return;
     choix = n;
     remettreCoffre();
     bilan.replaceChildren();
@@ -312,7 +336,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     if (!btnCoffre.hidden) btnCoffre.focus({ preventScroll: true });
   }
   function choisirType(t) {
-    if (enCours || t === type) return;
+    if (enCours || charge || t === type) return;
     type = t;
     try { history.replaceState(null, "", t === "legendaire" ? "?type=legendaire" : location.pathname); } catch (e) { /* ignore */ }
     remettreCoffre();
@@ -321,9 +345,150 @@ App.demarrer("lootbox", async (main, ctx) => {
     majTout();
   }
 
-  // ---------- Mécanique du coffre ----------
-  const pause = (ms) => new Promise((fin) => setTimeout(fin, App.reduit ? Math.min(ms, 60) : ms));
-  const melanger = (l) => l.map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+  // ---------- Mécanique ----------
+  // Pause que « Passer » peut écourter.
+  function pause(ms) {
+    return new Promise((fin) => {
+      if (passer) return fin();
+      const t = setTimeout(fin, App.reduit ? Math.min(ms, 60) : ms);
+      reveils.push(() => { clearTimeout(t); fin(); });
+    });
+  }
+  function toutPasser() {
+    if (!enCours || passer || performance.now() - tLance < 400) return;
+    passer = true;
+    reveils.splice(0).forEach((f) => f());
+  }
+
+  // Particules : petits carrés (comme les pixels du coffre) dessinés sur une toile au-dessus de la table.
+  const P = [], ctx2 = toile.getContext("2d");
+  let rafP = 0, tP = 0, flux = 0;
+  function braise(x, y, vx, vy, g, vie, c, taille) {
+    if (App.reduit || P.length > 700) return;
+    P.push({ x, y, vx, vy, g, vie, age: 0, c, t: taille });
+    if (!rafP) { tP = performance.now(); rafP = requestAnimationFrame(dessiner); }
+  }
+  function dessiner(t) {
+    const dt = Math.min(0.05, (t - tP) / 1000), dpr = Math.min(2, devicePixelRatio || 1);
+    tP = t;
+    const w = Math.round(table.clientWidth * dpr), h = Math.round(table.clientHeight * dpr);
+    if (toile.width !== w || toile.height !== h) { toile.width = w; toile.height = h; }
+    ctx2.clearRect(0, 0, w, h);
+    ctx2.globalCompositeOperation = "lighter";
+    for (let i = P.length - 1; i >= 0; i--) {
+      const p = P[i];
+      p.age += dt;
+      if (p.age >= p.vie) { P.splice(i, 1); continue; }
+      p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      const k = 1 - p.age / p.vie, c = p.t * dpr * (0.45 + k * 0.55);
+      ctx2.globalAlpha = Math.min(1, k * 1.6);
+      ctx2.fillStyle = p.c;
+      ctx2.fillRect(p.x * dpr - c / 2, p.y * dpr - c / 2, c, c);
+    }
+    rafP = P.length ? requestAnimationFrame(dessiner) : 0;
+    if (!rafP) ctx2.clearRect(0, 0, w, h);
+  }
+  // Gerbe : n particules qui partent de (x, y) dans un cône autour de « dir » (vers le haut par défaut).
+  function gerbe(x, y, c, n, { v = 240, cone = Math.PI * 1.3, dir = -Math.PI / 2, g = 520, vie = 0.9, taille = 4 } = {}) {
+    for (let i = 0; i < n; i++) {
+      const a = dir + (Math.random() - 0.5) * cone, s = v * (0.35 + Math.random() * 0.9);
+      braise(x, y, Math.cos(a) * s, Math.sin(a) * s, g, vie * (0.6 + Math.random() * 0.8), Math.random() < 0.28 ? "#fff" : c, taille * (0.6 + Math.random() * 0.9));
+    }
+  }
+  // Braises qui montent dans le faisceau tant qu'il est allumé.
+  function demarrerFlux() {
+    arreterFlux();
+    if (App.reduit) return;
+    flux = setInterval(() => {
+      const o = centreCoffre(), rang = Number(table.style.getPropertyValue("--rang")) || 0, c = table.style.getPropertyValue("--lueur") || BLANC;
+      for (let k = 0; k < 2 + rang; k++) braise(o.x + (Math.random() - 0.5) * (22 + rang * 16), o.y, (Math.random() - 0.5) * 30, -(260 + Math.random() * 380), -160, 0.5 + Math.random() * 0.5, Math.random() < 0.3 ? "#fff" : c, 3 + Math.random() * 3);
+    }, 45);
+  }
+  function arreterFlux() { clearInterval(flux); flux = 0; }
+  function centreCoffre() {
+    const t = table.getBoundingClientRect(), r = coffre.getBoundingClientRect();
+    return { x: r.left - t.left + r.width / 2, y: r.top - t.top + r.height * 0.36 };
+  }
+  // La couleur de la scène (faisceau, halo, voile) et son intensité (rang 0 à 4).
+  function lueur(c, rang) {
+    table.style.setProperty("--lueur", c);
+    coffre.style.setProperty("--lueur", c);
+    if (rang !== undefined) table.style.setProperty("--rang", String(rang));
+  }
+  function onde(x, y, c) {
+    if (App.reduit) return;
+    const e = el("span", { class: "onde-choc", style: { "--x": x + "px", "--y": y + "px", "--c": c } });
+    table.append(e);
+    setTimeout(() => e.remove(), 700);
+  }
+
+  // ---------- La charge : maintenir le coffre ----------
+  function debutCharge(auto) {
+    if (enCours || !pret || charge || stock(type) < choix) return;
+    App.sons.demarrer();
+    if (App.reduit) { ouvrir(choix); return; }
+    // Sur un petit écran, la table vient au centre : toute la scène doit se voir.
+    const cadre = table.getBoundingClientRect();
+    if (cadre.top < 60 || cadre.bottom > innerHeight - 60) table.scrollIntoView({ block: "center", behavior: "smooth" });
+    charge = { t0: performance.now(), auto: !!auto, pleine: false, raf: 0, minuterie: 0, o: centreCoffre(), couper: App.sons.tension(DUREE_CHARGE / 1000) };
+    coffre.classList.add("tremble");
+    table.classList.add("en-charge");
+    consigne.textContent = auto ? "" : "Maintiens…";
+    majBoutons();
+    const tour = (t) => {
+      if (!charge) return;
+      const p = Math.min(1, (t - charge.t0) / DUREE_CHARGE), o = charge.o;
+      table.style.setProperty("--charge", p.toFixed(3));
+      coffre.style.setProperty("--force", (1 + p * 3.4).toFixed(2));
+      // La lumière est aspirée par le coffre.
+      if (Math.random() < 0.3 + p * 0.7) {
+        const a = Math.random() * Math.PI * 2, d = 130 + Math.random() * 80;
+        braise(o.x + Math.cos(a) * d, o.y + Math.sin(a) * d, -Math.cos(a) * d / 0.42, -Math.sin(a) * d / 0.42, 0, 0.42, Math.random() < 0.3 ? "#fff" : couleur("legendaire"), 3 + Math.random() * 3);
+      }
+      if (p >= 1 && !charge.pleine) {
+        charge.pleine = true;
+        if (charge.auto) { lancer(); return; }
+        table.classList.add("charge-pleine");
+        consigne.textContent = "Relâche !";
+        App.sons.tic(4);
+        if (navigator.vibrate) navigator.vibrate(30);
+        charge.minuterie = setTimeout(lancer, TENUE_MAX);
+      }
+      charge.raf = requestAnimationFrame(tour);
+    };
+    charge.raf = requestAnimationFrame(tour);
+  }
+  function finCharge() {
+    if (!charge || charge.auto) return;
+    if (charge.pleine) { lancer(); return; }
+    // Relâché tout de suite : c'était un simple clic, le coffre finit de se charger tout seul.
+    if (performance.now() - charge.t0 < CLIC_MS) { charge.auto = true; consigne.textContent = ""; return; }
+    annulerCharge("Maintiens jusqu'au bout, ou clique une seule fois");
+  }
+  function arreterCharge() {
+    const c = charge;
+    charge = null;
+    cancelAnimationFrame(c.raf);
+    clearTimeout(c.minuterie);
+    c.couper();
+    table.classList.remove("en-charge", "charge-pleine");
+    table.style.setProperty("--charge", "0");
+  }
+  function annulerCharge(message) {
+    if (!charge) return;
+    arreterCharge();
+    coffre.classList.remove("tremble");
+    coffre.style.setProperty("--force", "1");
+    App.sons.relache();
+    majBoutons();
+    if (message) consigne.textContent = message;
+  }
+  function lancer() {
+    if (!charge) return;
+    arreterCharge();
+    ouvrir(choix);
+  }
+
   function disposition(n) {
     const w = table.clientWidth, etroit = w < 560;
     const cols = n === 1 ? 1 : etroit ? (n <= 3 ? n : n <= 6 ? 3 : 4) : Math.min(n, 5);
@@ -340,13 +505,9 @@ App.demarrer("lootbox", async (main, ctx) => {
     // Centre verticalement le bloc de cartes (badges compris).
     const decalage = Math.max(0, (hauteur - 48 - (rangs * (dh + gy) - gy + 40)) / 2);
     positions.forEach((p) => (p.y += decalage));
-    return { dw, hauteur: hauteur + 44, positions }; // 44 px en bas pour la consigne et « Tout révéler »
+    return { dw, hauteur: hauteur + 44, positions }; // 44 px en bas pour « Passer » puis « Encore »
   }
   const placer = (d, p, rot, echelle = 1) => { d.style.transform = "translate(" + p.x + "px," + p.y + "px) rotate(" + rot + "deg) scale(" + echelle + ")"; };
-  function boucheCoffre(dw) {
-    const t = table.getBoundingClientRect(), s = coffre.querySelector("svg").getBoundingClientRect();
-    return { x: s.left - t.left + s.width / 2 - dw / 2, y: s.top - t.top + s.height * 0.3 - dw * 0.7 };
-  }
   function resultat(t, max) {
     if (t.nouveau) return { cls: "nouveau", titre: "Nouveau !", texte: "nouveau dans ta collection" };
     if (t.niveau < max) return { cls: "monte", titre: "+" + (t.niveau - 1) + " → +" + t.niveau, texte: "amélioration +" + (t.niveau - 1) + " vers +" + t.niveau + " sur +" + max, jauge: t.niveau / max };
@@ -370,22 +531,8 @@ App.demarrer("lootbox", async (main, ctx) => {
     d._numero = o.numero;
     return d;
   }
-  function rendreCliquable(d) {
-    d.setAttribute("aria-label", d._etiquette + ". Voir la fiche");
-  }
-  function etincelles(rang, c, x0, y0) {
-    if (App.reduit) return;
-    if (x0 === undefined) {
-      const t = table.getBoundingClientRect(), s = coffre.querySelector("svg").getBoundingClientRect();
-      x0 = s.left - t.left + s.width / 2; y0 = s.top - t.top + s.height * 0.35;
-    }
-    for (let i = 0; i < 8 + rang * 10; i++) {
-      const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.3, v = 60 + Math.random() * (90 + rang * 50);
-      const e = el("span", { class: "etincelle", style: { "--x": x0 + "px", "--y": y0 + "px", "--dx": (Math.cos(a) * v).toFixed(1) + "px", "--dy": (Math.sin(a) * v).toFixed(1) + "px", "--d": (0.7 + Math.random() * 0.6).toFixed(2) + "s", "--c": Math.random() < 0.3 ? "#fff" : c } });
-      table.append(e);
-      setTimeout(() => e.remove(), 1500);
-    }
-  }
+  // Compatibilité avec les anciens appels : une gerbe vers le haut, plus fournie quand c'est rare.
+  function etincelles(rang, c, x, y) { gerbe(x, y, c, 10 + rang * 14, { v: 170 + rang * 55 }); }
   const vibrer = (rang) => { if (!App.reduit && VIBRATIONS[rang] && navigator.vibrate) navigator.vibrate(VIBRATIONS[rang]); };
   function eclair(c, duree) {
     const e = el("span", { class: "eclair", style: { "--flash": c, "--df": duree + "s" } });
@@ -413,40 +560,86 @@ App.demarrer("lootbox", async (main, ctx) => {
     }
     for (let i = 0; i < 9; i++) setTimeout(App.sons.tinte, 200 + i * 110);
   }
-  // Aura + son discret : l'indice de rareté d'une carte face cachée.
-  function indice(d, rang) {
-    if (d.classList.contains("retournee") || d.classList.contains("aura")) return;
-    d.classList.add("aura");
-    App.sons.indice(rang);
+  // Échelle des raretés : elle s'allume palier par palier, jusqu'à la vraie rareté du tirage.
+  function preparerEchelle() {
+    echelle.replaceChildren(...ORDRE_RARETE.map((r) => el("span", { class: poids(r) ? null : "exclu", style: { "--c": "var(--" + r + ")" }, texte: RARETES[r].nom })));
+    echelle.hidden = false;
   }
-  // Retourne une carte. Sans survol préalable (toucher, clavier, Tout révéler), l'aura se montre d'abord un instant.
-  async function reveler(etat, i) {
-    const d = etat.cartes[i], rang = rangRarete(etat.tirages[i].rarete);
-    if (d.classList.contains("retournee") || d._enCours) return;
-    d._enCours = true;
-    if (!d.classList.contains("aura")) { indice(d, rang); await pause(INDICE_MS); }
-    retourner(etat, i);
+  function monterEchelle(rang) {
+    [...echelle.children].forEach((s, i) => {
+      s.classList.toggle("atteint", i <= rang && !s.classList.contains("exclu"));
+      s.classList.toggle("actuel", i === rang);
+    });
   }
-  function retourner(etat, i) {
+  // Le faisceau force vers le grade suivant : montera, montera pas ?
+  async function hesiter(r, suivant) {
+    if (passer) return;
+    table.style.setProperty("--suivante", couleur(ORDRE_RARETE[suivant]));
+    table.classList.add("hesite");
+    coffre.style.setProperty("--force", String(2 + r));
+    const duree = 330 + r * 110;
+    for (let k = 0; k < 3 && !passer; k++) {
+      App.sons.tic(r + k * 0.6);
+      if (r >= 2 && k === 1) App.sons.battement();
+      await pause(duree / 3);
+    }
+    table.classList.remove("hesite");
+  }
+  // Il monte : flash, onde, gerbe et motif sonore de la nouvelle rareté, chaque fois plus fort.
+  async function monter(r) {
+    const c = couleur(ORDRE_RARETE[r]);
+    if (r >= 3 && !passer) {
+      // Faux calme avant un Épique ou un Légendaire : le faisceau se resserre, un battement, puis ça part.
+      table.classList.add("calme");
+      App.sons.battement();
+      await pause(480);
+      table.classList.remove("calme");
+    }
+    lueur(c, r);
+    monterEchelle(r);
+    if (passer) return;
+    const o = centreCoffre();
+    eclair(c, 0.45 + r * 0.12);
+    secouer(0.22 + r * 0.1);
+    onde(o.x, o.y, c);
+    gerbe(o.x, o.y, c, 26 + r * 22, { v: 220 + r * 70 });
+    App.sons.explosion(r);
+    App.sons.rarete(r);
+    vibrer(r);
+    if (r >= 2) coffre.classList.add("rayonne");
+    if (r >= 4) { table.classList.remove("flash-leg"); void table.offsetWidth; table.classList.add("flash-leg"); pluieDePieces(); }
+    await pause(300 + r * 80);
+  }
+
+  // Crée la carte à sa place sur la table, face cachée.
+  function poser(etat, i) {
+    const d = creerCarteTable(etat.tirages[i]), p = etat.disp.positions[i];
+    etat.cartes[i] = d;
+    d.style.transition = "none";
+    placer(d, p, p.r);
+    d.addEventListener("click", (e) => { e.stopPropagation(); if (d.classList.contains("retournee")) ficheObjet(d._numero); });
+    d.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); d.click(); } });
+    table.append(d);
+    return d;
+  }
+  function retourner(etat, i, muet) {
     const d = etat.cartes[i], t = etat.tirages[i], rang = rangRarete(t.rarete);
-    if (d.classList.contains("retournee")) return;
-    d.classList.remove("aura");
+    d.classList.remove("charge");
     d.style.setProperty("--pop", String(1.06 + rang * 0.05));
     d.classList.add("retournee", "pop");
     if (rang >= 2 || t.nouveau) d.classList.add("eclate");
     if (rang >= 3) d.classList.add("haute");
-    rendreCliquable(d);
-    const p = etat.disp.positions[i], c = couleur(t.rarete);
+    d.setAttribute("role", "button");
+    d.tabIndex = 0;
+    d.setAttribute("aria-label", d._etiquette + ". Voir la fiche");
+    if (muet) return;
+    const c = couleur(t.rarete), r = d.getBoundingClientRect(), tb = table.getBoundingClientRect();
     App.sons.retournement();
     App.sons.combo(etat.combo++);
     if (rang >= 2) App.sons.rarete(rang);
-    etincelles(Math.max(0, rang - 1), c, p.x + etat.disp.dw / 2, p.y + etat.disp.dw * 0.7);
+    etincelles(rang, c, r.left - tb.left + r.width / 2, r.top - tb.top + r.height / 2);
     vibrer(rang);
-    if (rang >= 3) {
-      secouer(rang >= 4 ? 0.6 : 0.35); eclair(c, 0.6); tampon(t.rarete);
-      // Épique et Légendaire : le reste de la table plonge un instant dans l'ombre.
-      if (etat.cartes.length > 1) { table.classList.add("focus"); d.classList.add("vedette"); setTimeout(() => { table.classList.remove("focus"); d.classList.remove("vedette"); }, 900); }
-    }
+    if (rang >= 3) { secouer(rang >= 4 ? 0.6 : 0.35); eclair(c, 0.6); tampon(t.rarete); }
     if (rang >= 4) pluieDePieces();
     // Le son du badge (nouveau, amélioration, max) suit l'apparition du badge sous la carte.
     const cls = d._resultat;
@@ -455,43 +648,94 @@ App.demarrer("lootbox", async (main, ctx) => {
       else if (cls === "max") App.sons.accordMax();
       else if (cls === "monte") App.sons.cloche(t.niveau);
     }, 360);
-    if (--etat.reste === 0) etat.fin();
   }
-  // « Tout révéler » : les cartes restantes, une par une, dans un ordre aléatoire.
-  async function toutReveler() {
-    const etat = etatCourant;
-    if (!etat || btnPasser.disabled) return;
-    btnPasser.disabled = true;
-    for (const i of melanger(etat.cartes.map((_, k) => k))) {
-      if (etat !== etatCourant) return;
-      if (etat.cartes[i].classList.contains("retournee")) continue;
-      await reveler(etat, i);
-      await pause(ECART[rangRarete(etat.tirages[i].rarete)]);
+  // Une carte s'abat à sa place : chute, impact, charge de sa couleur si elle est rare, retournement.
+  async function abattre(etat, i) {
+    const d = poser(etat, i), t = etat.tirages[i], rang = rangRarete(t.rarete), p = etat.disp.positions[i], dw = etat.disp.dw, c = couleur(t.rarete);
+    if (passer) { retourner(etat, i, true); return; }
+    const chute = d.animate([
+      { transform: `translate(${p.x}px,${p.y - 440}px) rotate(${p.r + (i % 2 ? 10 : -10)}deg) scale(1.5)`, opacity: 0 },
+      { opacity: 1, offset: 0.3 },
+      { transform: d.style.transform, opacity: 1 }], { duration: App.reduit ? 1 : 290, easing: "cubic-bezier(.6, 0, .9, .45)" });
+    App.sons.envol();
+    await pause(290);
+    chute.finish();
+    if (!passer) {
+      d.classList.add("impact");
+      App.sons.impact(rang);
+      onde(p.x + dw / 2, p.y + dw * 0.7, c);
+      gerbe(p.x + dw / 2, p.y + dw * 1.36, c, 6 + rang * 7, { v: 150 + rang * 30, cone: Math.PI * 1.7, vie: 0.5, taille: 3 });
+      if (rang >= 2) secouer(0.14 + rang * 0.05);
+      if (CHARGE[rang]) {
+        d.style.setProperty("--vib", CHARGE[rang] + "ms");
+        d.classList.add("charge");
+        if (rang >= 3) App.sons.battement();
+        await pause(CHARGE[rang]);
+      } else await pause(70);
     }
+    retourner(etat, i, passer);
+    await pause(ECART[rang]);
+  }
+  // La meilleure carte (Épique ou Légendaire) arrive en dernier, en grand, au ralenti.
+  async function vedette(etat, i) {
+    const d = poser(etat, i), t = etat.tirages[i], rang = rangRarete(t.rarete), p = etat.disp.positions[i], dw = etat.disp.dw, n = etat.tirages.length;
+    const k = n === 1 ? 1.12 : Math.min(2.1, Math.min(table.clientWidth * 0.5, 250) / dw);
+    const centre = { x: table.clientWidth / 2 - dw / 2, y: (etat.disp.hauteur - 44) / 2 - dw * 0.7 };
+    table.classList.add("focus", "final");
+    d.classList.add("vedette");
+    lueur(couleur(t.rarete), rang);
+    d.style.opacity = "0";
+    placer(d, { x: centre.x, y: centre.y - 140 }, 0, k * 0.8);
+    void d.offsetWidth;
+    App.sons.battement();
+    await pause(350);
+    // Elle descend lentement, face cachée, en vibrant de sa couleur.
+    d.style.transition = "transform 1s cubic-bezier(.16, 1, .3, 1), opacity .5s";
+    d.style.opacity = "1";
+    placer(d, centre, 0, k);
+    d.classList.add("charge");
+    const couper = App.sons.tension(1.1);
+    await pause(560);
+    App.sons.battement();
+    await pause(560);
+    couper();
+    d.classList.add("lente");
+    retourner(etat, i, passer);
+    await pause(800 + rang * 200);
+    d.classList.remove("lente");
+    d.style.transition = "";
+    placer(d, p, p.r); // elle rejoint sa place
+    table.classList.remove("focus", "final");
+    d.classList.remove("vedette");
+    await pause(n > 1 ? 520 : 200);
   }
 
   function commandes(actives) {
     typesBtns.forEach((b) => (b.disabled = !actives));
+    btnPasser.hidden = actives;
+    table.classList.toggle("passable", !actives);
     majBoutons();
   }
   function remettreCoffre() {
-    $$(".dcarte, .etincelle, .eclair, .tampon, .piece", table).forEach((e) => e.remove());
-    table.classList.remove("flash-leg", "focus", "secoue", "a-reveler");
+    $$(".dcarte, .eclair, .tampon, .piece, .onde-choc", table).forEach((e) => e.remove());
+    table.classList.remove("flash-leg", "focus", "final", "secoue", "invocation", "cartes", "hesite", "calme", "en-charge", "charge-pleine");
     coffre.classList.remove("tremble", "ouvert", "rayonne", "recule", "inspire");
-    btnPasser.hidden = true;
-    etatCourant = null;
-    pret = true;
+    arreterFlux();
+    echelle.hidden = true;
+    encore.hidden = true;
     coffre.classList.toggle("version-legendaire", type === "legendaire");
-    coffre.style.setProperty("--lueur", "#f4f2ec");
+    lueur(BLANC, 0);
     coffre.style.setProperty("--force", "1");
+    table.style.setProperty("--charge", "0");
     table.style.setProperty("--h-table", (table.clientWidth < 560 ? 340 : 420) + "px");
     dernier = null;
+    pret = true;
   }
 
   // ---------- L'ouverture ----------
   async function ouvrir(n) {
     if (enCours || !pret || n < 1 || stock(type) < n) return;
-    enCours = true; pret = false;
+    enCours = true; pret = false; passer = false; reveils = []; tLance = performance.now();
     const leg = type === "legendaire";
     App.sons.demarrer();
     bilan.replaceChildren();
@@ -499,15 +743,27 @@ App.demarrer("lootbox", async (main, ctx) => {
     consigne.textContent = "";
     commandes(false);
 
-    // 1. Le coffre tremble pendant que le serveur tire les objets. Rien ne trahit encore les raretés.
-    coffre.classList.add("tremble");
-    const couper = App.sons.tension(1.2);
+    // 1. Le couvercle saute et le faisceau part, blanc tant que le serveur n'a pas tiré les objets.
+    const possibles = ORDRE_RARETE.map((r, k) => (poids(r) > 0 ? k : -1)).filter((k) => k >= 0);
+    preparerEchelle();
+    lueur(BLANC, 0);
+    coffre.classList.remove("tremble");
+    coffre.classList.add("ouvert");
+    table.classList.add("invocation");
+    const o = centreCoffre();
+    eclair(BLANC, 0.45);
+    secouer(0.3);
+    onde(o.x, o.y, BLANC);
+    gerbe(o.x, o.y, BLANC, 44, { v: 340 });
+    App.sons.explosion(1);
+    App.sons.faisceau();
+    vibrer(2);
+    demarrerFlux();
     let res;
     try {
-      [res] = await Promise.all([App.rpc("ouvrir_lootbox", { p_nombre: n, p_legendaire: leg }), pause(900)]);
+      [res] = await Promise.all([App.rpc("ouvrir_lootbox", { p_nombre: n, p_legendaire: leg }), pause(700)]);
       if (!res || !Array.isArray(res.tirages) || !res.tirages.length) throw new Error("L'ouverture n'a rien renvoyé. Recharge la page.");
     } catch (e) {
-      couper();
       App.erreur(e);
       enCours = false;
       remettreCoffre();
@@ -517,80 +773,63 @@ App.demarrer("lootbox", async (main, ctx) => {
     const tirages = res.tirages;
     if (leg) ctx.joueur.lootbox_legendaire = res.lootbox_restantes; else ctx.joueur.lootbox = res.lootbox_restantes;
     const rafraichi = Promise.all([App.rafraichirJoueur(), App.rafraichirCollection()]).catch((e) => console.warn(e));
-    // Les objets sont déjà acquis : l'historique de session est enregistré tout de suite (affiché après la révélation).
+    // Les objets sont déjà acquis : l'historique de session est enregistré tout de suite (affiché à la fin).
     histo = [...tirages.map((t) => ({ numero: t.numero, niveau: t.niveau, nouveau: !!t.nouveau })).reverse(), ...histo].slice(0, 40);
     ecrireHisto(histo);
-    // Ordre mélangé : la place d'une carte ne dit rien de sa rareté.
-    const ordre = melanger(tirages);
-    const rangMax = Math.max(...ordre.map((t) => rangRarete(t.rarete)));
+    // Les cartes tombent de la moins rare à la plus rare : le meilleur arrive en dernier.
+    const ordre = tirages.slice().sort((x, y) => rangRarete(x.rarete) - rangRarete(y.rarete));
+    const rangMax = rangRarete(ordre[ordre.length - 1].rarete);
+    const cMax = couleur(ORDRE_RARETE[rangMax]);
 
-    // 2. Le couvercle saute, sans couleur de rareté.
-    couper();
-    coffre.classList.remove("tremble");
-    coffre.classList.add("ouvert");
-    eclair("#f4f2ec", 0.5);
-    App.sons.explosion(1);
-    etincelles(1, "#f4f2ec");
-    await pause(560);
+    // 2. Montée en grade : le faisceau prend la couleur de chaque rareté possible, jusqu'à la meilleure du tirage.
+    const paliers = possibles.filter((k) => k <= rangMax);
+    if (!paliers.includes(rangMax)) paliers.push(rangMax);
+    lueur(couleur(ORDRE_RARETE[paliers[0]]), paliers[0]);
+    monterEchelle(paliers[0]);
+    if (!passer) App.sons.tic(0);
+    await pause(420);
+    for (let k = 1; k < paliers.length; k++) {
+      await hesiter(paliers[k - 1], paliers[k]);
+      await monter(paliers[k]);
+    }
+    // Dernière hésitation : il force vers le grade du dessus… et retombe. C'est son verdict.
+    const auDessus = possibles.find((k) => k > rangMax);
+    if (auDessus !== undefined) {
+      await hesiter(rangMax, auDessus);
+      if (!passer) App.sons.relache();
+    }
+    if (!passer) {
+      tampon(ORDRE_RARETE[rangMax]);
+      if (paliers.length === 1) App.sons.rarete(rangMax);
+      await pause(420 + rangMax * 100);
+    }
 
-    // 3. Les cartes jaillissent du coffre, face cachée.
+    // 3. Les cartes s'abattent une à une.
+    arreterFlux();
+    echelle.hidden = true;
     const disp = disposition(ordre.length);
     table.style.setProperty("--dw", disp.dw + "px");
     table.style.setProperty("--h-table", disp.hauteur + "px");
     table.classList.toggle("etroite", disp.dw < 110);
-    const bouche = boucheCoffre(disp.dw);
     coffre.classList.add("recule");
-    const cartes = ordre.map((t) => {
-      const d = creerCarteTable(t);
-      d.style.transition = "none";
-      d.style.opacity = "0";
-      placer(d, bouche, 0, 0.25);
-      table.append(d);
-      return d;
-    });
-    void table.offsetWidth;
-    cartes.forEach((d, i) => {
-      d.style.transition = "";
-      d.style.transitionDelay = i * 70 + "ms";
-      d.style.opacity = "1";
-      placer(d, disp.positions[i], disp.positions[i].r);
-      App.sons.envol(i * 0.07);
-    });
-    dernier = { n: ordre.length, cartes };
-    await pause(760 + ordre.length * 70);
-    cartes.forEach((d) => (d.style.transitionDelay = "0ms"));
+    table.classList.add("cartes");
+    await pause(380);
+    const etat = { tirages: ordre, cartes: [], disp, combo: 0 };
+    dernier = { n: ordre.length, cartes: etat.cartes };
+    for (let i = 0; i < ordre.length; i++) {
+      if (i === ordre.length - 1 && rangRarete(ordre[i].rarete) >= 3 && !passer) await vedette(etat, i);
+      else await abattre(etat, i);
+    }
+    if (passer) {
+      App.sons.rarete(rangMax);
+      if (ordre.some((t) => t.nouveau)) App.sons.scintille();
+      if (rangMax >= 3) tampon(ORDRE_RARETE[rangMax]);
+    }
+    table.classList.remove("invocation", "focus", "final");
+    lueur(cMax, rangMax);
 
-    // 4. Au joueur de retourner ses cartes : survol = aura et son de la rareté, clic = retournement.
-    const etat = { tirages: ordre, cartes, disp, combo: 0, reste: cartes.length, fin: null };
-    const fini = new Promise((f) => (etat.fin = f));
-    etatCourant = etat;
-    cartes.forEach((d, i) => {
-      const rang = rangRarete(ordre[i].rarete);
-      d.style.setProperty("--rang", String(rang));
-      d.toggleAttribute("data-haut", rang >= 3);
-      d.setAttribute("role", "button");
-      d.tabIndex = 0;
-      d.setAttribute("aria-label", `Carte ${i + 1} sur ${cartes.length}, face cachée. La retourner`);
-      d.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse") indice(d, rang); });
-      d.addEventListener("pointerleave", () => { if (!d._enCours) d.classList.remove("aura"); });
-      d.addEventListener("focus", () => { if (d.matches(":focus-visible")) indice(d, rang); });
-      d.addEventListener("blur", () => { if (!d._enCours) d.classList.remove("aura"); });
-      d.addEventListener("click", () => { if (d.classList.contains("retournee")) ficheObjet(d._numero); else reveler(etat, i); });
-      d.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); d.click(); } });
-    });
-    table.classList.add("a-reveler");
-    btnPasser.disabled = false;
-    btnPasser.hidden = cartes.length < 2;
-    consigne.textContent = tactile ? "Touche une carte pour la retourner" : "Survole une carte pour deviner sa rareté, clique pour la retourner";
-    await fini;
-    if (etat !== etatCourant) return;
-    table.classList.remove("a-reveler");
-    btnPasser.hidden = true;
-    consigne.textContent = "";
-
-    // 5. Bilan, compteurs, historique, succès.
+    // 4. Bilan, compteurs, historique, succès, et de quoi recommencer tout de suite.
     await rafraichi;
-    const cMax = couleur(ORDRE_RARETE[rangMax]);
     const nouveaux = tirages.filter((t) => t.nouveau).length;
     const montees = tirages.filter((t) => !t.nouveau && t.niveau <= (t.niveau_max || App.niveauMax(t.rarete))).length;
     const trop = tirages.length - nouveaux - montees;
@@ -605,6 +844,14 @@ App.demarrer("lootbox", async (main, ctx) => {
     majTout();
     rendreSuite(tirages);
     App.verifierSucces();
+    const reste = stock(type);
+    if (reste > 0) {
+      btnEncore.replaceChildren(icone("i-coffre-ligne"), "Encore ×" + choix);
+      resteEncore.textContent = "il t'en reste " + fmt(reste);
+      encore.hidden = false;
+      btnEncore.focus({ preventScroll: true });
+      btnEncore.scrollIntoView({ block: "nearest", behavior: App.reduit ? "auto" : "smooth" });
+    }
   }
 
   // Repositionne les cartes posées quand la largeur change.
@@ -612,12 +859,12 @@ App.demarrer("lootbox", async (main, ctx) => {
   addEventListener("resize", () => {
     clearTimeout(minuterie);
     minuterie = setTimeout(() => {
-      if (!dernier) { table.style.setProperty("--h-table", (table.clientWidth < 560 ? 340 : 420) + "px"); return; }
+      if (!dernier || enCours) { if (dernier) return; table.style.setProperty("--h-table", (table.clientWidth < 560 ? 340 : 420) + "px"); return; }
       const disp = disposition(dernier.n);
       table.style.setProperty("--dw", disp.dw + "px");
       table.style.setProperty("--h-table", disp.hauteur + "px");
       table.classList.toggle("etroite", disp.dw < 110);
-      dernier.cartes.forEach((d, i) => { d.style.transition = "none"; placer(d, disp.positions[i], disp.positions[i].r); });
+      dernier.cartes.forEach((d, i) => { if (!d) return; d.style.transition = "none"; placer(d, disp.positions[i], disp.positions[i].r); });
     }, 120);
   });
 
