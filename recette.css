@@ -43,3 +43,4 @@
 .sim-verdict.hausse { color: var(--legendaire); }
 .sim-verdict.baisse { color: #ff8a8a; }
 .sim-note { margin-top: 12px; max-width: 90ch; }
+.sim-lancer [hidden] { display: none !important; }
