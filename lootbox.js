@@ -4,8 +4,9 @@
 //   2. le couvercle saute et des faisceaux jaillissent, un palier de rareté après l'autre :
 //      1 blanc au Commun, 2 verts au Normal, 3 bleus au Rare, 4 violets à l'Épique (de larges bandes
 //      pleines, des pièces et des mini-cartes qui remontent), et au Légendaire le jackpot : toute la
-//      page s'embrase, 7 faisceaux, feux d'artifice, fontaine de pièces qui déborde de la table. À chaque palier, la musique gagne une
-//      couche, les sons et le tremblement montent d'un cran ;
+//      page s'embrase, 7 faisceaux, feux d'artifice, fontaine de pièces qui déborde de la table.
+//      Chaque palier dure le temps de son extrait musical (3 s) ; les sons et le tremblement montent
+//      d'un cran à chaque fois, et la musique finit sur la conclusion de la rareté obtenue ;
 //   3. les cartes s'abattent une à une, de la moins rare à la plus rare ; la meilleure (Épique ou
 //      Légendaire) arrive en dernier, en grand, au ralenti ;
 //   4. bilan et bouton « Encore ».
@@ -13,6 +14,7 @@
 (function () {
 const { $, $$, el, icone, fmt, nombre, RARETES, ORDRE_RARETE, SLOTS, rangRarete, couleur } = App;
 
+const DUREE_PALIER = 3000;  // un palier de rareté dure le temps de son extrait musical : 3 s sans fichier (ms)
 const DUREE_CHARGE = 1000;  // montée de tension après le clic, avant que le couvercle saute (ms)
 // Faisceaux par rareté : 1, 2, 3, 4, puis l'éventail complet du Légendaire (angles en degrés).
 const EVENTAILS = [[0], [-22, 22], [-38, 0, 38], [-57, -19, 19, 57], [-69, -46, -23, 0, 23, 46, 69]];
@@ -582,39 +584,40 @@ App.demarrer("lootbox", async (main, ctx) => {
     const duree = 330 + r * 110;
     for (let k = 0; k < 3 && !passer; k++) {
       App.sons.tic(r + k * 0.6);
-      if (r >= 2 && k === 1) App.sons.battement();
+      // Avant un Épique ou un Légendaire possible : faux calme sur le dernier temps, les faisceaux se resserrent.
+      if (r >= 2 && k === 2) { table.classList.add("calme"); App.sons.battement(); }
       await pause(duree / 3);
     }
-    table.classList.remove("hesite");
+    table.classList.remove("hesite", "calme");
     forceCoffre(r);
   }
-  // Un palier de plus : davantage de faisceaux, une couche de musique en plus, et tout monte d'un cran
+  // Le palier dure le temps de son extrait musical (3 s par défaut). Sur la fin, s'il existe un palier
+  // au-dessus, les faisceaux crépitent : montera, montera pas ?
+  async function tenir(r, debut, ms, hesite) {
+    const duree = Math.max(1200, Math.min(6000, ms || DUREE_PALIER)), h = hesite ? 330 + r * 110 : 0;
+    await pause(Math.max(0, debut + duree - h - performance.now()));
+    if (hesite) await hesiter(r);
+  }
+  // Un palier de plus : davantage de faisceaux, l'extrait musical suivant, et tout monte d'un cran
   // (flash, onde, gerbe, secousse, tremblement du coffre). Au Légendaire, c'est le paroxysme.
   async function monter(r, musique) {
     const c = teinte(r);
-    if (r >= 3 && !passer) {
-      // Faux calme avant un Épique ou un Légendaire : les faisceaux se resserrent, un battement, puis ça part.
-      table.classList.add("calme");
-      App.sons.battement();
-      await pause(480);
-      table.classList.remove("calme");
-    }
     lueur(c, r);
     monterEchelle(r);
     faisceaux(r);
     forceCoffre(r);
-    if (passer) return;
-    musique.palier(r);
+    if (passer) return { debut: 0, ms: 0 };
+    const ms = musique.palier(r), debut = performance.now();
     const o = centreCoffre();
     eclair(c, 0.45 + r * 0.12);
     secouer(0.25 + r * 0.12, 0.6 + r * 0.45);
     onde(o.x, o.y, c);
     gerbe(o.x, o.y, c, 26 + r * 22, { v: 220 + r * 70 });
     App.sons.explosion(r);
-    App.sons.rarete(r);
+    if (!ms) App.sons.rarete(r); // avec un extrait fourni, le motif généré ne joue pas par-dessus
     vibrer(r);
     if (r >= 4) await jackpot(c);
-    await pause(300 + r * 80);
+    return { debut, ms };
   }
 
   // Légendaire : le jackpot. Toute la page s'embrase, fond doré qui pulse, soleil qui tourne derrière le coffre,
@@ -667,9 +670,12 @@ App.demarrer("lootbox", async (main, ctx) => {
     d.setAttribute("aria-label", d._etiquette + ". Voir la fiche");
     if (muet) return;
     const c = couleur(t.rarete), r = d.getBoundingClientRect(), tb = table.getBoundingClientRect();
-    App.sons.retournement();
-    App.sons.combo(etat.combo++);
-    if (rang >= 2) App.sons.rarete(rang);
+    // Bruitage de la carte : le fichier « carte-<rareté> » s'il existe, sinon les sons générés.
+    if (!App.sons.carte(rang)) {
+      App.sons.retournement();
+      App.sons.combo(etat.combo++);
+      if (rang >= 2) App.sons.rarete(rang);
+    }
     etincelles(rang, c, r.left - tb.left + r.width / 2, r.top - tb.top + r.height / 2);
     vibrer(rang);
     if (rang >= 3) { secouer(rang >= 4 ? 0.6 : 0.35); eclair(c, 0.6); tampon(t.rarete); }
@@ -788,7 +794,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     coffre.classList.add("ouvert"); // il reste « tremble » : le coffre secoue pendant toute la montée
     table.classList.add("invocation");
     const musique = App.sons.musique();
-    musique.palier(premier);
+    let ms = musique.palier(premier), debut = performance.now();
     const o = centreCoffre();
     eclair(BLANC, 0.45);
     secouer(0.3, 0.6);
@@ -821,24 +827,19 @@ App.demarrer("lootbox", async (main, ctx) => {
     const rangMax = rangRarete(ordre[ordre.length - 1].rarete);
     const cMax = couleur(ORDRE_RARETE[rangMax]);
 
-    // 2. Montée en grade : un palier après l'autre, jusqu'à la meilleure rareté du tirage.
+    // 2. Montée en grade : un palier après l'autre, chacun le temps de son extrait, jusqu'à la meilleure
+    //    rareté du tirage. Puis la conclusion de cette rareté : c'est le verdict, et la fin de la musique.
     const paliers = possibles.filter((k) => k <= rangMax);
     if (!paliers.includes(rangMax)) paliers.push(rangMax);
-    await pause(420);
-    for (let k = 1; k < paliers.length; k++) {
-      await hesiter(paliers[k - 1]);
-      await monter(paliers[k], musique);
+    for (let k = 0; k < paliers.length; k++) {
+      await tenir(paliers[k], debut, ms, possibles.some((x) => x > paliers[k]));
+      if (k < paliers.length - 1) ({ debut, ms } = await monter(paliers[k + 1], musique));
     }
-    // Dernière hésitation : il force vers le grade du dessus… et retombe. C'est son verdict.
-    const auDessus = possibles.find((k) => k > rangMax);
-    if (auDessus !== undefined) {
-      await hesiter(rangMax);
-      if (!passer) App.sons.relache();
-    }
-    if (!passer) {
+    if (passer) musique.arreter();
+    else {
+      const fin = musique.conclure(rangMax);
       if (rangMax < 4) tampon(ORDRE_RARETE[rangMax]); // le Légendaire a déjà eu son jackpot
-      if (paliers.length === 1) App.sons.rarete(rangMax);
-      await pause(420 + rangMax * 100);
+      await pause(Math.max(900, Math.min(5000, fin || 1100)));
     }
 
     // 3. Les cartes s'abattent une à une.
@@ -846,7 +847,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     echelle.hidden = true;
     coffre.classList.remove("tremble");
     table.classList.remove("jackpot");
-    if (passer) musique.arreter();
+    musique.arreter();
     const disp = disposition(ordre.length);
     table.style.setProperty("--dw", disp.dw + "px");
     table.style.setProperty("--h-table", disp.hauteur + "px");
@@ -857,11 +858,9 @@ App.demarrer("lootbox", async (main, ctx) => {
     const etat = { tirages: ordre, cartes: [], disp, combo: 0 };
     dernier = { n: ordre.length, cartes: etat.cartes };
     for (let i = 0; i < ordre.length; i++) {
-      // La musique se tait juste avant la carte vedette : silence, battement, puis le retournement.
-      if (i === ordre.length - 1 && rangRarete(ordre[i].rarete) >= 3 && !passer) { musique.arreter(); await vedette(etat, i); }
+      if (i === ordre.length - 1 && rangRarete(ordre[i].rarete) >= 3 && !passer) await vedette(etat, i);
       else await abattre(etat, i);
     }
-    musique.arreter(!passer);
     if (passer) {
       App.sons.rarete(rangMax);
       if (ordre.some((t) => t.nouveau)) App.sons.scintille();

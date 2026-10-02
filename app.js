@@ -647,10 +647,13 @@ function impact(rang = 0) {
   if (fichierLb(["impact-" + ORDRE_RARETE[rang], "impact"], { vitesse: 1 - rang * 0.06 })) return;
   coup(170 - rang * 18, 42, 0, 0.14 + rang * 0.05, 0.55); souffle(1400, 300, 0.09, 0.18, "lowpass");
 }
-// Musique de l'ouverture : une boucle qui gagne une couche à chaque rareté atteinte.
-// Commun : basse. Normal : + arpège. Rare : + contretemps et charleston. Épique : + grosse caisse et mélodie.
-// Légendaire : + accords, caisse claire, un ton plus haut. Le tempo accélère à chaque palier.
-// Un fichier « musique-<rareté> » (boucle) remplace la musique générée pour ce palier.
+// Musique de l'ouverture : un extrait par palier de rareté, puis une conclusion, puis plus rien (les cartes
+// n'ont que leurs bruitages).
+//   - « musique-<rareté> » : l'extrait du palier (environ 3 s, joué une fois ; le palier dure le temps de l'extrait) ;
+//   - « conclusion-<rareté> » : la fin, jouée pour la meilleure rareté du tirage.
+// Sans fichier, la musique est générée : une boucle qui gagne une couche à chaque palier (basse, arpège,
+// contretemps et charleston, grosse caisse et mélodie, puis accords un ton plus haut) et accélère ;
+// la conclusion générée est le motif de la rareté suivi d'un accord posé.
 const ACCORDS = [[0, 4, 7], [7, 11, 14], [9, 12, 16], [5, 9, 12]]; // Do, Sol, La mineur, Fa (demi-tons depuis Do)
 function musique() {
   let rang = 0, pas = 0, minuterie = 0, fichier = null, fini = false;
@@ -674,22 +677,40 @@ function musique() {
     minuterie = setTimeout(jouer, 60000 / (116 + rang * 12) / 2);
   };
   jouer();
+  const couper = () => { if (fichier) { fichier(); fichier = null; } };
+  const duree = (nom) => { const b = tamponsLb.get(nom); return b ? b.duration * 1000 : 0; };
   return {
+    // Renvoie la durée de l'extrait en ms (0 : pas de fichier, musique générée).
     palier(r) {
       rang = r;
-      if (fichier) { fichier(); fichier = null; }
-      fichier = fichierLb(["musique-" + ORDRE_RARETE[r]], { boucle: true, vol: 0.8 });
+      couper();
+      const nom = "musique-" + ORDRE_RARETE[r];
+      fichier = fichierLb([nom], { vol: 0.9 });
+      return fichier ? duree(nom) : 0;
     },
-    // accord : termine sur un accord posé (fin normale) plutôt que net (Passer, carte vedette).
-    arreter(accord) {
+    // Fin de la musique sur la conclusion de la rareté obtenue. Renvoie sa durée en ms (0 : générée).
+    conclure(r) {
+      if (fini) return 0;
+      fini = true;
+      clearTimeout(minuterie);
+      couper();
+      const nom = "conclusion-" + ORDRE_RARETE[r];
+      if (fichierLb([nom], { vol: 0.9 })) return duree(nom);
+      sonRarete(r);
+      if (audible()) [0, 4, 7, 12].forEach((d, i) => note(hz(d + (r >= 4 ? 2 : 0), 0), 0.35 + i * 0.03, 0.9, "triangle", 0.06, 0.4));
+      return 0;
+    },
+    // Coupe net, sans conclusion (Passer, erreur).
+    arreter() {
       if (fini) return;
       fini = true;
       clearTimeout(minuterie);
-      if (fichier) fichier();
-      else if (accord && audible()) [0, 4, 7, 12].forEach((d, i) => note(hz(d + (rang >= 4 ? 2 : 0), 0), i * 0.03, 0.9, "triangle", 0.07, 0.4));
+      couper();
     },
   };
 }
+// Bruitage d'une carte qui se retourne, par rareté : « carte-<rareté> ». Renvoie false s'il n'y a pas de fichier.
+function carte(rang) { return !!fichierLb(["carte-" + ORDRE_RARETE[rang]]); }
 function scintille() { if (fichierLb(["nouveau"])) return; [1568, 1976, 2349, 2637, 3136].forEach((f, i) => note(f, i * 0.045, 0.32, "sine", 0.06, 0.5)); }
 function cloche(niveau) {
   if (fichierLb(["amelioration"], { vitesse: Math.pow(2, Math.min(niveau, 24) / 24) })) return;
@@ -716,7 +737,7 @@ function sonRarete(rang) {
 
 App.sons = {
   demarrer: demarrerAudio, rarete: sonRarete, grondement: () => tension(2), tension, tic, battement, explosion,
-  envol, relache, faisceau, impact, musique, retournement, combo, scintille, cloche, accordMax, tinte,
+  envol, relache, faisceau, impact, musique, carte, retournement, combo, scintille, cloche, accordMax, tinte,
   get actif() { return sonActif; },
   set actif(v) { sonActif = !!v; },
 };
