@@ -512,16 +512,18 @@ function nivelerEquipement(equipementBrut) {
 const REGLES_ESSAI = { BASE_PV: 200.0 }; // PV de base (100 en ligne) ; toujours 10 PV par point
 // Puissance « budget » : additive et prévisible. 200 de base, 10 par point de stat (20 en PV),
 // plus le budget de chaque objet : socle de sa rareté à +0, plafond au niveau max, linéaire entre les deux.
-// Tous les emplacements pèsent pareil ; une arme à deux mains compte double (elle prend deux emplacements).
+// Tous les emplacements pèsent pareil. Grille resserrée à pas régulier (30 entre deux raretés à +0, 95 au niveau max),
+// réglée pour qu'un légendaire gagne environ 60 % des duels quand tout le monde est au même stade (voir moteur/CORRECTIFS.md).
+// Une arme à deux mains vaut son budget + celui d'une main gauche moyenne (elle prend les deux emplacements).
 const BUDGET = {
-    BASE: 200, POINT: 10, POINT_PV: 20, DEUX_MAINS: 2,
-    RARETE: { commun: [150, 600], normal: [200, 700], rare: [280, 800], epique: [380, 900], legendaire: [500, 1000] },
+    BASE: 200, POINT: 10, POINT_PV: 20, MAIN_GAUCHE: [265, 752],
+    RARETE: { commun: [220, 610], normal: [250, 705], rare: [280, 800], epique: [310, 895], legendaire: [340, 990] },
 };
 function budgetObjet(data, niveau) {
     if (!data) return 0;
     const g = BUDGET.RARETE[data.rarete] || BUDGET.RARETE.commun, max = niveauMaxPourRarete(data.rarete);
-    const n = Math.max(0, Math.min(max, niveau || 0));
-    return (g[0] + (g[1] - g[0]) * n / max) * (data.hand === "two_handed" ? BUDGET.DEUX_MAINS : 1);
+    const t = Math.max(0, Math.min(max, niveau || 0)) / max, mg = BUDGET.MAIN_GAUCHE;
+    return g[0] + (g[1] - g[0]) * t + (data.hand === "two_handed" ? mg[0] + (mg[1] - mg[0]) * t : 0);
 }
 // stacks : { atk, def, pv, spd, luck } ; pieces : [{ data, niveau }] (les emplacements vides sont ignorés)
 function puissanceBudget(stacks, pieces) {
@@ -532,5 +534,4 @@ function puissanceBudget(stacks, pieces) {
 }
 
 if (typeof module !== 'undefined') module.exports = { CST, simulerBuild, calculerStatsEffectives, calculerPowerLevelSimule, estimerAtkEquivalentAvecStance, appliquerAmelioration, nivelerEquipement, mitigation };
-
 export { CST, appliquerAmelioration, calculerStatsEffectives, calculerPowerLevelSimule, estimerAtkEquivalent, estimerAtkEquivalentAvecStance, appliquerBonusArmeStance, appliquerStatAuPersonnage, vueArmeSelonStance, valeurStat, niveauMaxPourRarete, mitigation, simulerBuild };

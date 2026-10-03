@@ -460,35 +460,38 @@ const BUDGET = {
     BASE: 200,
     POINT: 10,
     POINT_PV: 20,
-    DEUX_MAINS: 2,
+    MAIN_GAUCHE: [
+        265,
+        752
+    ],
     RARETE: {
         commun: [
-            150,
-            600
+            220,
+            610
         ],
         normal: [
-            200,
-            700
+            250,
+            705
         ],
         rare: [
             280,
             800
         ],
         epique: [
-            380,
-            900
+            310,
+            895
         ],
         legendaire: [
-            500,
-            1000
+            340,
+            990
         ]
     }
 };
 function budgetObjet(data, niveau) {
     if (!data) return 0;
     const g = BUDGET.RARETE[data.rarete] || BUDGET.RARETE.commun, max = niveauMaxPourRarete(data.rarete);
-    const n = Math.max(0, Math.min(max, niveau || 0));
-    return (g[0] + (g[1] - g[0]) * n / max) * (data.hand === "two_handed" ? BUDGET.DEUX_MAINS : 1);
+    const t = Math.max(0, Math.min(max, niveau || 0)) / max, mg = BUDGET.MAIN_GAUCHE;
+    return g[0] + (g[1] - g[0]) * t + (data.hand === "two_handed" ? mg[0] + (mg[1] - mg[0]) * t : 0);
 }
 function puissanceBudget(stacks, pieces) {
     const st = stacks || {};

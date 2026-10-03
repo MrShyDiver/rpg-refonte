@@ -169,6 +169,11 @@ tous les emplacements × 1, arme à deux mains × 2. **Rien de tout cela n'est e
 `budgetObjet` et `puissanceBudget`, et seul le Simulateur s'en sert (mode « à l'essai »). `moteur-bac.js` expose `MoteurDuel.CST` pour que le Simulateur
 applique `BASE_PV = 200` le temps d'une simulation, puis le remette.
 
+**Grille de budget validée (3 oct., 13 h 30) — toujours à l'essai, rien en ligne.** `BUDGET.RARETE` : commun 220 → 610, normal 250 → 705, rare 280 → 800,
+épique 310 → 895, légendaire 340 → 990 (pas de 30 entre raretés à +0, de 95 au niveau max), réglée pour qu'un légendaire gagne environ 60 % des duels à stade égal.
+`BUDGET.DEUX_MAINS` disparaît : une arme à deux mains vaut son budget + `BUDGET.MAIN_GAUCHE` (265 → 752, une main gauche moyenne). Pas de coup de pouce à l'outsider (refusé).
+Le brouillon du patchnote contient les 50 objets re-réglés sur cette grille, base et passifs ensemble (voir EQUILIBRAGE-ARMES.md).
+
 Bascule en ligne le jour venu (dans cet ordre) : `CST.BASE_PV = 200` ; `puissanceDe` de la fonction `duel` et `construireCombattant` passent à `puissanceBudget` ;
 affichages de puissance du site ; `node outils/moteur-navigateur.mjs` ; redéploiement de `duel` ; `puissance_perimee = true` ; puis MrShyDiver publie les objets depuis l'atelier.
 
