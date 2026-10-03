@@ -10,6 +10,8 @@ const COL = { weapon: "arme", offhand: "offhand", torso: "armure", strategeme: "
 const STATS = ["atk", "def", "pv", "spd", "luck"];
 const ECART_COMPARABLE = 0.15; // deux builds sont « de puissance comparable » à 15 % près
 const LOT = 40;                // duels simulés entre deux rafraîchissements de l'écran
+const DUELS_PAR_POINT = 30;    // un point de la courbe n'est tracé qu'à partir de 30 duels dans son palier
+const COULEUR_MESURE = "#2f8cf0", COULEUR_AJUSTEE = "#bd861b"; // validées sur le fond des panneaux (contraste, daltonisme)
 
 App.demarrer("simulateur", async (main, ctx) => {
   const refus = () => main.replaceChildren(el("div", { class: "vide" }, el("b", { texte: "Page introuvable." }), el("a", { class: "btn-second", href: "lootbox.html", texte: "Retour au jeu" })));
@@ -34,7 +36,8 @@ App.demarrer("simulateur", async (main, ctx) => {
   function buildAuHasard(login) {
     const arme = tirer(parSlot.weapon), deuxMains = arme.data.hand === "two_handed";
     const poids = STATS.map(() => Math.random()), somme = poids.reduce((a, b) => a + b, 0);
-    const stacks = Object.fromEntries(STATS.map((k, i) => [k, Math.round((f.points * poids[i]) / somme)]));
+    const points = f.points === "hasard" ? Math.floor(Math.random() * 151) : f.points; // « au hasard » : de 0 à 150, tiré pour chaque joueur
+    const stacks = Object.fromEntries(STATS.map((k, i) => [k, Math.round((points * poids[i]) / somme)]));
     const objetsBuild = [arme, deuxMains ? null : tirer(parSlot.offhand), tirer(parSlot.torso), tirer(parSlot.strategeme)].filter(Boolean);
     return { entree: joueur(login, stacks, Object.fromEntries(objetsBuild.map((o) => [COL[o.slot], piece(o)]))), objets: objetsBuild };
   }
@@ -50,20 +53,20 @@ App.demarrer("simulateur", async (main, ctx) => {
   const lancer = el("button", { type: "button", class: "btn-principal rc-lancer", onclick: () => (enCours ? (arret = true) : simuler()) });
   const exporter = el("button", { type: "button", class: "btn-second", hidden: true, onclick: () => exporterCsv() }, "Exporter en CSV");
   const barre = el("i"), progres = el("div", { class: "jauge-niv sim-progres", hidden: true }, barre), etatTxt = el("p", { class: "mention", "aria-live": "polite" });
-  const chiffres = el("div", { class: "grille-chiffres" }), zone = el("div");
+  const chiffres = el("div", { class: "grille-chiffres" }), zone = el("div"), zoneCourbe = el("section", { class: "panneau-b sim-courbe", hidden: true });
   const noteEssai = el("p", { class: "mention sim-essai" });
   const reglages = el("div", { class: "panneau-b sim-reglages" },
     groupe("Catalogue et règles", "source", [["ligne", "En ligne"], ["essai", "À l'essai"]]),
     groupe("Duels simulés", "duels", [[1000, "1 000"], [4000, "4 000"], [12000, "12 000"], [40000, "40 000"]]),
-    groupe("Points de stats par joueur", "points", [[0, "0"], [20, "20"], [40, "40"], [80, "80"], [150, "150"]]),
+    groupe("Points de stats par joueur", "points", [[0, "0"], [20, "20"], [40, "40"], [80, "80"], [150, "150"], ["hasard", "Au hasard"]]),
     groupe("Amélioration des objets", "niveau", [["base", "Base (+0)"], ["moitie", "À mi-chemin"], ["max", "Au max"]]),
     noteEssai, el("div", { class: "sim-lancer" }, lancer, exporter, progres, etatTxt));
   const onglets = el("div", { class: "onglets-b defile", role: "group", "aria-label": "Emplacement" },
     [["tout", "Tout"], ...Object.entries(SLOTS).map(([k, s]) => [k, s.pluriel])].map(([k, t]) => el("button", { type: "button", "data-c": "slot", "data-v": k, onclick: () => { f.slot = k; majReglages(); rendre(); }, texte: t })));
   main.append(
     el("header", { class: "entete-page" }, el("div", {}, el("h1", { texte: "Simulateur" }),
-      el("p", { texte: `Des builds tirés au hasard dans les ${objets.length} objets du catalogue s'affrontent avec le moteur du site (${MoteurDuel.VERSION_MOTEUR}). Les deux joueurs ont le même nombre de points, répartis au hasard, et des objets au même stade d'amélioration. Les simulations ne sont pas enregistrées.` }))),
-    reglages, chiffres, el("section", { class: "section-page" }, onglets, zone));
+      el("p", { texte: `Des builds tirés au hasard dans les ${objets.length} objets du catalogue s'affrontent avec le moteur du site (${MoteurDuel.VERSION_MOTEUR}). Les deux joueurs ont le même nombre de points (ou un nombre tiré au hasard pour chacun), répartis au hasard, et des objets au même stade d'amélioration. Les simulations ne sont pas enregistrées.` }))),
+    reglages, chiffres, zoneCourbe, el("section", { class: "section-page" }, onglets, zone));
 
   function majReglages() {
     for (const b of main.querySelectorAll("[data-c]")) b.setAttribute("aria-pressed", String(String(f[b.dataset.c]) === b.dataset.v));
@@ -118,7 +121,11 @@ App.demarrer("simulateur", async (main, ctx) => {
       const attendu = 1 / (1 + Math.exp(-pente * x));
       for (const [liste, ecart] of [[oa, g - attendu], [ob, attendu - g]]) for (const o of liste) { const s = stat.get(o.numero); s.nc++; s.vc += 0.5 + ecart; }
     }
-    res = { stat, tot, reglages: { ...f }, puissances: new Map(objets.map((o) => [o.numero, puissanceDe(o)])) };
+    // Courbe : victoires de l'attaquant par palier de 10 % d'écart de puissance (défenseur par rapport à l'attaquant).
+    const paliers = new Map();
+    for (const [x, g] of duels) { const k = Math.round((Math.exp(-x) - 1) * 10), p = paliers.get(k) || [0, 0]; p[0] += g; p[1]++; paliers.set(k, p); }
+    const courbe = { pente, points: [...paliers].filter(([, p]) => p[1] >= DUELS_PAR_POINT).map(([k, [v, n]]) => ({ e: k * 10, taux: (100 * v) / n, n })).sort((a, b) => a.e - b.e) };
+    res = { stat, tot, courbe, reglages: { ...f }, puissances: new Map(objets.map((o) => [o.numero, puissanceDe(o)])) };
     enCours = false; progres.hidden = true; barre.style.width = "0";
     etatTxt.textContent = arret ? `Arrêté après ${fmt(tot.n)} duels.` : `${fmt(tot.n)} duels simulés.`;
     majReglages(); rendre();
@@ -141,7 +148,76 @@ App.demarrer("simulateur", async (main, ctx) => {
     if (t + m < 45) return ["Trop faible", "baisse"];
     return ["Dans la norme", ""];
   }
+  // ---------- Courbe : victoires de l'attaquant selon l'écart de puissance ----------
+  const signeEcart = (e) => (e > 0 ? "+" : e < 0 ? "−" : "") + Math.abs(e) + " %";
+  // Chance de l'attaquant d'après la courbe ajustée, pour un défenseur à e % de puissance en plus (ou en moins).
+  const attendu = (pente, e) => (e <= -100 ? 100 : 100 / (1 + Math.exp(pente * Math.log(1 + e / 100))));
+  function tracerCourbe(cadre, C) {
+    const W = Math.max(300, Math.round(cadre.clientWidth || 600)), H = W < 520 ? 240 : 300, M = { g: 46, d: 28, h: 12, b: 30 };
+    const x0 = C.points[0].e, x1 = C.points[C.points.length - 1].e, etendue = Math.max(10, x1 - x0);
+    const X = (e) => M.g + ((W - M.g - M.d) * (e - x0)) / etendue, Y = (t) => M.h + (H - M.h - M.b) * (1 - t / 100);
+    const pasX = [10, 20, 50, 100, 200].find((p) => (etendue / p) * 52 <= W - M.g - M.d) || 200;
+    const n1 = (v) => v.toFixed(1);
+    let svg = "";
+    for (const t of [0, 25, 50, 75, 100]) svg += `<line x1="${M.g}" x2="${W - M.d}" y1="${n1(Y(t))}" y2="${n1(Y(t))}" stroke="var(--trait)" stroke-width="1"/><text x="${M.g - 8}" y="${n1(Y(t) + 4)}" text-anchor="end">${t} %</text>`;
+    for (let e = Math.ceil(x0 / pasX) * pasX; e <= x1; e += pasX) svg += `<text x="${n1(X(e))}" y="${H - 8}" text-anchor="middle">${e === 0 ? "0" : signeEcart(e)}</text>`;
+    if (x0 < 0 && x1 > 0) svg += `<line x1="${n1(X(0))}" x2="${n1(X(0))}" y1="${M.h}" y2="${H - M.b}" stroke="var(--trait-fort)" stroke-width="1"/>`;
+    const ajustee = []; for (let e = x0; e <= x1 + 0.001; e += etendue / 80) ajustee.push(`${n1(X(e))},${n1(Y(attendu(C.pente, e)))}`);
+    svg += `<polyline points="${ajustee.join(" ")}" fill="none" stroke="${COULEUR_AJUSTEE}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    svg += `<polyline points="${C.points.map((p) => n1(X(p.e)) + "," + n1(Y(p.taux))).join(" ")}" fill="none" stroke="${COULEUR_MESURE}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    svg += C.points.map((p) => `<circle cx="${n1(X(p.e))}" cy="${n1(Y(p.taux))}" r="4" fill="${COULEUR_MESURE}" stroke="var(--sol-2)" stroke-width="2"/>`).join("");
+    svg += `<g class="sim-viseur" visibility="hidden"><line y1="${M.h}" y2="${H - M.b}" stroke="var(--encre-3)" stroke-width="1"/><circle r="6" fill="${COULEUR_MESURE}" stroke="var(--encre)" stroke-width="2"/></g>`;
+    cadre.replaceChildren(el("div", { html: `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Victoires de l'attaquant selon l'écart de puissance du défenseur : le détail est dans le tableau sous la courbe.">${svg}</svg>` }).firstChild);
+    // Survol : le viseur se cale sur le palier le plus proche, la bulle donne les deux valeurs et le nombre de duels.
+    const viseur = cadre.querySelector(".sim-viseur"), bulle = el("div", { class: "sim-bulle", hidden: true });
+    cadre.append(bulle);
+    const montrer = (ev) => {
+      const r = cadre.getBoundingClientRect(), x = ev.clientX - r.left;
+      const p = C.points.reduce((a, b) => (Math.abs(X(b.e) - x) < Math.abs(X(a.e) - x) ? b : a));
+      viseur.setAttribute("visibility", "visible");
+      viseur.firstChild.setAttribute("x1", X(p.e)); viseur.firstChild.setAttribute("x2", X(p.e));
+      viseur.lastChild.setAttribute("cx", X(p.e)); viseur.lastChild.setAttribute("cy", Y(p.taux));
+      const cle = (c) => el("i", { style: { "--k": c } });
+      bulle.replaceChildren(el("b", { texte: p.e === 0 ? "Puissances égales" : "Défenseur à " + signeEcart(p.e) + " de puissance" }),
+        el("span", {}, cle(COULEUR_MESURE), el("b", { class: "num", texte: fmt(p.taux, 1) + " %" }), " mesuré"),
+        el("span", {}, cle(COULEUR_AJUSTEE), el("b", { class: "num", texte: fmt(attendu(C.pente, p.e), 1) + " %" }), " courbe ajustée"),
+        el("span", { class: "mention", texte: fmt(p.n) + " duels" }));
+      bulle.hidden = false;
+      // La bulle se place à droite du viseur, à gauche si elle déborderait, et ne sort jamais du cadre.
+      const lb = bulle.offsetWidth, adroite = X(p.e) + 14;
+      bulle.style.left = Math.max(0, Math.min(W - lb, adroite + lb > W ? X(p.e) - 14 - lb : adroite)) + "px";
+      bulle.style.top = Math.max(0, Math.min(H - 110, Y(p.taux) - 50)) + "px";
+    };
+    cadre.onpointermove = montrer; cadre.onpointerdown = montrer;
+    cadre.onpointerleave = () => { viseur.setAttribute("visibility", "hidden"); bulle.hidden = true; };
+  }
+  let observateur = null;
+  function rendreCourbe() {
+    if (observateur) { observateur.disconnect(); observateur = null; }
+    zoneCourbe.hidden = !res;
+    if (!res) return;
+    const C = res.courbe, titre = el("h2", { texte: "Victoires de l'attaquant selon l'écart de puissance" });
+    if (C.points.length < 3) {
+      zoneCourbe.replaceChildren(titre, el("p", { class: "mention", texte: `Pas assez d'écarts de puissance pour tracer la courbe (il faut au moins ${DUELS_PAR_POINT} duels par palier de 10 %). Choisis « Au hasard » pour les points de stats, ou simule plus de duels.` }));
+      return;
+    }
+    const cadre = el("div", { class: "sim-trace" });
+    const egal = C.points.find((p) => p.e === 0);
+    zoneCourbe.replaceChildren(titre,
+      el("p", { class: "mention", texte: `Écart = puissance du défenseur par rapport à celle de l'attaquant, par paliers de 10 % (au moins ${DUELS_PAR_POINT} duels par point).` + (egal ? ` À puissances égales, l'attaquant gagne ${fmt(egal.taux, 1)} % des duels.` : "") }),
+      el("div", { class: "sim-legende" }, el("span", {}, el("i", { style: { "--k": COULEUR_MESURE } }), "Mesuré dans la simulation"), el("span", {}, el("i", { style: { "--k": COULEUR_AJUSTEE } }), "Courbe ajustée (celle qui sert au calcul « à puissance égale »)")),
+      cadre,
+      el("details", { class: "sim-chiffres-courbe" }, el("summary", { texte: "Voir les chiffres de la courbe" }),
+        el("div", { class: "table-defile", tabindex: "0", role: "region", "aria-label": "Chiffres de la courbe" }, el("table", { class: "table-objets" },
+          el("thead", {}, el("tr", {}, ["Écart de puissance du défenseur", "Victoires de l'attaquant", "Courbe ajustée", "Duels"].map((t) => el("th", { scope: "col", texte: t })))),
+          el("tbody", {}, C.points.map((p) => el("tr", {}, el("th", { scope: "row", class: "num", texte: p.e === 0 ? "0 %" : signeEcart(p.e) }), el("td", { class: "num", texte: fmt(p.taux, 1) + " %" }),
+            el("td", { class: "num", texte: fmt(attendu(C.pente, p.e), 1) + " %" }), el("td", { class: "num", texte: fmt(p.n) }))))))));
+    tracerCourbe(cadre, C);
+    if (window.ResizeObserver) { let largeur = cadre.clientWidth; observateur = new ResizeObserver(() => { if (cadre.clientWidth && cadre.clientWidth !== largeur) { largeur = cadre.clientWidth; tracerCourbe(cadre, C); } }); observateur.observe(cadre); }
+  }
+
   function rendre() {
+    rendreCourbe();
     if (!res) { zone.replaceChildren(el("div", { class: "vide vide-large" }, el("b", { texte: "Aucune simulation pour l'instant" }), "Choisis tes réglages puis lance la simulation : le tableau des objets s'affichera ici.")); return; }
     const { stat, tot } = res;
     chiffres.replaceChildren(

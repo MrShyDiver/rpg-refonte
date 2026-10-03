@@ -44,3 +44,19 @@
 .sim-verdict.baisse { color: #ff8a8a; }
 .sim-note { margin-top: 12px; max-width: 90ch; }
 .sim-lancer [hidden] { display: none !important; }
+
+/* Courbe du Simulateur : victoires de l'attaquant selon l'écart de puissance */
+.sim-courbe { display: grid; gap: 10px; margin: 18px 0; }
+.sim-courbe[hidden] { display: none; }
+.sim-courbe h2 { font-size: 18px; }
+.sim-legende { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 13px; color: var(--encre-2); }
+.sim-legende i, .sim-bulle i { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--k); border-radius: 2px; vertical-align: middle; margin-right: 7px; }
+.sim-trace { position: relative; min-width: 0; touch-action: pan-y; }
+.sim-trace svg { display: block; max-width: 100%; }
+.sim-trace text { fill: var(--encre-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sim-bulle { position: absolute; display: grid; gap: 3px; padding: 10px 12px; border-radius: 10px; background: var(--sol-3); border: 1px solid var(--trait-fort); font-size: 13px; color: var(--encre-2); pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.45); z-index: 2; }
+.sim-bulle[hidden] { display: none; }
+.sim-bulle > b { color: var(--encre); font-size: 13px; }
+.sim-bulle span b { color: var(--encre); margin-right: 4px; }
+.sim-chiffres-courbe > summary { cursor: pointer; font-size: 13.5px; color: var(--encre-2); padding: 8px 0; min-height: 44px; display: flex; align-items: center; }
+.sim-chiffres-courbe .table-objets { min-width: 0; }
