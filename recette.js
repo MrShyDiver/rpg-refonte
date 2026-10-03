@@ -50,6 +50,12 @@ App.demarrer("recette", async (main, ctx) => {
   const bTout = el("button", { type: "button", class: "btn-principal" }, icone("i-cartes"), "Tout débloquer");
   bTout.onclick = () => action(bTout, () => App.rpc("recette_tout_debloquer", { p_mode: mode.value }), "Les 50 objets sont dans ta collection.");
   const credit = (lib, args, msg) => { const b = el("button", { type: "button", class: "btn-second", texte: lib }); b.onclick = () => action(b, () => App.rpc("recette_crediter", args), msg); return b; };
+  // Arène : rejouer un parcours tout de suite (ticket), ou revoir l'écran des coffres sans rejouer (fin de parcours simulée).
+  const arene = (lib, args, msg, aller) => {
+    const b = el("button", { type: "button", class: "btn-second", texte: lib });
+    b.onclick = () => action(b, () => App.rpc("recette_arene", args).then(() => { if (aller) location.href = "arene.html"; }), msg);
+    return b;
+  };
   let armeRestaurer = false;
   bRestaurer.onclick = () => {
     if (!armeRestaurer) { armeRestaurer = true; bRestaurer.textContent = "Confirmer la restauration"; setTimeout(() => { armeRestaurer = false; bRestaurer.textContent = "Restaurer mon compte"; }, 4000); return; }
@@ -181,6 +187,13 @@ App.demarrer("recette", async (main, ctx) => {
         credit("+20 tickets", { p_lootbox: 0, p_lootbox_legendaire: 0, p_tickets: 20 }, "+20 tickets de duel."),
         bRestaurer),
       el("p", { class: "mention", texte: "Pour tes tests de combat, préfère le bac à sable ou l'entraînement : un duel classé contre un vrai joueur compte pour lui." })),
+    el("section", { class: "section-page" }, el("h2", { texte: "Arène" }),
+      el("p", { class: "sous", texte: "Un ticket d'arène relance un draft complet sans attendre demain. « Coffres » te met directement en fin de parcours, coffres à ouvrir : pratique pour revoir l'animation et les sons. Ça remplace ton parcours en cours, sans toucher à ton record." }),
+      el("div", { class: "rc-actions" },
+        arene("+1 ticket d'arène", { p_action: "ticket", p_valeur: 1 }, "+1 ticket d'arène : tu peux relancer un draft."),
+        [3, 5, 7, 10].map((v) => arene(`Coffres à ${v} victoires`, { p_action: "coffres", p_valeur: v }, `Fin de parcours à ${v} victoires : coffres prêts.`, true)),
+        el("a", { class: "btn-second", href: "arene.html" }, icone("i-arene"), "Aller à l'Arène")),
+      el("p", { class: "mention", texte: "Ce sont de vrais coffres : les lootbox gagnées s'annulent avec « Restaurer mon compte », les médailles restent." })),
     el("section", { class: "section-page" }, el("h2", { texte: "Bac à sable de combat" }),
       el("p", { class: "sous", texte: "Deux builds au choix, calculés avec le moteur du serveur, regardés dans l'arène. Rien n'est enregistré : pas de ticket, pas de médailles, pas de délai, personne n'est prévenu." }),
       el("div", { class: "rc-duo" }, G.el, D.el),
