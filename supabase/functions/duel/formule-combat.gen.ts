@@ -504,6 +504,33 @@ function nivelerEquipement(equipementBrut) {
     };
 }
 
+// =========================================================================
+// RÈGLES À L'ESSAI (décidées le 3 octobre 2026, PAS ENCORE EN LIGNE)
+// Utilisées seulement par le Simulateur en mode « à l'essai ». Le jeu en ligne garde CST et
+// calculerPowerLevelSimule tant que la bascule n'est pas faite (voir moteur/CORRECTIFS.md).
+// =========================================================================
+const REGLES_ESSAI = { BASE_PV: 200.0 }; // PV de base (100 en ligne) ; toujours 10 PV par point
+// Puissance « budget » : additive et prévisible. 200 de base, 10 par point de stat (15 en PV),
+// plus le budget de chaque objet : socle de sa rareté à +0, plafond au niveau max, linéaire entre les deux.
+// Tous les emplacements pèsent pareil ; une arme à deux mains compte double (elle prend deux emplacements).
+const BUDGET = {
+    BASE: 200, POINT: 10, POINT_PV: 15, DEUX_MAINS: 2,
+    RARETE: { commun: [150, 600], normal: [200, 700], rare: [280, 800], epique: [380, 900], legendaire: [500, 1000] },
+};
+function budgetObjet(data, niveau) {
+    if (!data) return 0;
+    const g = BUDGET.RARETE[data.rarete] || BUDGET.RARETE.commun, max = niveauMaxPourRarete(data.rarete);
+    const n = Math.max(0, Math.min(max, niveau || 0));
+    return (g[0] + (g[1] - g[0]) * n / max) * (data.hand === "two_handed" ? BUDGET.DEUX_MAINS : 1);
+}
+// stacks : { atk, def, pv, spd, luck } ; pieces : [{ data, niveau }] (les emplacements vides sont ignorés)
+function puissanceBudget(stacks, pieces) {
+    const st = stacks || {};
+    const points = (st.atk || 0) + (st.def || 0) + (st.spd || 0) + (st.luck || 0);
+    return BUDGET.BASE + BUDGET.POINT * points + BUDGET.POINT_PV * (st.pv || 0)
+        + (pieces || []).reduce((t, x) => t + (x && x.data ? budgetObjet(x.data, x.niveau) : 0), 0);
+}
+
 if (typeof module !== 'undefined') module.exports = { CST, simulerBuild, calculerStatsEffectives, calculerPowerLevelSimule, estimerAtkEquivalentAvecStance, appliquerAmelioration, nivelerEquipement, mitigation };
 
 export { CST, appliquerAmelioration, calculerStatsEffectives, calculerPowerLevelSimule, estimerAtkEquivalent, estimerAtkEquivalentAvecStance, appliquerBonusArmeStance, appliquerStatAuPersonnage, vueArmeSelonStance, valeurStat, niveauMaxPourRarete, mitigation, simulerBuild };

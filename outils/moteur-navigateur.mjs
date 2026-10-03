@@ -11,7 +11,7 @@ writeFileSync(new URL("../moteur-bac.js", import.meta.url), `// Généré par ou
 "use strict";
 ${formule}
 ${moteur}
-window.MoteurDuel = { simulerDuel, construireCombattant, VERSION_MOTEUR };
+window.MoteurDuel = { simulerDuel, construireCombattant, VERSION_MOTEUR, CST }; // CST : le Simulateur y applique les règles à l'essai, le temps d'une simulation
 })();
 `);
 console.log("moteur-bac.js écrit");

@@ -44,6 +44,7 @@ const PAGES = [
   { id: "duels", titre: "Duels", href: "duels.html", icone: "i-epees", mobile: true },
   { id: "succes", titre: "Succès", href: "succes.html", icone: "i-trophee" },
   { id: "classements", titre: "Classements", href: "classements.html", icone: "i-podium" },
+  { id: "patchnotes", titre: "Patchnotes", href: "patchnotes.html", icone: "i-journal" },
 ];
 
 const SYMBOLES = "<symbol id=\"i-twitch\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z\"/></symbol><symbol id=\"i-live\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"2.2\" fill=\"currentColor\"/><path d=\"M8.2 15.8a5.4 5.4 0 0 1 0-7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.4 18.6a9.3 9.3 0 0 1 0-13.2M18.6 5.4a9.3 9.3 0 0 1 0 13.2\"/></symbol><symbol id=\"i-boite\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3.5\" y=\"9\" width=\"17\" height=\"11\" rx=\"1.5\"/><path d=\"M2.5 9h19V6.5A1.5 1.5 0 0 0 20 5H4a1.5 1.5 0 0 0-1.5 1.5zM12 5v15M12 5c-1.5-2.6-5-3-5-.6 0 1.2 1.6.9 5 .6zM12 5c1.5-2.6 5-3 5-.6 0 1.2-1.6.9-5 .6z\"/></symbol><symbol id=\"i-bouclier\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 2.8 4.5 5.6v6.1c0 4.6 3.1 8 7.5 9.5 4.4-1.5 7.5-4.9 7.5-9.5V5.6z\"/><path d=\"M12 7v10M8.2 11.2h7.6\"/></symbol><symbol id=\"i-epees\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 6.5 13 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2\"/></symbol><symbol id=\"i-retour\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5\"/></symbol><symbol id=\"i-cle\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4.5\" y=\"10.5\" width=\"15\" height=\"10\" rx=\"2\"/><path d=\"M8 10.5V7.5a4 4 0 0 1 8 0v3\"/></symbol><symbol id=\"i-etoile\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M12 2.5l2.3 6.2 6.2 2.3-6.2 2.3L12 19.5l-2.3-6.2L3.5 11l6.2-2.3z\"/></symbol><symbol id=\"i-marque\" viewBox=\"0 0 40 40\"><rect x=\"9\" y=\"4\" width=\"22\" height=\"31\" rx=\"4.5\" fill=\"#2a1d4a\" stroke=\"#b777ff\" stroke-opacity=\".6\" transform=\"rotate(-10 20 20)\"/><rect x=\"10\" y=\"5.5\" width=\"22\" height=\"31\" rx=\"4.5\" fill=\"#15121f\" stroke=\"#ffc53d\" stroke-width=\"1.5\"/><g fill=\"#ffc53d\" shape-rendering=\"crispEdges\"><rect x=\"24\" y=\"10\" width=\"3\" height=\"3\"/><rect x=\"21\" y=\"13\" width=\"3\" height=\"3\"/><rect x=\"18\" y=\"16\" width=\"3\" height=\"3\"/><rect x=\"15\" y=\"19\" width=\"3\" height=\"3\"/><rect x=\"13\" y=\"22\" width=\"3\" height=\"3\" fill=\"#b777ff\"/><rect x=\"16\" y=\"25\" width=\"3\" height=\"3\" fill=\"#b777ff\"/><rect x=\"11\" y=\"20\" width=\"3\" height=\"3\" fill=\"#b777ff\"/><rect x=\"11\" y=\"27\" width=\"3\" height=\"3\" fill=\"#f4f2ec\"/></g></symbol><symbol id=\"i-coffre\" viewBox=\"0 0 32 26\" shape-rendering=\"crispEdges\"><rect class=\"cf-o\" x=\"3\" y=\"10\" width=\"26\" height=\"15\"/><rect class=\"cf-b\" x=\"4\" y=\"11\" width=\"24\" height=\"13\"/><rect class=\"cf-bc\" x=\"4\" y=\"11\" width=\"24\" height=\"1\"/><rect class=\"cf-bs\" x=\"4\" y=\"15\" width=\"24\" height=\"1\"/><rect class=\"cf-bs\" x=\"4\" y=\"19\" width=\"24\" height=\"1\"/><rect class=\"cf-bs\" x=\"4\" y=\"23\" width=\"24\" height=\"1\"/><rect class=\"cf-m\" x=\"7\" y=\"11\" width=\"3\" height=\"13\"/><rect class=\"cf-ms\" x=\"9\" y=\"11\" width=\"1\" height=\"13\"/><rect class=\"cf-m\" x=\"22\" y=\"11\" width=\"3\" height=\"13\"/><rect class=\"cf-ms\" x=\"24\" y=\"11\" width=\"1\" height=\"13\"/><rect class=\"cf-o\" x=\"4\" y=\"2\" width=\"24\" height=\"1\"/><rect class=\"cf-o\" x=\"3\" y=\"3\" width=\"26\" height=\"8\"/><rect class=\"cf-b\" x=\"4\" y=\"3\" width=\"24\" height=\"7\"/><rect class=\"cf-bc\" x=\"4\" y=\"3\" width=\"24\" height=\"2\"/><rect class=\"cf-bs\" x=\"4\" y=\"8\" width=\"24\" height=\"1\"/><rect class=\"cf-m\" x=\"7\" y=\"3\" width=\"3\" height=\"7\"/><rect class=\"cf-ms\" x=\"9\" y=\"3\" width=\"1\" height=\"7\"/><rect class=\"cf-m\" x=\"22\" y=\"3\" width=\"3\" height=\"7\"/><rect class=\"cf-ms\" x=\"24\" y=\"3\" width=\"1\" height=\"7\"/><rect class=\"cf-ms\" x=\"3\" y=\"10\" width=\"26\" height=\"1\"/><rect class=\"cf-o\" x=\"13\" y=\"8\" width=\"6\" height=\"9\"/><rect class=\"cf-s\" x=\"14\" y=\"9\" width=\"4\" height=\"1\"/><rect class=\"cf-s\" x=\"14\" y=\"12\" width=\"4\" height=\"4\"/><rect class=\"cf-o\" x=\"15.5\" y=\"13\" width=\"1\" height=\"2\"/></symbol>";
@@ -69,6 +70,7 @@ const ICONES = `
 <symbol id="i-son" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.2 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
 <symbol id="i-cadenas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
 <symbol id="i-fleche" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-journal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h8.5L18 7v13.5H6zM14.5 3.5V7H18M9 11.5h6M9 15h6"/></symbol>
 `;
 
 // ---------------------------------------------------------------------
@@ -158,6 +160,9 @@ App.api = {
   // Set du jour : { aujourdhui: "2026-10-02", semaine: [{ jour, set, multiplicateur } × 7] }, tirée chaque lundi par le serveur.
   rotationLootbox: () => App.rpc("rotation_lootbox"),
   trocsRecents: () => App.rpc("trocs_recents"),
+  // Patchnotes publiés (lecture publique). La version courte sert à la cloche des notifications.
+  patchnotes: () => q(client().from("patchnotes").select("id,version,titre,texte,objets,publie_le,corrige_le").order("publie_le", { ascending: false }).limit(50)),
+  patchnotesRecents: () => q(client().from("patchnotes").select("id,version,titre,publie_le").order("publie_le", { ascending: false }).limit(5)),
   lootboxSets: () => q(client().from("lootbox_sets").select("*")),
   // Replays des duels : fichiers statiques duels/<id>.json publiés par le snapshot GitHub.
   replay: async (fichier) => {
@@ -854,6 +859,7 @@ function coque(page) {
   const j = App.ctx.joueur;
   const lienRecette = App.estRecetteur(j) ? el("a", { href: "recette.html", "aria-current": page === "recette" ? "page" : null }, icone("i-cle"), "Recette") : null;
   const lienSimulateur = App.estRecetteur(j) ? el("a", { href: "simulateur.html", "aria-current": page === "simulateur" ? "page" : null }, icone("i-podium"), "Simulateur") : null;
+  const lienAtelier = App.estRecetteur(j) ? el("a", { href: "atelier.html", "aria-current": page === "atelier" ? "page" : null }, icone("i-journal"), "Atelier patchnote") : null;
   const lien = (p) => el("a", { href: p.href, "aria-current": p.id === page ? "page" : null }, icone(p.icone), p.titre,
     p.id === "lootbox" ? el("span", { class: "pastille", "data-pastille-lootbox": "" }) : null);
   const lateral = el("nav", { class: "lateral", "aria-label": "Navigation du jeu" },
@@ -864,10 +870,10 @@ function coque(page) {
     el("div", { class: "nav-bas" },
       el("a", { href: "aide.html", "aria-current": page === "aide" ? "page" : null }, icone("i-livre"), "Comment jouer"),
       el("a", { href: "parametres.html", "aria-current": page === "parametres" ? "page" : null }, icone("i-reglages"), "Paramètres"),
-      lienRecette, lienSimulateur,
+      lienRecette, lienSimulateur, lienAtelier,
       el("button", { type: "button", onclick: App.seDeconnecter }, icone("i-sortie"), "Se déconnecter")));
 
-  const titrePage = (PAGES.find((p) => p.id === page) || { titre: { aide: "Comment jouer", recette: "Recette", simulateur: "Simulateur" }[page] || "Paramètres" }).titre;
+  const titrePage = (PAGES.find((p) => p.id === page) || { titre: { aide: "Comment jouer", recette: "Recette", simulateur: "Simulateur", atelier: "Atelier patchnote" }[page] || "Paramètres" }).titre;
   const cloche = el("button", { class: "bouton-icone", type: "button", "aria-label": "Notifications", "aria-expanded": "false", onclick: () => basculerNotifs(cloche) }, icone("i-cloche"));
   const haute = el("header", { class: "barre-haute" },
     el("a", { class: "marque marque-mobile", href: "lootbox.html", "aria-label": "Stream RPG" }, icone("i-marque"), el("b", { texte: "Stream RPG" })),
@@ -880,7 +886,7 @@ function coque(page) {
     PAGES.filter((p) => !p.mobile).map((p) => el("a", { href: p.href, "aria-current": p.id === page ? "page" : null }, icone(p.icone), p.titre)),
     el("a", { href: "aide.html", "aria-current": page === "aide" ? "page" : null }, icone("i-livre"), "Comment jouer"),
     el("a", { href: "parametres.html", "aria-current": page === "parametres" ? "page" : null }, icone("i-reglages"), "Paramètres"),
-    lienRecette && lienRecette.cloneNode(true), lienSimulateur && lienSimulateur.cloneNode(true),
+    lienRecette && lienRecette.cloneNode(true), lienSimulateur && lienSimulateur.cloneNode(true), lienAtelier && lienAtelier.cloneNode(true),
     el("div", { class: "legende-ressources" }, el("b", { texte: "Tes ressources" }), el("div", { "data-ressources": "" }),
       el("a", { href: "aide.html#lexique", texte: "À quoi servent-elles ?" })));
   const onglets = el("nav", { class: "barre-onglets", "aria-label": "Navigation principale" },
@@ -899,13 +905,14 @@ function coque(page) {
   return main;
 }
 
-// Notifications : dons reçus depuis le live et succès débloqués.
+// Notifications : dons reçus depuis le live, succès débloqués, duels et patchnotes publiés.
 let notifs = [];
 async function chargerNotifs(cloche) {
   try {
     const p = App.ctx.prefs || {};
     const lues = new Date(p.notifications_lues_le || 0).getTime();
-    const [dons, succes, catalogue, duels] = await Promise.all([App.api.grants(App.ctx.joueur.id), App.api.succesJoueurs(App.ctx.joueur.id), App.api.succes(), p.notif_duels !== false ? App.api.duels().catch(() => []) : []]);
+    const [dons, succes, catalogue, duels, patchs] = await Promise.all([App.api.grants(App.ctx.joueur.id), App.api.succesJoueurs(App.ctx.joueur.id), App.api.succes(), p.notif_duels !== false ? App.api.duels().catch(() => []) : [],
+      p.notif_annonces !== false && App.api.patchnotesRecents ? App.api.patchnotesRecents().catch(() => []) : []]);
     const titres = new Map(catalogue.map((s) => [s.code, s]));
     notifs = [];
     if (p.notif_lootbox !== false) dons.forEach((d) => notifs.push({ quand: d.cree_le, icone: d.type === "stat" ? "i-profil" : d.type === "lootbox_legendaire" ? "i-etoile" : "i-coffre-ligne",
@@ -917,6 +924,7 @@ async function chargerNotifs(cloche) {
       const res = d.egalite ? "Égalité" : d.vainqueur_login === moi ? "Victoire" : "Défaite";
       notifs.push({ quand: d.joue_le, icone: "i-epees", texte: `${res} en duel contre ${autre}`, lien: "combat.html?duel=" + encodeURIComponent(d.id) });
     });
+    patchs.forEach((x) => notifs.push({ quand: x.publie_le, icone: "i-journal", texte: `Patchnote ${x.version} : ${x.titre}`, lien: "patchnotes.html#patch-" + x.id }));
     notifs.sort((a, b) => new Date(b.quand) - new Date(a.quand));
     notifs = notifs.slice(0, 25).map((n) => ({ ...n, nouvelle: new Date(n.quand).getTime() > lues }));
     if (notifs.some((n) => n.nouvelle)) cloche.append(el("span", { class: "point" }));
@@ -977,6 +985,134 @@ App.demarrer = async (page, rendu, options = {}) => {
     if (m) m.replaceChildren(el("div", { class: "vide" }, el("b", { texte: "La page n'a pas pu se charger." }), "Vérifie ta connexion puis recharge la page."));
   }
 };
+
+// ---------------------------------------------------------------------
+// Patchnotes : comparaison de deux versions d'un objet (avant / après), verdict et rendu.
+// Sert à la page publique, à l'atelier réservé et à l'éditeur du Simulateur.
+// ---------------------------------------------------------------------
+// [libellé, sens] — sens : +1 = plus c'est haut, mieux c'est ; -1 = plus c'est bas, mieux c'est ; 0 = neutre.
+const CHAMPS_PATCH = {
+  baseDegatsMin: ["Dégâts de base (minimum)", 1], baseDegatsMax: ["Dégâts de base (maximum)", 1],
+  stance2BaseDegatsMin: ["Dégâts de base, 2e forme (minimum)", 1], stance2BaseDegatsMax: ["Dégâts de base, 2e forme (maximum)", 1],
+  incrementBaseDegats: ["Dégâts de base, par amélioration", 1], coupsParUsage: ["Coups par utilisation", 1],
+  degatsDirects: ["Dégâts par coup", 1], incrementDegatsDirects: ["Dégâts par coup, par amélioration", 1],
+  usagesParCombat: ["Utilisations par combat", 1], cooldownTours: ["Recharge (tours)", -1], delaiTours: ["Délai avant l'impact (tours)", -1],
+  soinDirect: ["Soin", 1], soinDureeTours: ["Durée du soin (tours)", 0], shieldMontant: ["Bouclier", 1],
+  poisonDegats: ["Poison", 1], poisonDuree: ["Durée du poison (tours)", 1], brulureDegats: ["Brûlure par tour", 1], brulureDuree: ["Durée de la brûlure (tours)", 1],
+  saignementDegats: ["Saignement par coup", 1], saignementStacksParCoup: ["Stacks de saignement par coup", 1], saignementChanceParCoup: ["Chance de saignement (%)", 1],
+  lifesteal: ["Vol de vie (%)", 1], penetration: ["Pénétration (%)", 1], paradeChance: ["Parade (%)", 1], blocage: ["Blocage (%)", 1], blocageReduction: ["Dégâts bloqués (%)", 1],
+  reflection: ["Renvoi de dégâts (%)", 1], reductionDegatsTir: ["Réduction des tirs (%)", 1], resistanceCrit: ["Anti-critique (%)", 1], resistanceFeu: ["Résistance au feu (%)", 1], resistancePoison: ["Résistance au poison (%)", 1],
+  regeneration: ["Régénération par tour", 1], etourdissementChance: ["Chance d'étourdir (%)", 1], etourdissementDureeTours: ["Durée de l'étourdissement (tours)", 1],
+  paralysieChance: ["Chance de paralysie (%)", 1], paralysieDuree: ["Durée de la paralysie (tours)", 1], briseDefPoints: ["Défense brisée (points)", 1], briseDefDuree: ["Durée de la défense brisée (tours)", 1],
+  marqueDegatsPourcentage: ["Marque : dégâts subis en plus (%)", 1], marqueDuree: ["Durée de la marque (tours)", 1], antiHealPourcentage: ["Anti-soin (%)", 1], antiHealDuree: ["Durée de l'anti-soin (tours)", 1],
+  amplificationSoinsPourcentage: ["Soins renforcés (%)", 1], amplificationDegatsFeuPourcentage: ["Dégâts de feu en plus (%)", 1], frenesieBonusSpd: ["Frénésie : vitesse gagnée", 1], frenesieDuree: ["Durée de la frénésie (tours)", 1],
+  tenaciteChance: ["Ténacité (%)", 1], dernierSouffleFractionPv: ["Dernier souffle : part des PV rendus", 1], esquiveParadeBuffPourcentage: ["Esquive ou parade renforcée (%)", 1], esquiveParadeBuffDuree: ["Durée du renfort (tours)", 1],
+  critBonus: ["Critique (%)", 1], precision: ["Précision", 1], executionSeuil: ["Exécution : seuil de PV (%)", 1], executionBonus: ["Exécution : dégâts en plus (%)", 1], rageBonusMax: ["Rage : bonus max (%)", 1], rageSeuilMin: ["Rage : seuil de PV (%)", 0],
+  bruleeReflectionDegats: ["Brûlure infligée à l'attaquant", 1], bruleeReflectionDuree: ["Durée de cette brûlure (tours)", 1],
+  rechargeTousLesCoups: ["Recharge tous les N coups", -1], rechargeSacrificePourcentage: ["PV sacrifiés à la recharge (%)", -1], reductionPvMaxPourcentage: ["PV max retirés à la cible (%)", 1],
+  autoDegatsPourcentageDesDegats: ["Contrecoup subi (%)", -1], riposteEtourdissementTousLesCoups: ["Riposte étourdissante tous les N coups", -1], dureeStance: ["Durée d'une forme (tours)", 0],
+  stance2IncrementBaseDegats: ["Dégâts de la 2e forme, par amélioration", 1],
+  multiplicateurDegats: ["Multiplicateur de dégâts", 1],
+};
+const RANG_LETTRE = { S: 6, A: 5, B: 4, C: 3, D: 2, E: 1 };
+const champDe = (nom) => (nom ? nom.charAt(0).toLowerCase() + nom.slice(1) : "");
+// Feuilles d'un objet de données, à plat : "passifsExtra.0.incrementPassif" → valeur.
+function aplatir(o, prefixe = "", m = new Map()) {
+  for (const [k, v] of Object.entries(o || {})) {
+    const c = prefixe ? prefixe + "." + k : k;
+    if (v && typeof v === "object") aplatir(v, c, m); else m.set(c, v);
+  }
+  return m;
+}
+// Libellé lisible et sens d'un champ (chemin à plat), d'après les données de l'objet.
+function libelleChamp(chemin, d) {
+  const stat = (cle) => { const st = d[cle]; return st ? (STATS[st] || st) + (st === "esquive" ? " (%)" : "") : null; };
+  let m;
+  if ((m = /^bonus(\d?)$/.exec(chemin)) && stat("stat" + m[1])) return [stat("stat" + m[1]), 1];
+  if ((m = /^increment(\d?)$/.exec(chemin)) && stat("stat" + m[1])) return [stat("stat" + m[1]) + ", par amélioration", 1];
+  if ((m = /^stance2Bonus(\d?)$/.exec(chemin)) && stat("stance2Stat" + m[1])) return [stat("stance2Stat" + m[1]) + " (2e forme)", 1];
+  if ((m = /^stance2IncrementBonus(\d?)$/.exec(chemin)) && stat("stance2Stat" + m[1])) return [stat("stance2Stat" + m[1]) + " (2e forme), par amélioration", 1];
+  if (chemin === "incrementPassif") { const b = CHAMPS_PATCH[champDe(d.statPrincipale)]; return b ? [b[0] + ", par amélioration", b[1]] : ["Passif, par amélioration", 1]; }
+  if ((m = /^passifsExtra\.(\d+)\.incrementPassif$/.exec(chemin))) { const b = CHAMPS_PATCH[champDe(((d.passifsExtra || [])[m[1]] || {}).champ)]; return b ? [b[0] + ", par amélioration", b[1]] : ["Passif secondaire, par amélioration", 1]; }
+  if ((m = /^statsExtra\.(\d+)\.(bonus|increment)$/.exec(chemin))) { const st = ((d.statsExtra || [])[m[1]] || {}).nom; return [(STATS[st] || st || "Stat") + (m[2] === "increment" ? ", par amélioration" : ""), 1]; }
+  if ((m = /^modesTir\.(\d+)\.(\w+)$/.exec(chemin))) { const b = CHAMPS_PATCH[m[2]]; return ["Mode de tir " + (Number(m[1]) + 1) + " : " + (b ? b[0].charAt(0).toLowerCase() + b[0].slice(1) : m[2]), b ? b[1] : 1]; }
+  if ((m = /^(stance2)?[sS]caling(\d)Lettre$/.exec(chemin))) { const st = d[(m[1] ? "stance2Scaling" : "scaling") + m[2] + "Stat"]; return ["Scaling " + (STATS[st] || st || m[2]) + (m[1] ? " (2e forme)" : ""), 1]; }
+  return CHAMPS_PATCH[chemin] || [chemin, 1];
+}
+// Compare deux versions des données d'un objet : lignes lisibles + verdict (buff, nerf, équilibrage).
+function diffObjet(avant, apres) {
+  const A = aplatir(avant), B = aplatir(apres), lignes = [], vus = new Set();
+  const change = (k) => A.get(k) !== B.get(k) && !(Number(A.get(k) || 0) === Number(B.get(k) || 0) && typeof (A.get(k) ?? 0) !== "string" && typeof (B.get(k) ?? 0) !== "string");
+  const cles = [...new Set([...A.keys(), ...B.keys()])].filter(change);
+  const plage = (kMin, kMax, libelle) => {
+    if (!cles.includes(kMin) && !cles.includes(kMax)) return;
+    vus.add(kMin); vus.add(kMax);
+    const a = [Number(A.get(kMin) || 0), Number(A.get(kMax) || 0)], b = [Number(B.get(kMin) || 0), Number(B.get(kMax) || 0)];
+    lignes.push({ libelle, avant: nombre(a[0]) + "–" + nombre(a[1]), apres: nombre(b[0]) + "–" + nombre(b[1]), sens: Math.sign(b[0] + b[1] - a[0] - a[1]) });
+  };
+  plage("baseDegatsMin", "baseDegatsMax", "Dégâts de base");
+  plage("stance2BaseDegatsMin", "stance2BaseDegatsMax", "Dégâts de base (2e forme)");
+  for (const k of cles) {
+    if (vus.has(k)) continue;
+    const a = A.get(k), b = B.get(k), [libelle, bon] = libelleChamp(k, apres || avant || {});
+    if (/[sS]caling\d?Lettre$/.test(k)) lignes.push({ libelle, avant: a || "–", apres: b || "–", sens: Math.sign((RANG_LETTRE[b] || 0) - (RANG_LETTRE[a] || 0)) });
+    else if (typeof a === "string" || typeof b === "string" || typeof a === "boolean" || typeof b === "boolean") lignes.push({ libelle, avant: String(a ?? "–"), apres: String(b ?? "–"), sens: 0 });
+    else lignes.push({ libelle, avant: nombre(Number(a || 0)), apres: nombre(Number(b || 0)), sens: Math.sign(Number(b || 0) - Number(a || 0)) * bon });
+  }
+  const mieux = lignes.filter((l) => l.sens > 0).length, pire = lignes.filter((l) => l.sens < 0).length;
+  return { lignes, verdict: mieux && !pire ? "buff" : pire && !mieux ? "nerf" : "equilibrage" };
+}
+const VERDICTS = { buff: ["Buff", "Buffs"], nerf: ["Nerf", "Nerfs"], equilibrage: ["Équilibrage", "Équilibrages"] };
+// Texte libre d'un patchnote → paragraphes, « ## Sous-titre », listes « - point ». Jamais de HTML interprété.
+function textePatch(texte) {
+  const racine = el("div", { class: "patch-texte" });
+  let liste = null, para = [];
+  const vider = () => { if (para.length) { racine.append(el("p", { texte: para.join(" ") })); para = []; } };
+  for (const brut of String(texte || "").split(/\r?\n/)) {
+    const l = brut.trim();
+    if (!l) { vider(); liste = null; }
+    else if (/^##\s+/.test(l)) { vider(); liste = null; racine.append(el("h3", { texte: l.replace(/^##\s+/, "") })); }
+    else if (/^[-•]\s+/.test(l)) { vider(); if (!liste) { liste = el("ul"); racine.append(liste); } liste.append(el("li", { texte: l.replace(/^[-•]\s+/, "") })); }
+    else { liste = null; para.push(l); }
+  }
+  vider();
+  return racine;
+}
+// Objets modifiés, regroupés par verdict. objets : [{ numero, nom, slot, rarete, avant, apres }].
+// action(objet) (facultatif) renvoie un bouton à afficher sur la ligne de l'objet (atelier).
+function objetsPatch(objets, action = null) {
+  const calcules = (objets || []).map((o) => ({ ...o, ...diffObjet(o.avant, o.apres) })).filter((o) => o.lignes.length);
+  const racine = el("div", { class: "patch-objets" });
+  if (!calcules.length) return racine;
+  const compte = (v) => calcules.filter((o) => o.verdict === v).length;
+  racine.append(el("p", { class: "patch-resume" }, el("b", { texte: calcules.length + (calcules.length > 1 ? " objets retouchés" : " objet retouché") }), " : ",
+    ["buff", "nerf", "equilibrage"].filter(compte).map((v) => compte(v) + " " + VERDICTS[v][compte(v) > 1 ? 1 : 0].toLowerCase()).join(", "), "."));
+  const ordreSlots = Object.keys(SLOTS);
+  const ligne = (l) => el("li", {}, el("span", { texte: l.libelle }), el("span", { class: "num avant", texte: l.avant }),
+    el("span", { class: "fleche", "aria-hidden": "true", texte: "→" }),
+    el("b", { class: "num " + (l.sens > 0 ? "hausse" : l.sens < 0 ? "baisse" : ""), texte: l.apres + (l.sens > 0 ? " ▲" : l.sens < 0 ? " ▼" : "") }));
+  const carteObjet = (o) => el("article", { class: "patch-objet", style: { "--c": `var(--${o.rarete})` } },
+    el("header", {}, el("b", { class: "nom-objet", texte: o.nom }), el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom }),
+      el("span", { class: "mention", texte: SLOTS[o.slot] ? SLOTS[o.slot].nom : o.slot }), action ? action(o) : null),
+    el("ul", { class: "patch-lignes" }, o.lignes.map(ligne)));
+  for (const v of ["buff", "nerf", "equilibrage"]) {
+    const groupe = calcules.filter((o) => o.verdict === v).sort((a, b) => ordreSlots.indexOf(a.slot) - ordreSlots.indexOf(b.slot) || rangRarete(b.rarete) - rangRarete(a.rarete) || a.nom.localeCompare(b.nom, "fr"));
+    if (!groupe.length) continue;
+    racine.append(el("details", { class: "patch-groupe " + v, open: "" },
+      el("summary", {}, el("span", { class: "patch-verdict " + v, texte: VERDICTS[v][1] }), el("span", { class: "mention num", texte: String(groupe.length) })),
+      el("div", { class: "patch-liste" }, groupe.map(carteObjet))));
+  }
+  return racine;
+}
+// Un patchnote complet : version, titre, date, texte, objets.
+function articlePatch(p, action = null) {
+  return el("article", { class: "patchnote panneau-b", id: p.id ? "patch-" + p.id : null },
+    el("header", { class: "patch-entete" }, el("span", { class: "pilule", texte: "Version " + p.version }),
+      el("h2", { texte: p.titre || "Sans titre" }),
+      el("time", { class: "mention", datetime: p.publie_le || "", texte: p.publie_le ? "Publié le " + date(p.publie_le) : "Aperçu : pas encore publié" })),
+    textePatch(p.texte), objetsPatch(p.objets, action));
+}
+App.patch = { diff: diffObjet, libelle: libelleChamp, aplatir, texte: textePatch, objets: objetsPatch, article: articlePatch };
 
 // ---------------------------------------------------------------------
 // Récit d'un tour de duel : mêmes phrases sur l'écran de combat et dans le lecteur de la page Duels.

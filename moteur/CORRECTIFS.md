@@ -160,3 +160,23 @@ Contrôle (600 duels par cas) : chance 0 → 13,8 % de critiques (théorie 15), 
 Éclair de Tomoe différé → 44,1 % (42,3), cible en Armure Anti-crit → 0 %, mode compat → 0 % ; dégâts critiques = 2 × dégâts normaux. 6 000 duels sans anomalie.
 Effet mesuré sur 20 000 duels (builds au hasard, objets à mi-chemin) : 13,5 → 12,7 tours ; Éclair de Tomoe 63,6 → 66,6 % de victoires, Solo Silo 54,5 → 57,2,
 Frappe 500kg 45,8 → 48,5, Frappe Aérienne 39,4 → 41,1, Frappe de précision 34,6 → 35,9 ; Générateur de bouclier 66,6 → 62,6, Gas Orbital 49,4 → 44,4.
+
+
+### Règles à l'essai, atelier patchnote et éditeur d'objets (03/10) — moteur inchangé (1.3.0)
+
+Décisions de MrShyDiver : **200 PV de base** (10 PV par point inchangé), **puissance par budget** avec **15 par point de PV** (10 pour les autres stats),
+tous les emplacements × 1, arme à deux mains × 2. **Rien de tout cela n'est en ligne** : c'est rangé dans `formule-combat.js` sous `REGLES_ESSAI`, `BUDGET`,
+`budgetObjet` et `puissanceBudget`, et seul le Simulateur s'en sert (mode « à l'essai »). `moteur-bac.js` expose `MoteurDuel.CST` pour que le Simulateur
+applique `BASE_PV = 200` le temps d'une simulation, puis le remette.
+
+Bascule en ligne le jour venu (dans cet ordre) : `CST.BASE_PV = 200` ; `puissanceDe` de la fonction `duel` et `construireCombattant` passent à `puissanceBudget` ;
+affichages de puissance du site ; `node outils/moteur-navigateur.mjs` ; redéploiement de `duel` ; `puissance_perimee = true` ; puis MrShyDiver publie les objets depuis l'atelier.
+
+Patchnotes : tables `public.patchnotes` (lecture publique), `private.items_brouillon` et `private.patchnote_brouillon` ; fonctions `patchnote_*`
+verrouillées par `private.recetteur()`. Les objets à l'essai ne touchent pas `public.items` avant `patchnote_publier()`, qui applique les objets,
+garde leur photo avant / après, vide le texte du brouillon et marque les puissances à recalculer (une seule transaction).
+Le verdict buff / nerf / équilibrage est calculé à l'affichage (`App.patch.diff`) à partir des deux versions.
+
+Simulateur : la colonne « à puissance égale » remplace la fenêtre à 15 %. On ajuste sur tous les duels la chance de gagner selon le rapport des puissances
+(courbe logistique à une pente), puis on mesure pour chaque objet l'écart entre victoires réelles et attendues. Raison : quand tous les builds ont les mêmes points
+et le même stade d'amélioration, la fenêtre faisait passer les objets rares pour « trop forts » simplement parce qu'ils pèsent plus lourd.

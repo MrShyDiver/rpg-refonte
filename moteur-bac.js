@@ -453,6 +453,48 @@ function nivelerEquipement(equipementBrut) {
         strat: appliquerAmelioration(equipementBrut.strat, equipementBrut.strat ? equipementBrut.strat.niveau || 0 : 0)
     };
 }
+const REGLES_ESSAI = {
+    BASE_PV: 200.0
+};
+const BUDGET = {
+    BASE: 200,
+    POINT: 10,
+    POINT_PV: 15,
+    DEUX_MAINS: 2,
+    RARETE: {
+        commun: [
+            150,
+            600
+        ],
+        normal: [
+            200,
+            700
+        ],
+        rare: [
+            280,
+            800
+        ],
+        epique: [
+            380,
+            900
+        ],
+        legendaire: [
+            500,
+            1000
+        ]
+    }
+};
+function budgetObjet(data, niveau) {
+    if (!data) return 0;
+    const g = BUDGET.RARETE[data.rarete] || BUDGET.RARETE.commun, max = niveauMaxPourRarete(data.rarete);
+    const n = Math.max(0, Math.min(max, niveau || 0));
+    return (g[0] + (g[1] - g[0]) * n / max) * (data.hand === "two_handed" ? BUDGET.DEUX_MAINS : 1);
+}
+function puissanceBudget(stacks, pieces) {
+    const st = stacks || {};
+    const points = (st.atk || 0) + (st.def || 0) + (st.spd || 0) + (st.luck || 0);
+    return BUDGET.BASE + BUDGET.POINT * points + BUDGET.POINT_PV * (st.pv || 0) + (pieces || []).reduce((t, x)=>t + (x && x.data ? budgetObjet(x.data, x.niveau) : 0), 0);
+}
 if (typeof module !== 'undefined') module.exports = {
     CST,
     simulerBuild,
@@ -1730,5 +1772,5 @@ function construireReplay(cbA, cbD, A, B, rounds, vainqueur, premierRoundFatigue
     return r;
 }
 
-window.MoteurDuel = { simulerDuel, construireCombattant, VERSION_MOTEUR };
+window.MoteurDuel = { simulerDuel, construireCombattant, VERSION_MOTEUR, CST }; // CST : le Simulateur y applique les règles à l'essai, le temps d'une simulation
 })();

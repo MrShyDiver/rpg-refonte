@@ -1,0 +1,59 @@
+/* Patchnotes : page publique, atelier réservé, éditeur d'objets du Simulateur. */
+.patchnote { display: grid; gap: 18px; margin-bottom: 22px; scroll-margin-top: 80px; }
+.patch-entete { display: grid; gap: 8px; justify-items: start; }
+.patch-entete h2 { font-size: clamp(21px, 2.4vw, 28px); font-weight: 800; letter-spacing: -.02em; }
+.patch-texte { display: grid; gap: 10px; max-width: 75ch; color: var(--encre-2); font-size: 15.5px; line-height: 1.6; }
+.patch-texte:empty { display: none; }
+.patch-texte h3 { margin-top: 8px; font-size: 17px; color: var(--encre); }
+.patch-texte ul { display: grid; gap: 6px; padding-left: 20px; list-style: disc; }
+.patch-objets { display: grid; gap: 12px; }
+.patch-objets:empty { display: none; }
+.patch-resume { color: var(--encre-2); font-size: 15px; }
+.patch-resume b { color: var(--encre); }
+.patch-groupe { border: 1px solid var(--trait); border-radius: 14px; background: var(--sol); }
+.patch-groupe > summary { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; list-style: none; min-height: 44px; }
+.patch-groupe > summary::-webkit-details-marker { display: none; }
+.patch-groupe > summary::after { content: "+"; margin-left: auto; color: var(--encre-3); font-weight: 700; }
+.patch-groupe[open] > summary::after { content: "–"; }
+.patch-verdict { font-family: var(--titre); font-weight: 700; font-size: 15px; }
+.patch-verdict.buff { color: var(--normal); }
+.patch-verdict.nerf { color: #ff8a8a; }
+.patch-verdict.equilibrage { color: var(--legendaire); }
+.patch-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 10px; padding: 0 12px 12px; }
+.patch-objet { display: grid; gap: 10px; align-content: start; padding: 14px; border-radius: 12px; background: var(--sol-2); border: 1px solid var(--trait); border-left: 3px solid var(--c, var(--trait-fort)); min-width: 0; }
+.patch-objet > header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.patch-objet > header .btn-second { margin-left: auto; padding: 6px 10px; font-size: 13px; }
+.patch-lignes { display: grid; gap: 5px; font-size: 13.5px; color: var(--encre-2); }
+.patch-lignes li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; align-items: baseline; }
+.patch-lignes .avant { color: var(--encre-3); }
+.patch-lignes .fleche { color: var(--encre-3); }
+.patch-lignes b { color: var(--encre); white-space: nowrap; }
+.patch-lignes b.hausse { color: var(--normal); }
+.patch-lignes b.baisse { color: #ff8a8a; }
+
+/* Atelier */
+.at-grille { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 22px; }
+.at-form { display: grid; gap: 12px; }
+.at-form label { display: grid; gap: 5px; font-size: 13px; color: var(--encre-3); }
+.at-form input, .at-form textarea, .ed-champ input { width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px; background: var(--sol-3); color: var(--encre); border: 1px solid var(--trait-fort); font: inherit; font-size: 15px; }
+.at-form textarea { min-height: 260px; resize: vertical; line-height: 1.5; }
+.at-form input:focus-visible, .at-form textarea:focus-visible, .ed-champ input:focus-visible { outline: 2px solid var(--legendaire); outline-offset: 1px; }
+.at-duo { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 10px; }
+.at-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.at-publier { font-size: 16px; padding: 14px 26px; min-height: 52px; }
+.at-titre { font-size: 18px; margin-bottom: 12px; }
+.at-publies { display: grid; gap: 8px; }
+.at-publie { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--trait); }
+.at-publie .btn-second { margin-left: auto; }
+@media (max-width: 900px) { .at-grille { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .at-duo { grid-template-columns: minmax(0, 1fr); } }
+
+/* Éditeur d'objet à l'essai (tiroir du Simulateur) */
+.ed { display: grid; gap: 14px; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--trait); }
+.ed h4 { font-size: 16px; }
+.ed-champs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px 12px; }
+.ed-champ { display: grid; gap: 4px; font-size: 12.5px; color: var(--encre-3); align-content: end; }
+.ed-champ.change input { border-color: var(--legendaire); }
+.ed-champ small { color: var(--encre-3); font-size: 11.5px; min-height: 15px; }
+.sim-modifie { justify-self: start; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #16120a; background: var(--legendaire); white-space: nowrap; }
+.sim-essai { grid-column: 1 / -1; }
