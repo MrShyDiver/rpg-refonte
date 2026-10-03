@@ -296,7 +296,7 @@ async function ecranTour(main, ctx) {
       el("a", { class: "lien-retour", href: "tour.html" }, picto("retour"), "Retour à la Tour"))));
 }
 
-// L'Arène à armes égales : on se bat avec le kit choisi, contre un kit de même puissance découvert au moment du combat.
+// L'Arène : on se bat avec le build drafté, contre le build d'un autre joueur au même nombre de victoires (ou du serveur), découvert au combat.
 async function ecranArene(main, ctx) {
   const moi = ctx.joueur;
   const vide = (titre, texte) => el("div", { class: "vide arene-vide" }, el("b", { texte: titre }), el("span", { texte: texte + " " }),
@@ -304,10 +304,11 @@ async function ecranArene(main, ctx) {
   main.replaceChildren(el("div", { class: "chargement", texte: "Préparation du combat…" }));
   let etat;
   try { etat = await App.api.arene(); } catch (e) { App.erreur(e); main.replaceChildren(vide("L'Arène n'a pas pu se charger.", "Vérifie ta connexion puis recharge la page.")); return; }
-  if (etat.etat !== "en_cours" || !etat.kit) { main.replaceChildren(vide(etat.etat === "choix" ? "Choisis d'abord ton kit." : "Aucun parcours en cours.", "Tout se passe sur la page de l'Arène.")); return; }
+  if (etat.etat !== "en_cours" || !etat.kit) { main.replaceChildren(vide(etat.etat === "draft" ? "Termine d'abord ton draft." : etat.etat === "coffres" ? "Ton parcours est terminé : des coffres t'attendent." : "Aucun parcours en cours.", "Tout se passe sur la page de l'Arène.")); return; }
   const kit = etat.kit, lo = Object.fromEntries(Object.entries(kit.equipement).map(([k, x]) => [k, x ? x.numero : null]));
   const niv = new Map(Object.values(kit.equipement).filter(Boolean).map((x) => [x.numero, x.niveau]));
-  const gauche = carteVersus(moi, lo, niv, kit.puissance, true);
+  const pk = App.puissance({ atk_stacks: kit.stacks.atk, def_stacks: kit.stacks.def, pv_stacks: kit.stacks.pv, spd_stacks: kit.stacks.spd, luck_stacks: kit.stacks.luck }, niv, lo);
+  const gauche = carteVersus(moi, lo, niv, pk ? Math.round(pk.powerLevel) : 0, true);
   const vd = gauche.querySelector(".vs-chiffres div:last-child");   // dans l'Arène, le bilan affiché est celui du parcours
   if (vd) vd.replaceChildren(el("b", { class: "num", texte: `${fmt(etat.victoires)}-${fmt(etat.defaites)}` }), el("span", { texte: "parcours" }));
   const lancer = el("button", { type: "button", class: "btn-principal vs-lancer" }, icone("i-epees"), el("span", { texte: "Lancer le combat" }));
@@ -315,7 +316,7 @@ async function ecranArene(main, ctx) {
     demarrerSon(); // geste utilisateur : l'audio peut démarrer
     lancer.disabled = true; lancer.classList.add("occupe"); lancer.lastChild.textContent = "Combat en cours…";
     try {
-      const rep = await App.lancerArene(false);
+      const rep = await App.lancerArene();
       if (rep.joueur) { Object.assign(ctx.joueur, rep.joueur); App.majRessources(); }
       history.replaceState(null, "", "combat.html?duel=" + encodeURIComponent(rep.duel_id));
       await pSfx; demarrerSon();
@@ -328,16 +329,16 @@ async function ecranArene(main, ctx) {
     }
   });
   main.replaceChildren(el("section", { class: "versus", "aria-labelledby": "titre-versus" },
-    el("header", { class: "vs-entete" }, el("span", { class: "vs-sur", texte: "Arène à armes égales" }), el("h1", { id: "titre-versus", texte: "Combat " + fmt(etat.victoires + etat.defaites + 1) + " du parcours" })),
+    el("header", { class: "vs-entete" }, el("span", { class: "vs-sur", texte: "Arène" }), el("h1", { id: "titre-versus", texte: "Combat " + fmt(etat.victoires + etat.defaites + 1) + " du parcours" })),
     el("div", { class: "vs-duo" }, gauche, el("div", { class: "vs-eclair", "aria-hidden": "true" }, el("span", { texte: "VS" })),
       el("div", { class: "vs-joueur mystere" },
         el("div", { class: "vs-portrait" }, el("span", { class: "vs-inconnu", "aria-hidden": "true", texte: "?" })),
         el("div", { class: "vs-ident" }, el("b", { texte: "Adversaire mystère" })),
-        el("p", { class: "vs-mystere-texte", texte: "Un kit de même puissance que le tien : tiré au hasard, ou choisi par un autre joueur. Tu le découvres au combat." }))),
+        el("p", { class: "vs-mystere-texte", texte: "Un build drafté comme le tien, par un joueur qui a déjà atteint ton nombre de victoires ou par le serveur. Tu le découvres au combat." }))),
     el("div", { class: "vs-bas" },
       el("p", { class: "vs-cout" }, icone("i-coche"), el("span", {}, el("b", { texte: "Gratuit" }), ` · ${fmt(etat.victoires)} victoire${etat.victoires > 1 ? "s" : ""} sur ${fmt(etat.max_victoires)}, ${fmt(etat.defaites)} défaite${etat.defaites > 1 ? "s" : ""} sur ${fmt(etat.max_defaites)}.`)),
       lancer,
-      el("p", { class: "mention vs-note", texte: "Tu te bats avec ton kit d'arène, pas avec ton équipement. Ce combat ne touche ni ton bilan ni ta ligue." }),
+      el("p", { class: "mention vs-note", texte: "Tu te bats avec ton build d'arène, pas avec ton équipement. Ce combat ne touche ni ton bilan ni ta ligue." }),
       el("a", { class: "lien-retour", href: "arene.html" }, picto("retour"), "Retour à l'Arène"))));
 }
 
@@ -446,7 +447,7 @@ function arene(main, ctx, opts) {
   parLogin.set(moi, ctx.joueur);
   for (const c of ["attaquant", "defenseur"]) { // replay d'un écho : portrait et nom du joueur d'origine
     const source = App.echoDe(R[c]);
-    if (source && !parLogin.has(R[c])) parLogin.set(R[c], { ...(parLogin.get(source) || {}), twitch_login: R[c], display_name: R.etage ? "Gardien de l'étage " + R.etage : R.type === "arene" ? "Kit de " + ((parLogin.get(source) || {}).display_name || source) : App.nomCombattant(R[c], parLogin) });
+    if (source && !parLogin.has(R[c])) parLogin.set(R[c], { ...(parLogin.get(source) || {}), twitch_login: R[c], display_name: R.etage ? "Gardien de l'étage " + R.etage : R.type === "arene" ? "Build de " + ((parLogin.get(source) || {}).display_name || source) : App.nomCombattant(R[c], parLogin) });
   }
   const nomDe = (l) => (parLogin.get(l) || {}).display_name || l || "?";
   const index = parNom();
@@ -1350,7 +1351,7 @@ function arene(main, ctx, opts) {
     const bouton = avecPorte ? el("button", { type: "button", class: "btn-principal intro-go" }, picto("lecture"), "Regarder le combat") : null;
     const voile = el("div", { class: "intro" + (avecPorte ? " porte" : ""), role: avecPorte ? "dialog" : null, "aria-label": "Présentation du combat" },
       el("div", { class: "intro-ligne" }, cote(G), el("div", { class: "intro-vs", texte: "VS" }), cote(D)),
-      el("div", { class: "intro-infos" }, [opts.bac ? "Bac à sable" : opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel ciblé", auto_battle: "Combat automatique", ligue: "Combat de ligue", tour: "La Tour", arene: "Arène à armes égales" }[(opts.duel || {}).type] || "Duel", R.echo_de ? "Écho" : null, TRANCHES[R.tranche] || null].filter(Boolean).join(" · ")),
+      el("div", { class: "intro-infos" }, [opts.bac ? "Bac à sable" : opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel ciblé", auto_battle: "Combat automatique", ligue: "Combat de ligue", tour: "La Tour", arene: "Arène" }[(opts.duel || {}).type] || "Duel", R.echo_de ? "Écho" : null, TRANCHES[R.tranche] || null].filter(Boolean).join(" · ")),
       compte, bouton);
     racine.append(voile);
     return { voile, compte, bouton };
@@ -1518,7 +1519,9 @@ function arene(main, ctx, opts) {
       }
       const lb = res.lootbox_gagnees != null ? res.lootbox_gagnees : estTour || estArene ? R.lootbox_attaquant : 0;
       if (lb) recompenses.push(el("span", { class: "gain-medailles" }, icone("i-coffre-ligne"), el("b", { class: "num", texte: "+" + fmt(lb) }), " lootbox"));
-      if (estArene && !recompenses.some((x) => x.classList.contains("mention"))) recompenses.push(el("p", { class: "mention", texte: res.termine ? "Parcours terminé : l'Arène rouvre demain." : "Les médailles tombent à 4, 7 et 10 victoires." }));
+      if (estArene && !recompenses.some((x) => x.classList.contains("mention"))) recompenses.push(el("p", { class: "mention", texte: !opts.resultat ? "Combat d'arène : les récompenses sont dans les coffres de fin de parcours."
+        : res.termine ? (res.coffres_a_ouvrir ? `Parcours terminé : ${fmt(res.coffres_a_ouvrir)} coffre${res.coffres_a_ouvrir > 1 ? "s" : ""} de récompense à ouvrir.` : "Parcours terminé. Les coffres commencent à 3 victoires.")
+        : "Les coffres de récompense s'ouvrent à la fin du parcours : paliers à 3, 5, 7 et 10 victoires." }));
       if (estTour && opts.resultat && !res.franchi) recompenses.push(el("p", { class: "mention", texte: "Une tentative de moins pour aujourd'hui. Renforce ton build et reviens." }));
       if (res.prime) recompenses.push(el("p", { class: "mention", texte: `Dont ${fmt(res.prime)} médailles de prime : ton adversaire était en série de victoires en ligue.` }));
       if (res.revanche) recompenses.push(el("p", { class: "mention", texte: "Duel de revanche : aucun ticket dépensé." }));
@@ -1532,7 +1535,7 @@ function arene(main, ctx, opts) {
     const auto = opts.mode === "auto" && R.attaquant === moi;
     const suite = estLigue ? (R.attaquant === moi && opts.resultat ? ["ligue.html#adversaires", "Combat suivant"] : null)
       : estTour ? (R.attaquant === moi && opts.resultat ? ["combat.html?mode=tour", res.franchi ? "Étage suivant" : "Réessayer"] : null)
-      : estArene ? (R.attaquant === moi && opts.resultat && !res.termine ? ["combat.html?mode=arene", "Combat suivant"] : null)
+      : estArene ? (R.attaquant === moi && opts.resultat ? (res.termine ? (res.coffres_a_ouvrir ? ["arene.html", "Ouvrir mes coffres"] : null) : ["combat.html?mode=arene", "Combat suivant"]) : null)
       : auto ? ["combat.html?mode=auto", "Nouveau combat auto"]
       : adverse ? [`combat.html?adversaire=${encodeURIComponent(App.echoDe(adverse) || adverse)}&mode=classe${App.echoDe(adverse) ? "&echo=1" : ""}`, "Rejouer ce duel"] : null;
     // Battu en duel ciblé par un autre joueur, il y a moins de 24 h : la revanche est gratuite (le serveur le revérifie).
@@ -1540,7 +1543,7 @@ function arene(main, ctx, opts) {
       && Date.now() - new Date(R.date).getTime() < 24 * 3600e3;
     if (revancheGratuite) suite[1] = "Revanche gratuite";
     if (suite) actions.push(estLigue || estTour || estArene || tickets > 0 || revancheGratuite
-      ? el("a", { class: "btn-principal", href: suite[0] }, icone("i-epees"), suite[1])
+      ? el("a", { class: "btn-principal", href: suite[0] }, icone(suite[0] === "arene.html" ? "i-coffre-ligne" : "i-epees"), suite[1])
       : el("button", { type: "button", class: "btn-principal", disabled: true, title: "Plus de ticket de duel — gagne-en en live" }, icone("i-epees"), suite[1]));
     if (opts.bac) actions.push(el("a", { class: "btn-principal", href: "recette.html?relancer=1" }, icone("i-epees"), "Relancer"));
     actions.push(el("button", { type: "button", class: "btn-second", onclick: () => arene(main, ctx, opts).jouer() }, picto("rejouer"), "Revoir"));
@@ -1552,7 +1555,7 @@ function arene(main, ctx, opts) {
     const titreEl = el("h2", { class: "outro-titre", tabindex: "-1", texte: titre });
     const panneau = el("div", { class: "outro " + genre, role: "dialog", "aria-labelledby": "outro-titre" },
       el("div", { class: "outro-carte" },
-        el("span", { class: "outro-sur", texte: opts.bac ? "Combat de test terminé" : opts.mode === "entrainement" ? "Entraînement terminé" : opts.mode === "auto" ? "Combat automatique terminé" : estLigue ? "Combat de ligue terminé" : estTour ? "La Tour" : estArene ? "Arène à armes égales" : "Combat terminé" }),
+        el("span", { class: "outro-sur", texte: opts.bac ? "Combat de test terminé" : opts.mode === "entrainement" ? "Entraînement terminé" : opts.mode === "auto" ? "Combat automatique terminé" : estLigue ? "Combat de ligue terminé" : estTour ? "La Tour" : estArene ? "Arène" : "Combat terminé" }),
         titreEl, sous ? el("p", { class: "outro-sous", texte: sous }) : null,
         recompenses.length ? el("div", { class: "outro-gains" }, recompenses) : null,
         el("table", { class: "outro-stats" }, el("thead", {}, el("tr", {}, el("td"), el("th", { scope: "col", texte: G.nom }), el("th", { scope: "col", texte: D.nom }))),

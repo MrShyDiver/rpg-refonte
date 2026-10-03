@@ -1,8 +1,9 @@
-/* Stream RPG — page Arène à armes égales (réutilise ligue.css pour le build et les pastilles) */
+/* Stream RPG — page Arène : draft, parcours et coffres de récompense (réutilise ligue.css pour le build) */
 .ar-tete { margin-top: 0; padding: 22px; border-radius: 20px; background: linear-gradient(140deg, color-mix(in oklab, var(--rare) 12%, var(--sol-2)), var(--sol-2) 62%); border: 1px solid color-mix(in oklab, var(--rare) 30%, var(--trait)); }
 .ar-tete h2 { font-family: var(--titre); font-weight: 800; letter-spacing: -.02em; font-size: clamp(24px, 3.4vw, 34px); color: var(--rare); }
 .ar-tete .sous { margin: 8px 0 16px; color: var(--encre-2); font-size: 14.5px; max-width: 70ch; }
 .ar-tete .btn-principal[aria-disabled="true"] { background: var(--sol-3); color: var(--encre-2); box-shadow: none; border: 1px dashed var(--trait-fort); cursor: not-allowed; transform: none; filter: none; }
+.ar-tete > .mention { margin-top: 12px; }
 .ar-score { display: flex; flex-wrap: wrap; gap: 14px 28px; margin: 4px 0 18px; }
 .ar-score > div { display: grid; gap: 6px; }
 .ar-score span { font-size: 13px; color: var(--encre-2); }
@@ -11,20 +12,115 @@
 .ar-pips i { width: 16px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.1); }
 .ar-pips.v i.plein { background: var(--normal); } .ar-pips.d i.plein { background: #ff7a59; }
 .ar-pips i.palier { outline: 1px solid color-mix(in oklab, var(--legendaire) 70%, transparent); outline-offset: 1px; }
-.ar-paliers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.ar-paliers .pilule svg { width: 14px; height: 14px; }
-.ar-paliers .pilule.atteint { --c: var(--normal); }
-.ar-kits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.ar-kit { display: grid; gap: 12px; align-content: start; padding: 18px; border-radius: 18px; background: var(--sol-2); border: 1px solid var(--trait); min-width: 0; }
-.ar-kit h3 { font-size: 18px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.ar-kit h3 small { font-family: var(--texte, inherit); font-size: 12.5px; font-weight: 600; color: var(--encre-3); }
+
+/* Les trois temps d'un parcours (écran d'entrée) */
+.ar-etapes { list-style: none; counter-reset: etape; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 18px; }
+.ar-etapes li { counter-increment: etape; display: grid; gap: 4px; padding: 14px; border-radius: 14px; background: rgba(255,255,255,.035); border: 1px solid var(--trait); font-size: 13.5px; color: var(--encre-2); }
+.ar-etapes b { font-family: var(--titre); font-size: 16px; color: var(--encre); }
+.ar-etapes b::before { content: counter(etape) ". "; color: var(--rare); }
+
+/* Paliers de récompense */
+.ar-paliers { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.ar-paliers li { display: grid; gap: 3px; align-content: start; padding: 14px; border-radius: 14px; background: var(--sol-2); border: 1px solid var(--trait); min-width: 0; }
+.ar-paliers b { font-family: var(--titre); font-size: 17px; }
+.ar-palier-coffres { font-weight: 700; color: var(--legendaire); font-size: 14.5px; }
+.ar-paliers small { font-size: 12.5px; color: var(--encre-2); line-height: 1.45; }
+.ar-paliers li.passe { opacity: .55; }
+.ar-paliers li.atteint { border-color: var(--legendaire); box-shadow: 0 0 0 1px rgba(255,197,61,.25); }
+
+/* Build */
+.ar-build-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 20px; flex-wrap: wrap; }
+.ar-build-tete h2 { font-size: 22px; }
+.ar-build-tete .sous { color: var(--encre-2); font-size: 14px; max-width: 62ch; margin-top: 4px; }
+.ar-puissance { font-size: 13.5px; color: var(--encre-2); white-space: nowrap; }
+.ar-puissance b { font-family: var(--titre); font-size: 24px; color: var(--legendaire); margin-right: 4px; }
+.ar-monkit { display: grid; gap: 12px; max-width: 560px; margin-top: 12px; }
 .ar-stats { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; text-align: center; }
 .ar-stats li { padding: 6px 2px; border-radius: 10px; background: rgba(255,255,255,.04); display: grid; gap: 1px; }
 .ar-stats b { font-family: var(--titre); font-size: 15px; }
 .ar-stats span { font-size: 10.5px; color: var(--encre-3); text-transform: uppercase; letter-spacing: .04em; }
-.ar-kit > .btn-principal, .ar-kit > .btn-second { width: 100%; justify-content: center; }
-.ar-monkit { max-width: 560px; margin-top: 12px; }
-@media (max-width: 900px) { .ar-kits { grid-template-columns: 1fr; } .ar-kit .lg-build { max-width: 420px; } }
-@media (max-width: 560px) { .ar-tete { padding: 16px; } }
-.ar-monkit { display: grid; gap: 12px; }
 .ar-note { margin-top: 16px; }
+
+/* Draft */
+.ar-draft { margin-top: 0; padding: 22px; border-radius: 20px; background: var(--sol-2); border: 1px solid var(--trait); }
+.ar-draft-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 20px; flex-wrap: wrap; }
+.ar-draft-tete h2 { font-family: var(--titre); font-weight: 800; letter-spacing: -.02em; font-size: clamp(22px, 3vw, 30px); }
+.ar-draft-tete .sous { margin-top: 6px; color: var(--encre-2); font-size: 14.5px; max-width: 64ch; }
+.ar-reste { font-size: 13.5px; font-weight: 700; color: var(--encre-2); white-space: nowrap; }
+.ar-avance { height: 6px; margin: 14px 0 20px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.ar-avance i { display: block; height: 100%; border-radius: inherit; background: var(--rare); transition: width .4s var(--ease); }
+.ar-offres { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; transition: opacity .15s; }
+.ar-attente .ar-offres { opacity: .45; pointer-events: none; }
+.ar-offre-case { flex: 0 1 190px; min-width: 0; display: grid; gap: 6px; justify-items: center; align-content: start; animation: ar-arrive .35s var(--ease) both; animation-delay: calc(var(--i) * 55ms); }
+@keyframes ar-arrive { from { opacity: 0; transform: translateY(14px) scale(.96); } }
+.ar-offre { --c: var(--encre-3); width: 100%; display: grid; gap: 6px; justify-items: center; align-content: start; padding: 12px 12px 14px; border-radius: 16px; background: var(--sol); border: 1px solid var(--trait); color: inherit; font: inherit; text-align: center; cursor: pointer; transition: transform .2s var(--ease), border-color .2s, box-shadow .2s; }
+.ar-offre.commun { --c: var(--commun); } .ar-offre.normal { --c: var(--normal); } .ar-offre.rare { --c: var(--rare); } .ar-offre.epique { --c: var(--epique); } .ar-offre.legendaire { --c: var(--legendaire); }
+.ar-offre.stat { --c: var(--epique); }
+.ar-offre:hover, .ar-offre:focus-visible { transform: translateY(-5px); border-color: var(--c); box-shadow: 0 14px 30px -18px var(--c), 0 0 0 1px color-mix(in oklab, var(--c) 40%, transparent); }
+.ar-offre > .carte, .ar-offre > .ar-carte-stat { width: 100%; max-width: 150px; }
+.ar-offre-genre { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: var(--encre-3); }
+.ar-offre.amelioration .ar-offre-genre { color: var(--normal); } .ar-offre.remplacement .ar-offre-genre { color: var(--legendaire); } .ar-offre.stat .ar-offre-genre { color: var(--epique); }
+.ar-offre small { font-size: 12.5px; color: var(--encre-2); line-height: 1.4; }
+.ar-alerte { display: inline-flex; align-items: center; gap: 5px; color: #ffb38a !important; }
+.ar-alerte svg { width: 14px; height: 14px; flex: none; }
+.ar-carte-stat { aspect-ratio: 5 / 7; display: grid; place-content: center; gap: 4px; border-radius: 12px; border: 1px solid color-mix(in oklab, var(--epique) 45%, var(--trait)); background: radial-gradient(90% 70% at 50% 35%, color-mix(in oklab, var(--epique) 26%, transparent), transparent 70%), var(--sol-2); }
+.ar-carte-stat b { font-family: var(--titre); font-weight: 800; font-size: 38px; line-height: 1; color: var(--epique); }
+.ar-carte-stat span { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--encre-2); }
+.ar-fiche { font-size: 12.5px; min-height: 28px; background: none; border: 0; cursor: pointer; }
+
+/* Coffres de récompense : un dessin à eux (ce ne sont pas des lootbox). Couleur du coffre : --cf. */
+.ar-coffrets { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 22px; margin: 26px 0 6px; }
+.ar-coffret { --cf: #7b68e6; --cf-clair: #c3b6ff; --cf-sombre: #251f44; position: relative; width: 128px; padding: 0 0 56px; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; animation: ar-flotte 3.2s ease-in-out infinite; animation-delay: calc(var(--i) * -.6s); }
+.ar-coffret.legendaire { --cf: #ffc53d; --cf-clair: #ffe9a8; --cf-sombre: #4a3407; }
+.ar-coffret.ticket { --cf: #4fd6c6; --cf-clair: #c2fff6; --cf-sombre: #0c3a35; }
+.ar-coffret svg { display: block; width: 100%; overflow: visible; filter: drop-shadow(0 10px 14px rgba(0,0,0,.5)); transition: transform .25s var(--ease), filter .25s; }
+.cf-ombre { fill: rgba(0,0,0,.4); }
+.cf-corps > rect:first-child { fill: var(--cf-sombre); stroke: var(--cf); stroke-width: 2; }
+.cf-couvercle > path:first-child { fill: color-mix(in oklab, var(--cf) 48%, var(--cf-sombre)); stroke: var(--cf); stroke-width: 2; }
+.cf-metal { fill: var(--cf-clair); opacity: .8; }
+.cf-gemme { fill: var(--cf-clair); stroke: #fff; stroke-width: 1.2; transition: opacity .2s; }
+.cf-couvercle { transform-box: fill-box; transform-origin: 50% 100%; transition: transform .45s var(--ease); }
+@keyframes ar-flotte { 50% { transform: translateY(-5px); } }
+.ar-coffret:not(.ouvert):hover svg, .ar-coffret:not(.ouvert):focus-visible svg { transform: scale(1.07) rotate(-2deg); filter: drop-shadow(0 0 16px color-mix(in oklab, var(--cf) 75%, transparent)) drop-shadow(0 10px 14px rgba(0,0,0,.5)); }
+.ar-coffret:not(.ouvert):hover .cf-couvercle, .ar-coffret:not(.ouvert):focus-visible .cf-couvercle { transform: translateY(-5px) rotate(-3deg); }
+.ar-coffret:not(.ouvert):active svg { transform: scale(.97); }
+.ar-coffret::before { content: ""; position: absolute; left: 50%; top: 50px; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle, #fff, var(--cf-clair) 35%, transparent 70%); opacity: 0; transform: translate(-50%, -50%); pointer-events: none; }
+.ar-coffret.ouvert { cursor: default; animation: none; }
+.ar-coffret.ouvert .cf-couvercle { transform: translateY(-22px) rotate(-9deg); }
+.ar-coffret.ouvert .cf-gemme { opacity: 0; }
+.ar-coffret.ouvert::before { animation: ar-eclat .9s var(--ease) forwards; }
+@keyframes ar-eclat { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 35% { opacity: .95; transform: translate(-50%, -50%) scale(9); } 100% { opacity: .55; transform: translate(-50%, -50%) scale(5); } }
+.ar-butin { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 100%; display: grid; justify-items: center; align-content: start; gap: 1px; min-height: 48px; text-align: center; font-size: 14.5px; line-height: 1.15; }
+.ar-butin:empty::before { content: "Ouvrir"; align-self: center; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--trait-fort); font-size: 12.5px; font-weight: 700; color: var(--encre-2); }
+.ar-butin svg { position: absolute; left: 50%; top: -74px; width: 30px; height: 30px; margin-left: -15px; color: #fff; filter: drop-shadow(0 0 8px var(--cf-clair)); }
+.ar-butin b { font-family: var(--titre); font-size: 20px; color: var(--cf-clair); }
+.ar-butin small { font-size: 12.5px; color: var(--encre-2); }
+.ar-coffret.ouvert .ar-butin { animation: ar-butin .5s .2s var(--ease) both; }
+@keyframes ar-butin { from { opacity: 0; transform: translate(-50%, -26px) scale(.6); } }
+.ar-recompenses { text-align: center; }
+.ar-recompenses .sous { margin-inline: auto; }
+.ar-tout[hidden] { display: none; }
+.ar-tout { display: block; margin: 4px auto 0; min-height: 36px; background: none; border: 0; cursor: pointer; font-size: 13.5px; }
+.ar-bilan { margin-top: 14px; display: grid; gap: 14px; justify-items: center; animation: ar-arrive .4s var(--ease) both; }
+.ar-bilan-texte { font-size: 16px; }
+.ar-bilan-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+.ar-gagnes { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.ar-gagnes li { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid var(--trait); font-size: 14px; }
+.ar-gagnes svg { width: 16px; height: 16px; color: var(--legendaire); }
+
+@media (max-width: 900px) { .ar-paliers { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ar-etapes { grid-template-columns: 1fr; } }
+@media (max-width: 560px) {
+  .ar-tete, .ar-draft { padding: 16px; }
+  .ar-coffrets:has(> :nth-child(4):last-child) { max-width: 250px; margin-inline: auto; }   /* 4 coffres : deux rangées de deux */
+  .ar-offres { gap: 10px; }
+  .ar-offre-case { flex-basis: calc(50% - 5px); }
+  .ar-offre { padding: 10px 8px 12px; }
+  .ar-coffret { width: 100px; }
+  .ar-butin svg { top: -60px; width: 24px; height: 24px; margin-left: -12px; }
+  .ar-coffrets { gap: 10px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ar-coffret, .ar-offre-case, .ar-bilan, .ar-coffret.ouvert .ar-butin { animation: none; }
+  .ar-coffret.ouvert::before { animation: none; opacity: .55; transform: translate(-50%, -50%) scale(5); }
+  .ar-coffret svg, .cf-couvercle, .ar-offre { transition: none; }
+}

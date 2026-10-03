@@ -164,7 +164,7 @@ App.api = {
   ligue: () => App.rpc("ma_ligue"),
   // Profil : record d'arène, combats en solo et quêtes terminées d'un joueur (ce que les tables publiques ne montrent pas).
   profilModes: (pid) => App.rpc("profil_modes", { p_id: pid }),
-  // Arène à armes égales (mode solo) : mon parcours (kits proposés, kit choisi, score).
+  // Arène (mode solo, draft) : mon parcours (cartes proposées, build drafté, score, coffres).
   arene: () => App.rpc("mon_arene"),
   // Tour (mode solo) : mon étage, mes tentatives et la liste des étages ; étages atteints par tous (classement).
   tour: () => App.rpc("ma_tour"),
@@ -230,8 +230,8 @@ async function fonctionDuel(corps) {
 App.lancerDuel = ({ adversaire, mode = "classe", echo = false }) => fonctionDuel(mode === "auto" ? { mode } : { adversaire, mode, echo: !!echo });
 // Combat de ligue contre l'un des trois adversaires proposés (0, 1 ou 2).
 App.lancerLigue = (cible) => fonctionDuel({ action: "ligue", cible });
-// Arène à armes égales : ouvrir un parcours (le serveur tire 3 kits) ou jouer le combat suivant.
-App.lancerArene = (ouvrir) => fonctionDuel({ action: "arene", ouvrir: !!ouvrir });
+// Arène : jouer le combat suivant avec le build drafté (le draft lui-même passe par arene_commencer et arene_drafter).
+App.lancerArene = () => fonctionDuel({ action: "arene" });
 // Tour : affronter le gardien du prochain étage, ou seulement le voir (apercu) : { etage, gardien: { login, puissance, equipement } }.
 App.lancerTour = (apercu) => fonctionDuel({ action: "tour", apercu: !!apercu });
 // Duel ciblé : catégorie décidée par le serveur (chance de victoire estimée) et revanche gratuite éventuelle.
@@ -288,7 +288,7 @@ App.dansTranche = (puissance, moi) => puissance > 0 && moi > 0 && Math.abs(puiss
 // Écho : build d'un autre joueur ramené à ton niveau. En base, son login est « echo:<login du joueur> ».
 App.echoDe = (login) => (String(login || "").startsWith("echo:") ? String(login).slice(5) : null);
 App.nomCombattant = (login, parLogin) => {
-  if (login === "arene") return "Adversaire de l'Arène";   // kit tiré au hasard (Arène à armes égales)
+  if (login === "arene") return "Adversaire de l'Arène";   // build drafté par le serveur
   const source = App.echoDe(login), j = parLogin && parLogin.get(source || login);
   const nom = (j && j.display_name) || source || login || "?";
   return source ? "Écho de " + nom : nom;
