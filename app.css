@@ -514,3 +514,23 @@ html.effets-reduits *, html.effets-reduits *::before, html.effets-reduits *::aft
 /* Gains passifs : compte à rebours du prochain +1 sous la ressource. */
 .ressource .prochain { display: block; font-size: 10.5px; line-height: 1.25; color: var(--normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ressources-mobile .ressource .prochain { display: none; }
+
+/* Emblème de rang de ligue (pages Ligue et Profil). Couleur de palier : --p. */
+.lg-embleme { --p: #8e8d9a; position: relative; display: inline-grid; place-items: center; flex: none; color: var(--p); vertical-align: middle; }
+.lg-embleme svg { width: 100%; height: 100%; fill: color-mix(in oklab, var(--p) 16%, transparent); }
+.lg-embleme.fer, .lg-rang.fer { --p: #9a9aa6; } .lg-embleme.bronze, .lg-rang.bronze { --p: #d08a55; }
+.lg-embleme.argent, .lg-rang.argent { --p: #cfd6e4; } .lg-embleme.or, .lg-rang.or { --p: #ffc53d; }
+.lg-embleme.platine, .lg-rang.platine { --p: #5fe0d0; } .lg-embleme.diamant, .lg-rang.diamant { --p: #7fb6ff; }
+.lg-embleme.maitre, .lg-rang.maitre { --p: #d79bff; }
+
+/* Encart « réserve » (Lootbox, Duels) : compte, chrono du prochain gain passif, rappel de la règle. */
+.encart-reserve { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 6px 22px; padding: 14px 18px; border-radius: 16px; background: var(--sol-2); border: 1px solid var(--trait); }
+.er-compte { display: flex; align-items: center; gap: 10px; color: var(--encre-2); font-size: 14px; }
+.er-compte svg { width: 24px; height: 24px; flex: none; color: var(--legendaire); }
+.er-compte b { font-size: 28px; line-height: 1; font-weight: 800; color: var(--encre); }
+.er-chrono { display: grid; gap: 2px; padding-left: 22px; border-left: 1px solid var(--trait); font-size: 12.5px; color: var(--encre-2); }
+.er-chrono b { font-size: 22px; line-height: 1.1; font-weight: 800; color: var(--normal); font-variant-numeric: tabular-nums; }
+.er-chrono b:not(.num) { font-size: 15px; color: var(--encre-2); }
+.er-note { margin: 0; font-size: 13.5px; color: var(--encre-2); }
+.encart-reserve.vide .er-compte b, .encart-reserve.vide .er-compte svg { color: #ff9b9b; }
+@media (max-width: 720px) { .encart-reserve { grid-template-columns: 1fr auto; } .er-note { grid-column: 1 / -1; } }

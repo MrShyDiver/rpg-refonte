@@ -122,7 +122,7 @@ App.demarrer("lootbox", async (main, ctx) => {
 
   // Set du jour : annoncé au-dessus de la table, le planning de la semaine s'ouvre au clic.
   const btnSet = el("button", { type: "button", class: "lb-set-jour", hidden: true, onclick: () => ouvrirPlanning() });
-  const scene = el("div", { class: "lb-scene" }, types, btnSet, table, actions);
+  const scene = el("div", { class: "lb-scene" }, types, App.encartReserve("lootbox"), btnSet, table, actions);
   const bilan = el("p", { class: "lb-bilan", "aria-live": "polite" });
   const suite = el("div", { class: "lb-suite", hidden: true });
   const premiersPas = el("section", { class: "panneau-b lb-premiers-pas", "aria-labelledby": "t-premiers-pas", hidden: true });
@@ -315,6 +315,8 @@ App.demarrer("lootbox", async (main, ctx) => {
   }
 
   function majTout() { majTypes(); majBoutons(); rendreTaux(); rendreProgression(); rendreHisto(); rendrePremiersPas(); }
+  // Une lootbox de la réserve vient d'arriver (chrono échu) : les compteurs de la page suivent.
+  document.addEventListener("rpg:passif", () => { if (!enCours) { majTypes(); majBoutons(); } });
 
   // ---------- Premiers pas : 3 étapes tirées des vraies données, masquables ----------
   function rendrePremiersPas() {

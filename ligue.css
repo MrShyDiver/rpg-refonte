@@ -1,10 +1,4 @@
-/* Page Ligue. Couleur de palier : --p, posée sur l'emblème et la carte de rang. */
-.lg-embleme { --p: #8e8d9a; position: relative; display: inline-grid; place-items: center; flex: none; color: var(--p); vertical-align: middle; }
-.lg-embleme svg { width: 100%; height: 100%; fill: color-mix(in oklab, var(--p) 16%, transparent); }
-.lg-embleme.fer, .lg-rang.fer { --p: #9a9aa6; } .lg-embleme.bronze, .lg-rang.bronze { --p: #d08a55; }
-.lg-embleme.argent, .lg-rang.argent { --p: #cfd6e4; } .lg-embleme.or, .lg-rang.or { --p: #ffc53d; }
-.lg-embleme.platine, .lg-rang.platine { --p: #5fe0d0; } .lg-embleme.diamant, .lg-rang.diamant { --p: #7fb6ff; }
-.lg-embleme.maitre, .lg-rang.maitre { --p: #d79bff; }
+/* Page Ligue. L'emblème de rang et ses couleurs de palier (--p) sont dans app.css : le profil s'en sert aussi. */
 
 .lg-rang { --p: #9a9aa6; margin-top: 0; padding: 22px; border-radius: 20px; background: linear-gradient(140deg, color-mix(in oklab, var(--p) 11%, var(--sol-2)), var(--sol-2) 62%); border: 1px solid color-mix(in oklab, var(--p) 30%, var(--trait)); }
 .lg-rang-tete { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
@@ -18,7 +12,7 @@
 .lg-pips { display: flex; gap: 3px; margin-top: 8px; }
 .lg-pips i { flex: 1; max-width: 16px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.1); }
 .lg-pips i.plein { background: var(--legendaire); }
-.chiffre .prochain { color: var(--normal); }
+.lg-chrono b { color: var(--normal); font-variant-numeric: tabular-nums; }
 
 .lg-titre-ligne { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 16px; }
 .lg-titre-ligne h2 { font-size: 22px; margin-bottom: 6px; }

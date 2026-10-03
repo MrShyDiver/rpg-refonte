@@ -21,7 +21,7 @@
     main.append(el("div", { class: "chargement", texte: "Chargement du profil…" }));
 
     // --- État de la page ---
-    const s = { joueur: null, niv: new Map(), loadout: {}, vitrine: [], res: null, puissances: null, enAttente: {} };
+    const s = { joueur: null, niv: new Map(), loadout: {}, vitrine: [], res: null, puissances: null, enAttente: {}, modes: null };
     const pl = () => (s.res ? s.res.powerLevel : 0);
 
     function depuisCtx() {
@@ -55,20 +55,21 @@
 
     rendre();
     chargerClassement();
+    chargerModes();
 
     // =================================================================
     // Rendu
     // =================================================================
     function rendre() {
       const focus = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.f : null;
-      main.replaceChildren(
+      main.replaceChildren(...[
         hero(),
         sectionVitrine(),
         sectionEquipement(),
         sectionPoints(),
         sectionStats(),
         sectionCarriere(),
-        el("p", { class: "sr", "aria-live": "polite", "data-annonce": "" }));
+        el("p", { class: "sr", "aria-live": "polite", "data-annonce": "" })].filter(Boolean));
       if (focus) { const c = main.querySelector(`[data-f="${focus}"]`); if (c) c.focus(); }
     }
     function remplacer(id, fabrique) {
@@ -104,7 +105,43 @@
         App.horsClassement(j) ? el("div", { class: "pf-record pf-hors" }, horsClassement()) : el("div", { class: "pf-record" },
           stat("Victoires", fmt(v), "v"), stat("Défaites", fmt(d), "d"), stat("Égalités", fmt(e)),
           stat("Winrate", tot ? nombre(Math.round((v / tot) * 1000) / 10) + " %" : "—"),
-          stat("Série en cours", fmt(j.serie_actuelle || 0), (j.serie_actuelle || 0) >= 5 ? "chaud" : "")));
+          stat("Série en cours", fmt(j.serie_actuelle || 0), (j.serie_actuelle || 0) >= 5 ? "chaud" : "")),
+        blocModes());
+    }
+    // ---------- Ligue, Tour, Arène, succès ----------
+    // s.modes : null tant que ça charge, false si la lecture a échoué.
+    function posTexte(p, quoi) { return p ? "#" + fmt(p.pos) + " sur " + fmt(p.total) + (quoi ? " " + quoi : "") : null; }
+    function blocModes() {
+      const m = s.modes, l = m && m.ligue, r = l ? App.rangLigue(l.points) : null;
+      const attente = m === null ? "…" : "—";
+      const tuile = (href, tete, nom, valeur, detail) => el("a", { class: "pf-mode", href }, tete,
+        el("span", { class: "pf-mode-texte" }, el("small", { texte: nom }), el("b", { class: "num", texte: valeur }), el("span", { texte: detail || "" })));
+      return el("div", { class: "pf-modes", id: "modes" },
+        tuile("ligue.html", r ? App.emblemeLigue(r, 40) : icone("i-ligue"), "Ligue", m ? (r ? r.nom : "Non classé") : attente,
+          m ? (r ? [pluriel(l.points, "point"), posTexte(m.posLigue)].filter(Boolean).join(" · ") : "Aucun combat de ligue") : ""),
+        tuile("tour.html", icone("i-tour"), "Tour", m ? (m.etage ? "Étage " + fmt(m.etage) : "—") : attente,
+          m ? (m.etage ? posTexte(m.posTour, "grimpeurs") || "Plus haut étage franchi" : "Aucun étage franchi") : ""),
+        tuile("arene.html", icone("i-arene"), "Arène", m ? (m.arene_record ? pluriel(m.arene_record, "victoire") : "—") : attente,
+          m ? (m.arene_record ? "Meilleur parcours" : "Aucun parcours joué") : ""),
+        tuile(proprio ? "succes.html" : "classements.html", icone("i-trophee"), "Succès", m ? fmt(m.succes) + " / " + fmt(m.succesTotal) : attente, m ? "débloqués" : ""));
+    }
+    async function chargerModes() {
+      const id = s.joueur.id;
+      try {
+        const [rl, tr, pm, cat, sj, js] = await Promise.all([App.api.rangsLigue(), App.api.tours(), App.api.profilModes(id), App.api.succes(), App.api.succesJoueurs(id), App.api.joueurs()]);
+        // Places : parmi les joueurs classés, comme sur les pages Ligue et Tour. Un compte hors classement n'a pas de place.
+        const classes = new Set(js.filter((x) => !App.horsClassement(x)).map((x) => x.id));
+        const place = (lignes, val) => {
+          const moi = lignes.find((x) => x.player_id === id), dans = lignes.filter((x) => classes.has(x.player_id) && val(x) > 0);
+          return moi && classes.has(id) && val(moi) > 0 ? { pos: 1 + dans.filter((x) => val(x) > val(moi)).length, total: dans.length } : null;
+        };
+        const l = rl.find((x) => x.player_id === id), t = tr.find((x) => x.player_id === id);
+        const enLigue = rl.filter((x) => x.combats > 0);
+        s.modes = { ...pm, ligue: l && l.combats > 0 ? l : null, posLigue: l && l.combats > 0 ? place(enLigue, (x) => x.points + 1) : null,
+          etage: t ? t.etage : 0, posTour: place(tr, (x) => x.etage), succes: sj.length, succesTotal: cat.length };
+      } catch (e) { console.warn(e); s.modes = false; }
+      remplacer("modes", blocModes);
+      remplacer("carriere", sectionCarriere);
     }
     function horsClassement() {
       return el("p", { class: "hors-classement" }, el("span", { class: "pilule", texte: "Compte hors classement" }),
@@ -267,9 +304,11 @@
       return sec;
     }
 
-    // ---------- Points investis ----------
+    // ---------- Points à placer ----------
+    // La répartition des points se lit dans « Statistiques de combat » : cette section n'apparaît que s'il reste des points à placer.
     function sectionPoints() {
-      const j = s.joueur, credits = proprio ? (j.credits_reset || 0) : 0, tickets = proprio ? (j.tickets_reset || 0) : 0;
+      const j = s.joueur, credits = proprio ? (j.credits_reset || 0) : 0;
+      if (credits < 1) return null;
       const attente = STATS_POINTS.reduce((t, k) => t + (s.enAttente[k] || 0), 0);
       const reste = credits - attente;
       const valeurs = STATS_POINTS.map((k) => (j[k + "_stacks"] || 0) + (s.enAttente[k] || 0));
@@ -303,9 +342,8 @@
 
       return el("section", { class: "section-page", id: "points", "aria-labelledby": "t-points" },
         el("div", { class: "pf-entete" },
-          el("div", {}, el("h2", { id: "t-points", texte: "Points investis" }),
-            el("p", { class: "sous" }, "Gagnés en live avec les points de chaîne : ", el("b", { class: "num", texte: fmt(total) }), " au total.")),
-          tickets > 0 ? el("button", { class: "btn-second", type: "button", "data-f": "ticket", onclick: tiroirReset }, icone("i-ticket"), "Utiliser un ticket de reset (" + fmt(tickets) + ")") : null),
+          el("div", {}, el("h2", { id: "t-points", texte: "Points à placer" }),
+            el("p", { class: "sous" }, "Répartis-les dans tes stats, puis valide. Déjà investis : ", el("b", { class: "num", texte: fmt(total) }), "."))),
         el("div", { class: "panneau-b pf-points" }, panneauCredits, el("ul", { class: "pf-barres" }, lignes)));
     }
 
@@ -357,9 +395,12 @@
 
     // ---------- Statistiques de combat ----------
     function sectionStats() {
+      const tickets = proprio ? (s.joueur.tickets_reset || 0) : 0;
       const sec = el("section", { class: "section-page", id: "stats", "aria-labelledby": "t-stats" },
-        el("h2", { id: "t-stats", texte: "Statistiques de combat" }),
-        el("p", { class: "sous", texte: "Base du personnage, points investis et bonus des objets équipés. Mêmes calculs que le calculateur." }));
+        el("div", { class: "pf-entete" },
+          el("div", {}, el("h2", { id: "t-stats", texte: "Statistiques de combat" }),
+            el("p", { class: "sous", texte: "Base du personnage, points investis en live avec les points de chaîne, et bonus des objets équipés." })),
+          tickets > 0 ? el("button", { class: "btn-second", type: "button", "data-f": "ticket", onclick: tiroirReset }, icone("i-ticket"), "Utiliser un ticket de reset (" + fmt(tickets) + ")") : null));
       const r = s.res;
       if (!r || !r.stats) { sec.append(el("div", { class: "vide", texte: "Les statistiques ne sont pas disponibles pour le moment." })); return sec; }
       const st = r.stats, j = s.joueur, stk = (k) => j[k + "_stacks"] || 0;
@@ -375,16 +416,7 @@
         { k: "esquive", nom: STATS.esquive, base: 15, pts: 0, gear: st.esquiveGear || 0, suffixe: " %", sous: "Chance d'éviter un coup" },
       ];
       sec.append(el("div", { class: "pf-tuiles" }, tuiles.map(tuile)),
-        el("div", { class: "pf-legende", "aria-hidden": "true" }, el("span", { class: "b", texte: "Base" }), el("span", { class: "p", texte: "Points investis" }), el("span", { class: "o", texte: "Objets équipés" })),
-        el("div", { class: "pf-estim" },
-          el("h3", { class: "pf-h3", texte: "Estimations de la simulation" }),
-          el("div", { class: "grille-chiffres" },
-            chiffre(nombre(r.critPct) + " %", "Critique"),
-            chiffre(nombre(r.esquivePct) + " %", "Esquive"),
-            chiffre(fmt(r.dpaInflige), "Dégâts par action"),
-            chiffre(nombre(Math.round(r.survieTours * 10) / 10), "Tours de survie estimés"),
-            chiffre(fmt(r.pvTotaux), "PV effectifs")),
-          el("p", { class: "mention", texte: "Combat simulé contre un mannequin qui se renforce à chaque tour : utile pour comparer des builds, pas une prédiction de duel." })));
+        el("div", { class: "pf-legende", "aria-hidden": "true" }, el("span", { class: "b", texte: "Base" }), el("span", { class: "p", texte: "Points investis" }), el("span", { class: "o", texte: "Objets équipés" })));
       return sec;
     }
     function tuile(t) {
@@ -416,19 +448,35 @@
       if (j.medailles_revente) med.push(fmt(j.medailles_revente) + " en revente");
       const sec = el("section", { class: "section-page", id: "carriere", "aria-labelledby": "t-carriere" },
         el("h2", { id: "t-carriere", texte: "Carrière" }),
-        App.horsClassement(j) ? horsClassement() : el("p", { class: "sous", texte: tot ? pluriel(tot, "duel") + " disputé" + (tot > 1 ? "s" : "") + " depuis l'arrivée sur Stream RPG." : "Aucun duel pour l'instant : la carrière commence au premier combat." }),
-        el("div", { class: "grille-chiffres" },
-          chiffre(fmt(v), "Victoires", tot ? nombre(Math.round((v / tot) * 1000) / 10) + " % de winrate" : null),
-          chiffre(fmt(d), "Défaites"),
-          chiffre(fmt(e), "Égalités"),
-          chiffre(fmt(j.serie_actuelle || 0), "Série en cours", "Record : " + fmt(j.serie_record || 0)),
-          chiffre(fmt(j.degats_infliges || 0), "Dégâts infligés", "Ratio " + ratio),
-          chiffre(fmt(j.degats_subis || 0), "Dégâts subis"),
-          chiffre(fmt(j.plus_gros_coup || 0), "Plus gros coup"),
-          chiffre(fmt(j.points || 0), "Points"),
-          chiffre(fmt(j.medailles || 0), "Médailles", med.join(" · ") || null),
-          chiffre(fmt((j.lootbox_ouvertes || 0) + (j.lootbox_leg_ouvertes || 0)), "Lootbox ouvertes", j.lootbox_leg_ouvertes ? "dont " + fmt(j.lootbox_leg_ouvertes) + " légendaire" + (j.lootbox_leg_ouvertes > 1 ? "s" : "") : null),
-          cd.protectionsActives ? chiffre(fmt(cd.protectionsActives), "Protections actives", "−20 % de dégâts pour un combat") : null));
+        App.horsClassement(j) ? horsClassement() : el("p", { class: "sous", texte: "Tout ce que " + (proprio ? "tu as" : j.display_name + " a") + " accompli sur Stream RPG, mode par mode." }));
+      const groupe = (titre, ...tuiles) => sec.append(el("h3", { class: "pf-h3 pf-groupe", texte: titre }), el("div", { class: "grille-chiffres" }, tuiles));
+      const m = s.modes, l = m && m.ligue, r = l ? App.rangLigue(l.points) : null, att = m === null ? "…" : "—";
+      groupe("Duels",
+        chiffre(fmt(v), "Victoires", tot ? nombre(Math.round((v / tot) * 1000) / 10) + " % de winrate sur " + pluriel(tot, "duel") : "Aucun duel pour l'instant"),
+        chiffre(fmt(d), "Défaites"),
+        chiffre(fmt(e), "Égalités"),
+        chiffre(fmt(j.serie_actuelle || 0), "Série en cours", "Record : " + fmt(j.serie_record || 0)),
+        chiffre(fmt(j.degats_infliges || 0), "Dégâts infligés", "Ratio " + ratio),
+        chiffre(fmt(j.degats_subis || 0), "Dégâts subis"),
+        chiffre(fmt(j.plus_gros_coup || 0), "Plus gros coup"),
+        cd.protectionsActives ? chiffre(fmt(cd.protectionsActives), "Protections actives", "−20 % de dégâts pour un combat") : null);
+      const jl = l ? l.victoires + l.defaites : 0, prime = App.primeDe(l);
+      groupe("Ligue",
+        chiffre(m ? (r ? r.nom : "Non classé") : att, "Rang", r ? [pluriel(l.points, "point"), posTexte(m.posLigue)].filter(Boolean).join(" · ") : m ? "Aucun combat de ligue" : null),
+        chiffre(l ? `${fmt(l.victoires)} – ${fmt(l.defaites)}` : att, "Victoires – défaites en attaque", jl ? fmt((100 * l.victoires) / jl) + " % de victoires" : null),
+        chiffre(l ? `${fmt(l.def_victoires)} – ${fmt(l.def_defaites)}` : att, "Défenses tenues – percées"),
+        chiffre(l ? fmt(l.serie) : att, "Série de ligue", prime ? "Prime de " + fmt(prime) + " médailles sur sa tête" : null));
+      groupe("Tour et Arène",
+        chiffre(m ? (m.etage ? "Étage " + fmt(m.etage) : "—") : att, "Plus haut étage de la Tour", m && m.etage ? posTexte(m.posTour, "grimpeurs") : null),
+        chiffre(m ? fmt(m.tour_combats) : att, "Combats dans la Tour"),
+        chiffre(m ? (m.arene_record ? pluriel(m.arene_record, "victoire") : "—") : att, "Meilleur parcours d'arène", "10 victoires au mieux"),
+        chiffre(m ? fmt(m.arene_combats) : att, "Combats d'arène", m && m.arene_combats ? pluriel(m.arene_victoires, "victoire") : null));
+      groupe("Quêtes, succès et butin",
+        chiffre(m ? fmt(m.quetes) : att, "Quêtes terminées", m && m.medailles_quetes ? fmt(m.medailles_quetes) + " médailles gagnées" : null),
+        chiffre(m ? fmt(m.succes) + " / " + fmt(m.succesTotal) : att, "Succès débloqués"),
+        chiffre(fmt(j.medailles || 0), "Médailles", med.join(" · ") || null),
+        chiffre(fmt((j.lootbox_ouvertes || 0) + (j.lootbox_leg_ouvertes || 0)), "Lootbox ouvertes", j.lootbox_leg_ouvertes ? "dont " + fmt(j.lootbox_leg_ouvertes) + " légendaire" + (j.lootbox_leg_ouvertes > 1 ? "s" : "") : null),
+        chiffre(fmt(j.points || 0), "Points"));
 
       // Tableau victoires / défenses / égalités / défaites × valeureuse / équitable / déshonorable
       const grille = ISSUES.map(() => [0, 0, 0]), autres = [];
@@ -444,15 +492,15 @@
       const blocDetail = el("div", { class: "pf-carriere-bas" });
       if (aDesCat) {
         blocDetail.append(el("div", { class: "panneau-b pf-matrice" },
-          el("h3", { class: "pf-h3", texte: "Détail des combats" }),
+          el("h3", { class: "pf-h3", texte: "Détail des duels" }),
           el("div", { class: "pf-table-zone" }, el("table", { class: "pf-table" },
-            el("caption", { class: "sr", texte: "Répartition des combats par issue et par écart de puissance" }),
+            el("caption", { class: "sr", texte: "Répartition des duels par issue et par catégorie" }),
             el("thead", {}, el("tr", {}, el("th", { scope: "col" }, el("span", { class: "sr", texte: "Issue" })),
               el("th", { scope: "col", texte: "Valeureuse" }), el("th", { scope: "col", texte: "Équitable" }), el("th", { scope: "col", texte: "Déshonorable" }))),
             el("tbody", {}, ISSUES.map(([cle, nom], i) => el("tr", { class: cle },
               el("th", { scope: "row", texte: nom }),
               grille[i].map((n, c) => el("td", { class: "num" + (n ? "" : " zero") }, fmt(n), cle === "defense" && c === 0 ? el("small", { texte: "exceptionnelle" }) : null))))))),
-          el("p", { class: "mention", texte: "Valeureuse : face à plus fort · Équitable : dans ta tranche de puissance · Déshonorable : face à plus faible." })));
+          el("p", { class: "mention", texte: "Valeureuse : la victoire était improbable · Équitable : combat ouvert · Déshonorable : l'attaquant était nettement favori." })));
       }
       const cote = el("div", { class: "pf-carriere-cote" });
       if (type) cote.append(el("div", { class: "panneau-b pf-type " + type.cls },

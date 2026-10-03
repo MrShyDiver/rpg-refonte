@@ -289,6 +289,11 @@
   .lb-histo-rang .zone { width: 80px; }
 }
 
+/* Encart « réserve » : le compte est déjà sur le bouton du type, on ne garde que le chrono et la règle. */
+.lb-scene .encart-reserve { grid-template-columns: auto 1fr; padding: 10px 16px; margin-top: 10px; }
+.lb-scene .encart-reserve .er-compte { display: none; }
+.lb-scene .encart-reserve .er-chrono { padding-left: 0; border-left: 0; }
+
 /* ---------- Premiers pas et prochaine étape (audit 30/09) ---------- */
 .sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .lb-premiers-pas[hidden], .lb-suite[hidden] { display: none; }

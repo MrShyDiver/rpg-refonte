@@ -10,12 +10,7 @@ const pluriel = (n, mot) => fmt(n) + " " + mot + (n > 1 ? "s" : "");
 const signe = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + fmt(Math.abs(n));
 const lienAide = (ancre, sujet) => el("a", { class: "lien-aide", href: "aide.html#" + ancre, target: "_blank", rel: "noopener", "aria-label": "Aide : " + sujet + " (nouvel onglet)", title: "Aide : " + sujet, texte: "?" });
 
-// Emblème de rang : même forme pour tous, la couleur dit le palier.
-function embleme(rang, taille = 56) {
-  return el("span", { class: "lg-embleme " + rang.cle, style: { width: taille + "px", height: taille + "px" }, title: rang.nom, "aria-hidden": "true" },
-    icone("i-ligue"));
-}
-App.emblemeLigue = embleme;
+const embleme = App.emblemeLigue;
 
 App.demarrer("ligue", async (main, ctx) => {
   const moi = ctx.joueur;
@@ -73,7 +68,7 @@ App.demarrer("ligue", async (main, ctx) => {
         el("div", { class: "chiffre" }, el("b", { class: "num", texte: fmt(etat.serie) }), el("span", { texte: "Série de victoires" }),
           el("small", { texte: etat.premiere_victoire_dispo ? "Première victoire du jour : médailles en plus" : "Bonus du jour déjà pris" })),
         el("div", { class: "chiffre lg-energie" }, el("b", { class: "num" }, icone("i-eclair"), `${fmt(etat.energie)} / ${fmt(etat.energie_plafond)}`), el("span", {}, "Énergie de ligue", lienAide("energie", "l'énergie de ligue")),
-          pips, etat.energie_prochaine ? el("small", { class: "prochain", "data-prochain": etat.energie_prochaine }) : el("small", { texte: "Réserve pleine" }))));
+          pips, etat.energie_prochaine ? el("small", { class: "lg-chrono" }, "Prochaine énergie dans ", el("b", { class: "num", role: "timer", "data-chrono": etat.energie_prochaine })) : el("small", { texte: "Réserve pleine" }))));
   }
 
   // ------------------------------------------------------------------ Adversaires proposés
@@ -156,7 +151,7 @@ App.demarrer("ligue", async (main, ctx) => {
 
   function rendre() {
     zone.replaceChildren(blocRang(), blocAdversaires(), blocDefense(), blocClassement());
-    App.majProchains();
+    App.majChronos();
   }
   await charger();
   rendre();

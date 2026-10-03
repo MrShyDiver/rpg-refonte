@@ -162,6 +162,8 @@ App.api = {
   loadoutsDefense: () => q(client().from("loadouts_defense").select("*").limit(5000)),
   // Ligue : mon état complet (énergie, trois adversaires proposés, défenses reçues) et les rangs publics de tous.
   ligue: () => App.rpc("ma_ligue"),
+  // Profil : record d'arène, combats en solo et quêtes terminées d'un joueur (ce que les tables publiques ne montrent pas).
+  profilModes: (pid) => App.rpc("profil_modes", { p_id: pid }),
   // Arène à armes égales (mode solo) : mon parcours (kits proposés, kit choisi, score).
   arene: () => App.rpc("mon_arene"),
   // Tour (mode solo) : mon étage, mes tentatives et la liste des étages ; étages atteints par tous (classement).
@@ -871,24 +873,34 @@ function avatar(j, taille = 40) {
 }
 App.avatar = avatar;
 
+// Heure du prochain gain passif (« lootbox » ou « tickets »), ou null si la réserve est pleine.
+// Réserve entamée depuis la dernière lecture (lootbox ouverte, ticket dépensé) : le compte à rebours repart d'ici, comme sur le serveur.
+App.prochainPassif = (j, quoi) => {
+  const pas = j.passif, c = quoi === "lootbox" ? "lootbox_prochaine" : "ticket_prochain";
+  if (!pas || !pas.plafond) return null;
+  if ((j[quoi] || 0) >= pas.plafond) return null;
+  if (!pas[c]) pas[c] = new Date(Date.now() + pas.intervalle_s * 1000).toISOString();
+  return pas[c];
+};
 function ressources(j) {
   // Gains passifs : heure du prochain +1 (lootbox, ticket). Rien à afficher quand la réserve est pleine.
-  const pas = j.passif || {};
-  // Réserve entamée depuis la dernière lecture (lootbox ouverte, ticket dépensé) : le compte à rebours repart d'ici, comme sur le serveur.
-  for (const [k, c] of [["lootbox", "lootbox_prochaine"], ["tickets", "ticket_prochain"]])
-    if (pas.plafond && j[k] < pas.plafond && !pas[c]) pas[c] = new Date(Date.now() + pas.intervalle_s * 1000).toISOString();
   const r = (href, ic, val, lib, aFaire, prochain) => el("a", { class: "ressource" + (aFaire ? " a-faire" : ""), href, title: lib, "aria-label": fmt(val) + " " + lib }, icone(ic),
     el("div", { "aria-hidden": "true" }, el("b", { texte: fmt(val) }), el("span", { texte: lib }), prochain ? el("small", { class: "prochain", "data-prochain": prochain }) : null));
   return [
-    r("lootbox.html", "i-coffre-ligne", j.lootbox, "Lootbox", j.lootbox > 0, pas.lootbox_prochaine),
+    r("lootbox.html", "i-coffre-ligne", j.lootbox, "Lootbox", j.lootbox > 0, App.prochainPassif(j, "lootbox")),
     r("lootbox.html?type=legendaire", "i-etoile", j.lootbox_legendaire || 0, "Légendaires", (j.lootbox_legendaire || 0) > 0),
     r("boutique.html", "i-medaille", j.medailles, "Médailles"),
-    r("duels.html", "i-ticket", j.tickets, "Tickets de duel", false, pas.ticket_prochain),
+    r("duels.html", "i-ticket", j.tickets, "Tickets de duel", false, App.prochainPassif(j, "tickets")),
   ];
 }
 // Comptes à rebours (« +1 dans 2 h 10 ») : tout élément [data-prochain] porte l'heure du prochain gain.
 // À l'échéance, on recharge le joueur (le serveur crédite à la lecture) puis la page est prévenue.
 let rechargePassif = 0;
+function relevePassif() {
+  if (Date.now() - rechargePassif < 20000 || !App.ctx || !App.ctx.joueur || App.DEMO) return;
+  rechargePassif = Date.now();
+  App.rafraichirJoueur().then(() => document.dispatchEvent(new CustomEvent("rpg:passif"))).catch(() => {});
+}
 App.majProchains = () => {
   let echu = false;
   $$("[data-prochain]").forEach((z) => {
@@ -896,19 +908,49 @@ App.majProchains = () => {
     if (!(reste > 0)) echu = true;
     z.textContent = reste > 0 ? "+1 dans " + App.dureeCourte(reste) : "+1 disponible";
   });
-  if (echu && Date.now() - rechargePassif > 20000 && App.ctx && App.ctx.joueur && !App.DEMO) {
-    rechargePassif = Date.now();
-    App.rafraichirJoueur().then(() => document.dispatchEvent(new CustomEvent("rpg:passif"))).catch(() => {});
-  }
+  if (echu) relevePassif();
 };
 setInterval(() => App.majProchains(), 30000);
+// Chrono qui défile, à la seconde : tout élément [data-chrono] porte l'heure visée et affiche « 4:12:33 » (ou « 12:33 » sous une heure).
+App.chrono = (ms) => {
+  const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), p = (n) => String(n).padStart(2, "0");
+  return (h ? h + ":" + p(m) : m) + ":" + p(s % 60);
+};
+App.majChronos = () => {
+  let echu = false;
+  $$("[data-chrono]").forEach((z) => {
+    const reste = new Date(z.dataset.chrono).getTime() - Date.now();
+    if (!(reste > 0)) echu = true;
+    z.textContent = App.chrono(reste);
+  });
+  if (echu) relevePassif();
+};
+setInterval(() => App.majChronos(), 1000);
 App.majRessources = () => {
   const j = App.ctx.joueur;
   $$("[data-ressources]").forEach((z) => z.replaceChildren(...ressources(j)));
   const b = $("[data-pastille-lootbox]");
   if (b) { const n = (j.lootbox || 0) + (j.lootbox_legendaire || 0); b.textContent = n; b.hidden = n === 0; }
-  App.majProchains();
+  $$("[data-reserve]").forEach(remplirReserve);
+  App.majProchains(); App.majChronos();
 };
+// Encart « réserve » des pages Lootbox et Duels : ce qu'il reste, et le chrono du prochain gain passif.
+const RESERVES = { lootbox: ["i-coffre-ligne", "lootbox à ouvrir", "lootbox à ouvrir", "Prochaine lootbox dans"], tickets: ["i-ticket", "ticket de duel", "tickets de duel", "Prochain ticket dans"] };
+function remplirReserve(z) {
+  const quoi = z.dataset.reserve, j = App.ctx.joueur, [ic, un, plusieurs, lib] = RESERVES[quoi], n = j[quoi] || 0, pas = j.passif || {};
+  const prochain = App.prochainPassif(j, quoi), parJour = pas.intervalle_s ? Math.round(86400 / pas.intervalle_s) : 5, plafond = pas.plafond || 10;
+  z.classList.toggle("vide", n < 1);
+  z.replaceChildren(
+    el("div", { class: "er-compte" }, icone(ic), el("b", { class: "num", texte: fmt(n) }), el("span", { texte: n > 1 ? plusieurs : un })),
+    el("div", { class: "er-chrono" }, prochain
+      ? [el("span", { texte: lib }), el("b", { class: "num", role: "timer", "data-chrono": prochain, texte: App.chrono(new Date(prochain) - Date.now()) })]
+      : [el("span", { texte: "Réserve pleine" }), el("b", { texte: "Chrono à l'arrêt" })]),
+    el("p", { class: "er-note" }, prochain ? `${parJour} par jour sans rien faire, jusqu'à ${plafond} en réserve. ` : `À ${plafond} ou plus, la réserve ne se remplit plus toute seule : dépense-en pour relancer le chrono. `,
+      el("a", { class: "lien", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener", texte: "Le live en donne d'autres" }), "."));
+}
+App.encartReserve = (quoi) => { const z = el("div", { class: "encart-reserve", "data-reserve": quoi }); remplirReserve(z); return z; };
+// Emblème de rang de ligue : même forme pour tous, la couleur dit le palier.
+App.emblemeLigue = (rang, taille = 56) => el("span", { class: "lg-embleme " + rang.cle, style: { width: taille + "px", height: taille + "px" }, title: rang.nom, "aria-hidden": "true" }, icone("i-ligue"));
 // Récompenses de quête à prendre : pastille du menu.
 App.majPastilleQuetes = (n) => { const b = $("[data-pastille-quetes]"); if (b) { b.textContent = n || ""; b.hidden = !n; } };
 App.rafraichirJoueur = async () => {

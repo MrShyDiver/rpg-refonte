@@ -39,6 +39,8 @@ App.demarrer("duels", async (main, ctx) => {
   // ------------------------------------------------------------------ Héros
   const joues = (moi.victoires || 0) + (moi.defaites || 0) + (moi.egalites || 0);
   const tickets = moi.tickets || 0;
+  // Un ticket de la réserve arrive alors qu'il n'y en avait plus : la page se recharge pour rouvrir les boutons de combat.
+  document.addEventListener("rpg:passif", () => { if (tickets < 1 && (App.ctx.joueur.tickets || 0) > 0) location.reload(); });
   const abonne = App.peutEntrainer(moi);
   const horsClassement = App.horsClassement(moi);
   const versCombat = (l, mode, echo) => `combat.html?adversaire=${encodeURIComponent(l)}&mode=${mode}${echo ? "&echo=1" : ""}`;
@@ -77,10 +79,8 @@ App.demarrer("duels", async (main, ctx) => {
       tuilePuissance),
     el("section", { class: "section-page se-battre", "aria-labelledby": "titre-se-battre" },
       el("h2", { id: "titre-se-battre", texte: "Se battre" }),
-      el("p", { class: "ligne-tickets" + (tickets < 1 ? " sans-ticket" : "") }, icone("i-ticket"),
-        tickets < 1
-          ? el("span", {}, el("b", { texte: "Plus de ticket de duel." }), " Tu en regagnes 5 par jour" + (moi.passif && moi.passif.ticket_prochain ? " (prochain dans " + App.dureeCourte(new Date(moi.passif.ticket_prochain) - Date.now()) + ")" : "") + ", et tes points de chaîne t'en donnent d'autres en live. ", el("a", { class: "lien", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener", texte: "Aller sur le live" }), lienAide("tickets", "les tickets de duel"))
-          : el("span", {}, "Il te reste ", el("b", { class: "num", texte: pluriel(tickets, "ticket") + " de duel" }), ". Un combat automatique ou un duel ciblé en coûte un.", lienAide("tickets", "les tickets de duel"))),
+      App.encartReserve("tickets"),
+      el("p", { class: "ligne-tickets" }, "Un combat automatique ou un duel ciblé coûte un ticket. La ligue, la Tour et l'Arène n'en demandent pas.", lienAide("tickets", "les tickets de duel")),
       el("div", { class: "modes-combat" },
         el("article", { class: "mode-combat auto" },
           el("span", { class: "pilule", texte: "Le plus rapide" }),
