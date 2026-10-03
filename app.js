@@ -43,6 +43,7 @@ const PAGES = [
   { id: "boutique", titre: "Boutique", href: "boutique.html", icone: "i-boutique" },
   { id: "ligue", titre: "Ligue", href: "ligue.html", icone: "i-ligue", mobile: true },
   { id: "duels", titre: "Duels", href: "duels.html", icone: "i-epees" },
+  { id: "quetes", titre: "Quêtes", href: "quetes.html", icone: "i-cible" },
   { id: "succes", titre: "Succès", href: "succes.html", icone: "i-trophee" },
   { id: "classements", titre: "Classements", href: "classements.html", icone: "i-podium" },
   { id: "patchnotes", titre: "Patchnotes", href: "patchnotes.html", icone: "i-journal" },
@@ -74,6 +75,7 @@ const ICONES = `
 <symbol id="i-son" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.2 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
 <symbol id="i-cadenas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
 <symbol id="i-fleche" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-cible" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".9" fill="currentColor"/></symbol>
 <symbol id="i-journal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h8.5L18 7v13.5H6zM14.5 3.5V7H18M9 11.5h6M9 15h6"/></symbol>
 `;
 
@@ -156,6 +158,8 @@ App.api = {
   loadoutsDefense: () => q(client().from("loadouts_defense").select("*").limit(5000)),
   // Ligue : mon état complet (énergie, trois adversaires proposés, défenses reçues) et les rangs publics de tous.
   ligue: () => App.rpc("ma_ligue"),
+  // Quêtes du jour et de la semaine, avec ma progression et le nombre de récompenses à prendre.
+  quetes: () => App.rpc("mes_quetes"),
   rangsLigue: () => q(client().from("ligue").select("player_id,points,combats,victoires,defaites,def_victoires,def_defaites,serie").limit(5000)),
   preferences: (pid) => q(client().from("preferences").select("*").eq("player_id", pid).maybeSingle()),
   grants: (pid) => q(client().from("grants").select("id,type,stat,quantite,source,cree_le").eq("player_id", pid).order("cree_le", { ascending: false }).limit(40)),
@@ -864,6 +868,8 @@ App.majRessources = () => {
   if (b) { const n = (j.lootbox || 0) + (j.lootbox_legendaire || 0); b.textContent = n; b.hidden = n === 0; }
   App.majProchains();
 };
+// Récompenses de quête à prendre : pastille du menu.
+App.majPastilleQuetes = (n) => { const b = $("[data-pastille-quetes]"); if (b) { b.textContent = n || ""; b.hidden = !n; } };
 App.rafraichirJoueur = async () => {
   const j = await App.api.moi();
   if (j) { App.ctx.joueur = j; App.majRessources(); }
@@ -908,7 +914,8 @@ function coque(page) {
   const lienSimulateur = App.estRecetteur(j) ? el("a", { href: "simulateur.html", "aria-current": page === "simulateur" ? "page" : null }, icone("i-podium"), "Simulateur") : null;
   const lienAtelier = App.estRecetteur(j) ? el("a", { href: "atelier.html", "aria-current": page === "atelier" ? "page" : null }, icone("i-journal"), "Atelier patchnote") : null;
   const lien = (p) => el("a", { href: p.href, "aria-current": p.id === page ? "page" : null }, icone(p.icone), p.titre,
-    p.id === "lootbox" ? el("span", { class: "pastille", "data-pastille-lootbox": "" }) : null);
+    p.id === "lootbox" ? el("span", { class: "pastille", "data-pastille-lootbox": "" })
+      : p.id === "quetes" ? el("span", { class: "pastille", "data-pastille-quetes": "", hidden: true }) : null);
   const lateral = el("nav", { class: "lateral", "aria-label": "Navigation du jeu" },
     el("a", { class: "marque", href: "lootbox.html" }, icone("i-marque"), el("b", { texte: "Stream RPG" })),
     el("a", { class: "joueur-puce", href: "profil.html" }, avatar(j), el("div", { style: { minWidth: 0 } }, el("b", { texte: j.display_name }), el("span", { texte: "Voir mon profil" }))),
@@ -958,8 +965,9 @@ async function chargerNotifs(cloche) {
   try {
     const p = App.ctx.prefs || {};
     const lues = new Date(p.notifications_lues_le || 0).getTime();
-    const [dons, succes, catalogue, duels, patchs] = await Promise.all([App.api.grants(App.ctx.joueur.id), App.api.succesJoueurs(App.ctx.joueur.id), App.api.succes(), p.notif_duels !== false ? App.api.duels().catch(() => []) : [],
-      p.notif_annonces !== false && App.api.patchnotesRecents ? App.api.patchnotesRecents().catch(() => []) : []]);
+    const [dons, succes, catalogue, duels, patchs, quetes] = await Promise.all([App.api.grants(App.ctx.joueur.id), App.api.succesJoueurs(App.ctx.joueur.id), App.api.succes(), p.notif_duels !== false ? App.api.duels().catch(() => []) : [],
+      p.notif_annonces !== false && App.api.patchnotesRecents ? App.api.patchnotesRecents().catch(() => []) : [],
+      App.api.quetes().catch(() => null)]);
     const titres = new Map(catalogue.map((s) => [s.code, s]));
     notifs = [];
     if (p.notif_lootbox !== false) dons.forEach((d) => {
@@ -980,6 +988,10 @@ async function chargerNotifs(cloche) {
           : `${res} en duel contre ${autre}` });
     });
     patchs.forEach((x) => notifs.push({ quand: x.publie_le, icone: "i-journal", texte: `Patchnote ${x.version} : ${x.titre}`, lien: "patchnotes.html#patch-" + x.id }));
+    // Récompense de quête à prendre : rappel en tête de liste, tant qu'elle n'est pas prise.
+    const aPrendre = (quetes && quetes.a_reclamer) || 0;
+    App.majPastilleQuetes(aPrendre);
+    if (aPrendre) notifs.push({ quand: new Date().toISOString(), icone: "i-cible", lien: "quetes.html", texte: aPrendre > 1 ? aPrendre + " récompenses de quête à prendre" : "1 récompense de quête à prendre" });
     notifs.sort((a, b) => new Date(b.quand) - new Date(a.quand));
     notifs = notifs.slice(0, 25).map((n) => ({ ...n, nouvelle: new Date(n.quand).getTime() > lues }));
     if (notifs.some((n) => n.nouvelle)) cloche.append(el("span", { class: "point" }));

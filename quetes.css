@@ -1,0 +1,22 @@
+/* Stream RPG — page Quêtes */
+.qt-titre { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 20px; flex-wrap: wrap; margin-bottom: 14px; }
+.qt-titre h2 { font-size: 22px; margin-bottom: 4px; }
+.qt-titre .sous { color: var(--encre-2); font-size: 14.5px; }
+.qt-fin { color: var(--encre-2); font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.qt-liste { list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.qt-carte { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 16px; background: var(--sol-2); border: 1px solid var(--trait); }
+.qt-carte.prete { border-color: var(--legendaire); box-shadow: 0 0 0 1px rgba(255,197,61,.25), 0 10px 30px -18px rgba(255,197,61,.6); }
+.qt-carte.prise { opacity: .62; }
+.qt-carte h3 { font-size: 16.5px; line-height: 1.25; }
+.qt-avance { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+.qt-barre { height: 8px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.qt-barre i { display: block; height: 100%; border-radius: inherit; background: var(--legendaire); transition: width .5s var(--ease); }
+.qt-carte.prise .qt-barre i { background: var(--normal); }
+.qt-compte { font-size: 13.5px; font-weight: 700; color: var(--encre-2); }
+.qt-pied { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: auto; }
+.qt-prix { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14.5px; }
+.qt-prix svg { width: 17px; height: 17px; color: var(--legendaire); }
+.qt-pied .btn-principal, .qt-pied .btn-second { min-height: 44px; }
+.qt-prise { display: inline-flex; align-items: center; gap: 6px; color: var(--normal); font-weight: 700; font-size: 14px; }
+.qt-prise svg { width: 16px; height: 16px; }
+.qt-note { margin-top: 18px; }
