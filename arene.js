@@ -1,4 +1,4 @@
-/* Stream RPG — page Arène : draft façon Hearthstone. Tout le monde part d'une coquille sans objet ni point de stat et
+/* Stream RPG — page Arène : draft façon Hearthstone. Animations des coffres : GSAP (gsap.min.js, chargé par arene.html). Tout le monde part d'une coquille sans objet ni point de stat et
    drafte son build en 30 tours (le serveur tire les cartes), puis enchaîne les combats : 10 victoires avant 3 défaites.
    En fin de parcours, des coffres de récompense à ouvrir un par un. Tes objets et tes stats ne comptent pas. */
 "use strict";
@@ -122,10 +122,11 @@ App.demarrer("arene", async (main, ctx) => {
   async function prendre(i) {
     if (occupe) return;
     occupe = true; zone.classList.add("ar-attente");
+    App.sons.demarrer(); App.sons.arene("carte");
     try {
       etat = await App.rpc("arene_drafter", { p_index: i });
       rendre(); viser();
-      if (etat.etat === "en_cours") annonce.textContent = "Draft terminé : ton build est prêt.";
+      if (etat.etat === "en_cours") { annonce.textContent = "Draft terminé : ton build est prêt."; App.sons.arene("draft-fini"); }
     } catch (e) { App.erreur(e); }
     occupe = false; zone.classList.remove("ar-attente");
   }
@@ -146,38 +147,108 @@ App.demarrer("arene", async (main, ctx) => {
   }
 
   // ------------------------------------------------------------------ Coffres de fin de parcours
+  // Avec GSAP (gsap.min.js) : arrivée des coffres, survol, ouverture en séquence (charge, couvercle, éclats, récompense).
+  // Sans GSAP, ou avec les effets réduits : les états ouverts/fermés du CSS suffisent.
+  const SON_BUTIN = { medailles: "recompense-medailles", lootbox: "recompense-lootbox", lootbox_legendaire: "recompense-legendaire", ticket_arene: "recompense-ticket" };
   function ecranCoffres() {
+    const G = window.gsap, anime = !!G && !App.reduit;
     const pal = palierAtteint() || { lootbox_legendaire: 0, tickets: 0 }, n = etat.coffres_a_ouvrir;
     const genreDe = (i) => (pal.tickets && i === n - 1 ? "ticket" : i >= n - (pal.tickets ? 1 : 0) - pal.lootbox_legendaire ? "legendaire" : "commun");
     const NOMS = { commun: "coffre de récompense", legendaire: "coffre légendaire", ticket: "coffre du champion" };
-    let contenu = null, apres = null; const ouverts = new Set();
-    const bilan = el("div", { class: "ar-bilan", hidden: true });
+    let contenu = null, apres = null, enCours = 0, fini = false, relance = null; const ouverts = new Set(), repos = [];
+    const bilan = el("div", { class: "ar-bilan", hidden: true }), flash = el("div", { class: "ar-flash", "aria-hidden": "true" });
     const boutons = Array.from({ length: n }, (_, i) => {
       const b = el("button", { type: "button", class: "ar-coffret " + genreDe(i), style: { "--i": i }, "aria-label": `Coffre ${i + 1} sur ${n} : ${NOMS[genreDe(i)]}, fermé. Ouvrir`, onclick: () => ouvrir(i) });
-      b.innerHTML = COFFRET;
-      b.append(el("span", { class: "ar-butin" }));
+      b.innerHTML = '<span class="ar-rayons" aria-hidden="true"></span><span class="ar-halo" aria-hidden="true"></span>' + COFFRET;
+      b.append(el("span", { class: "ar-fx", "aria-hidden": "true" }), el("span", { class: "ar-butin" }));
       return b;
     });
-    const toutOuvrir = el("button", { type: "button", class: "lien ar-tout", onclick: async () => { for (let i = 0; i < n; i++) await ouvrir(i); } }, "Tout ouvrir");
+    const rangee = el("div", { class: "ar-coffrets" + (anime ? " gsap" : ""), role: "group", "aria-label": "Tes coffres de récompense" }, boutons);
+    const toutOuvrir = el("button", { type: "button", class: "lien ar-tout", onclick: async () => {
+      toutOuvrir.hidden = true;
+      for (let i = 0; i < n; i++) { if (ouverts.has(i)) continue; await ouvrir(i); if (anime) await new Promise((r) => G.delayedCall(0.42, r)); }
+    } }, "Tout ouvrir");
+    const pieces = (b) => ({ svg: b.querySelector("svg"), couv: b.querySelector(".cf-couvercle"), gemme: b.querySelector(".cf-gemme"), halo: b.querySelector(".ar-halo"), rayons: b.querySelector(".ar-rayons") });
+
+    // Éclats qui jaillissent du coffre : montée, retombée, disparition.
+    function eclats(b, type, nb) {
+      const fx = b.querySelector(".ar-fx");
+      for (let k = 0; k < nb; k++) {
+        const p = el("i", { class: "ar-eclat " + type }); fx.append(p);
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.3, portee = 38 + Math.random() * 72, d = 0.7 + Math.random() * 0.55, haut = Math.sin(angle) * portee;
+        G.set(p, { scale: 0.4 + Math.random() * 0.9 });
+        G.to(p, { x: Math.cos(angle) * portee, duration: d, ease: "power1.out" });
+        G.to(p, { keyframes: { y: [0, haut, haut + 45 + Math.random() * 45], easeEach: "sine.inOut" }, duration: d, ease: "none" });
+        G.to(p, { autoAlpha: 0, scale: 0, duration: d * 0.35, delay: d * 0.65, onComplete: () => p.remove() });
+      }
+    }
+    // L'ouverture d'un coffre : il se tasse et tremble, le couvercle saute, la lumière et les éclats sortent, la récompense monte.
+    function animer(i, c) {
+      const b = boutons[i], { svg, couv, gemme, halo, rayons } = pieces(b), [ico, val, lib] = b.querySelector(".ar-butin").children;
+      const grand = c.type === "lootbox_legendaire";
+      if (repos[i]) repos[i].kill();
+      G.killTweensOf([b, svg, couv, halo]);
+      G.set([ico, val, lib], { autoAlpha: 0 });   // tout de suite : la récompense ne doit pas apparaître avant son heure
+      const tl = G.timeline({ defaults: { ease: "power2.out" } });
+      tl.to(b, { y: 0, duration: 0.1 })
+        .call(() => App.sons.arene("coffre-secousse", { vitesse: grand ? 0.8 : 1 }))
+        .to(svg, { scale: 1, scaleY: 0.87, scaleX: 1.08, duration: 0.14, ease: "power2.in" }, "<")
+        .to(couv, { y: 0, rotation: 0, duration: 0.1 }, "<")
+        .fromTo(svg, { rotation: grand ? -5 : -3 }, { rotation: grand ? 5 : 3, duration: 0.045, repeat: grand ? 15 : 7, yoyo: true, ease: "sine.inOut" }, "<")
+        .to(halo, { autoAlpha: 0.75, scale: 0.6, duration: 0.3 }, "<")
+        .addLabel("ouvre")
+        .call(() => App.sons.arene("coffre-ouverture"), null, "ouvre")
+        .set(svg, { rotation: 0 }, "ouvre")
+        .to(svg, { scaleY: 1.1, scaleX: 0.95, y: -10, duration: 0.16, ease: "power3.out" }, "ouvre")
+        .to(couv, { y: -30, rotation: -16, duration: 0.5, ease: "back.out(2.6)" }, "ouvre")
+        .to(gemme, { autoAlpha: 0, scale: 0, duration: 0.12 }, "ouvre")
+        .to(halo, { autoAlpha: 1, scale: grand ? 1.5 : 1.15, duration: 0.3 }, "ouvre")
+        .call(() => eclats(b, c.type, grand ? 34 : 16), null, "ouvre+=0.04")
+        .to(svg, { scaleY: 1, scaleX: 1, y: 0, duration: 0.7, ease: "elastic.out(1, 0.45)" }, "ouvre+=0.16")
+        .to(couv, { y: -28, rotation: -10, duration: 0.6, ease: "sine.inOut" }, "ouvre+=0.5")
+        .addLabel("prix", "ouvre+=0.14")
+        .call(() => App.sons.arene(SON_BUTIN[c.type] || "recompense-lootbox"), null, "prix")
+        .fromTo(ico, { y: 46, scale: 0.15, rotation: -30 }, { y: 0, scale: 1, rotation: 0, autoAlpha: 1, duration: 0.65, ease: "back.out(2.2)", immediateRender: false }, "prix")
+        .fromTo([val, lib], { y: 12 }, { y: 0, autoAlpha: 1, duration: 0.3, stagger: 0.07, immediateRender: false }, "prix+=0.22")
+        .to(halo, { autoAlpha: grand ? 0.75 : 0.45, scale: grand ? 1.2 : 0.9, duration: 0.8, ease: "sine.inOut" }, "prix+=0.3")
+        .call(() => G.to(ico, { y: -5, duration: 1.3, ease: "sine.inOut", yoyo: true, repeat: -1 }), null, "prix+=0.7");   // la récompense flotte au-dessus du coffre
+      if (c.type === "medailles") {   // les médailles se comptent
+        const cpt = { v: 0 };
+        tl.to(cpt, { v: c.valeur, duration: 0.6, ease: "power1.out", onUpdate: () => { val.textContent = "+" + fmt(Math.round(cpt.v)); } }, "prix+=0.22");
+      }
+      if (grand) {   // coffre légendaire : éclair, secousse de l'écran, rayons qui tournent
+        tl.fromTo(flash, { autoAlpha: 0.6 }, { autoAlpha: 0, duration: 0.7, ease: "power1.out", immediateRender: false }, "ouvre")
+          .fromTo(rangee, { x: -6 }, { x: 6, duration: 0.05, repeat: 7, yoyo: true, ease: "sine.inOut", clearProps: "x", immediateRender: false }, "ouvre")
+          .fromTo(rayons, { scale: 0.3, rotation: 0 }, { autoAlpha: 0.9, scale: 1, duration: 0.5, immediateRender: false }, "ouvre+=0.05")
+          .call(() => G.to(rayons, { rotation: 360, duration: 16, ease: "none", repeat: -1 }), null, "ouvre+=0.05");
+      }
+      return tl;
+    }
     async function ouvrir(i) {
       if (ouverts.has(i) || occupe) return;
+      App.sons.demarrer();
       if (!contenu) {   // premier coffre : le serveur crédite tout et donne le contenu, la page le dévoile coffre par coffre
         occupe = true;
         try { const r = await App.rpc("arene_recuperer"); contenu = r.coffres; apres = r; }
         catch (e) { App.erreur(e); occupe = false; return; }
         occupe = false;
+        if (ouverts.has(i)) return;
       }
       ouverts.add(i);
-      const c = contenu[i], [ic, texte] = butin(c), b = boutons[i];
+      const c = contenu[i], [ic, texte] = butin(c), b = boutons[i], coupe = texte.indexOf(" ");   // « +61 » en grand, « médailles » dessous
       b.classList.add("ouvert", c.type); b.setAttribute("aria-label", `Coffre ${i + 1} : ${texte}`); b.setAttribute("aria-disabled", "true");
-      const coupe = texte.indexOf(" ");   // « +61 » en grand, « médailles » dessous
       b.querySelector(".ar-butin").replaceChildren(icone(ic), el("b", { class: "num", texte: texte.slice(0, coupe) }), el("small", { texte: texte.slice(coupe + 1) }));
       annonce.textContent = `Coffre ${i + 1} : ${texte}`;
-      if (ouverts.size === n) terminer();
+      if (ouverts.size === n) toutOuvrir.hidden = true;
+      if (!anime) { App.sons.arene("coffre-ouverture"); App.sons.arene(SON_BUTIN[c.type] || "recompense-lootbox"); if (ouverts.size === n) terminer(); return; }
+      enCours++;
+      animer(i, c).then(() => { enCours--; if (ouverts.size === n && !enCours) terminer(); });
     }
     function terminer() {
+      if (fini) return; fini = true;
+      if (relance) relance.kill();
       Object.assign(ctx.joueur, apres.joueur); App.majRessources();
-      etat = apres.arene; toutOuvrir.hidden = true;
+      etat = apres.arene;
       const total = {}; for (const c of contenu) total[c.type] = (total[c.type] || 0) + c.valeur;
       bilan.replaceChildren(
         el("p", { class: "ar-bilan-texte" }, "Tu repars avec ", Object.entries(total).flatMap(([type, valeur], k, l) => [k ? (k === l.length - 1 ? " et " : ", ") : "", el("b", { texte: butin({ type, valeur })[1].slice(1) })]), "."),
@@ -185,15 +256,50 @@ App.demarrer("arene", async (main, ctx) => {
           total.lootbox || total.lootbox_legendaire ? el("a", { class: "btn-principal", href: total.lootbox ? "lootbox.html" : "lootbox.html?type=legendaire" }, icone("i-coffre-ligne"), "Ouvrir mes lootbox") : null,
           etat.peut_commencer ? boutonEntree(true) : el("span", { class: "mention", texte: "L'Arène rouvre demain." })));
       bilan.hidden = false;
-      const s = bilan.querySelector("a, button"); if (s) s.focus();
+      App.sons.arene("bilan");
+      if (anime) G.from(bilan.children, { y: 18, autoAlpha: 0, duration: 0.45, stagger: 0.12, ease: "power3.out", clearProps: "all" });
+      const s = bilan.querySelector("a, button"); if (s) s.focus({ preventScroll: true });
     }
     zone.replaceChildren(
       el("section", { class: "section-page ar-tete ar-recompenses", "aria-labelledby": "t-ar" },
+        flash,
         el("h2", { id: "t-ar", tabindex: "-1", texte: etat.victoires >= etat.max_victoires ? "Parcours parfait" : "Parcours terminé" }),
         el("p", { class: "sous", texte: `${pluriel(etat.victoires, "victoire")} : ${pluriel(n, "coffre")} à ouvrir. Touche chaque coffre pour découvrir ce qu'il contient.` }),
-        el("div", { class: "ar-coffrets", role: "group", "aria-label": "Tes coffres de récompense" }, boutons),
-        toutOuvrir, bilan),
+        rangee, toutOuvrir, bilan),
       blocBuild("Le build de ce parcours"), note());
+    if (!anime) return;
+
+    // Arrivée : les coffres tombent un par un et s'écrasent légèrement, puis flottent en attendant.
+    const entree = G.timeline();
+    boutons.forEach((b, i) => {
+      const { svg } = pieces(b);
+      G.set(svg, { transformOrigin: "50% 100%" });
+      entree.from(b, { y: -90, autoAlpha: 0, duration: 0.4, ease: "power2.in" }, 0.15 + i * 0.13)
+        .call(() => App.sons.arene("coffre-pose"), null, ">")
+        .to(svg, { scaleY: 0.8, scaleX: 1.13, duration: 0.08, ease: "power1.out" }, ">")
+        .to(svg, { scaleY: 1, scaleX: 1, duration: 0.55, ease: "elastic.out(1.1, 0.4)" }, ">")
+        .call(() => { if (!ouverts.has(i)) repos[i] = G.to(b, { y: -5, duration: 1.5 + i * 0.12, ease: "sine.inOut", yoyo: true, repeat: -1 }); }, null, ">-0.3");
+    });
+    // De temps en temps, un coffre fermé s'agite pour appeler le clic.
+    const agiter = () => {
+      if (!rangee.isConnected || ouverts.size === n) return;
+      const fermes = boutons.filter((_, i) => !ouverts.has(i)), { svg } = pieces(fermes[Math.floor(Math.random() * fermes.length)]);
+      if (!G.isTweening(svg)) G.fromTo(svg, { rotation: -4 }, { rotation: 4, duration: 0.07, repeat: 5, yoyo: true, ease: "sine.inOut", onComplete: () => G.set(svg, { rotation: 0 }) });
+      relance = G.delayedCall(2.6 + Math.random() * 1.6, agiter);
+    };
+    relance = G.delayedCall(2.4, agiter);
+    // Survol et focus : le coffre se soulève, le couvercle s'entrouvre, la lumière filtre.
+    boutons.forEach((b, i) => {
+      const { svg, couv, halo } = pieces(b);
+      const survol = (oui) => {
+        if (ouverts.has(i)) return;
+        G.to(svg, { scale: oui ? 1.09 : 1, duration: 0.25, ease: oui ? "back.out(2.5)" : "power2.out", overwrite: "auto" });
+        G.to(couv, { y: oui ? -6 : 0, rotation: oui ? -4 : 0, duration: 0.25, overwrite: "auto" });
+        G.to(halo, { autoAlpha: oui ? 0.55 : 0, scale: oui ? 0.7 : 0.5, duration: 0.25, overwrite: "auto" });
+      };
+      b.addEventListener("pointerenter", () => survol(true)); b.addEventListener("pointerleave", () => survol(false));
+      b.addEventListener("focus", () => survol(true)); b.addEventListener("blur", () => survol(false));
+    });
   }
 
   // ------------------------------------------------------------------ Entrée, parcours en cours, parcours terminé

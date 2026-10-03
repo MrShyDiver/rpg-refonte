@@ -634,13 +634,16 @@ function demarrerAudio() {
 function chargerSonsLootbox() {
   if (remplacementsLb || App.DEMO) return;
   remplacementsLb = new Set();
-  fetch("sons/lootbox/liste.json").then((r) => (r.ok ? r.json() : [])).then((l) => {
-    (Array.isArray(l) ? l : []).map(String).filter((n) => /^[\w-]+$/.test(n)).forEach((n) => {
-      remplacementsLb.add(n);
-      fetch("sons/lootbox/" + n + ".mp3").then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
-        .then((o) => actx.decodeAudioData(o)).then((b) => tamponsLb.set(n, b)).catch(() => tamponsLb.set(n, null));
-    });
-  }).catch(() => {});
+  // Deux dossiers, même principe : sons/lootbox/ (clé = nom) et sons/arene/ (clé = « arene/nom »).
+  for (const [dossier, prefixe] of [["lootbox", ""], ["arene", "arene/"]]) {
+    fetch("sons/" + dossier + "/liste.json").then((r) => (r.ok ? r.json() : [])).then((l) => {
+      (Array.isArray(l) ? l : []).map(String).filter((n) => /^[\w-]+$/.test(n)).forEach((n) => {
+        remplacementsLb.add(prefixe + n);
+        fetch("sons/" + dossier + "/" + n + ".mp3").then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+          .then((o) => actx.decodeAudioData(o)).then((b) => tamponsLb.set(prefixe + n, b)).catch(() => tamponsLb.set(prefixe + n, null));
+      });
+    }).catch(() => {});
+  }
 }
 // Joue le fichier qui remplace <nom> s'il est prêt ; renvoie la fonction d'arrêt, ou null (synthèse).
 function fichierLb(noms, { vitesse = 1, vol = 1, boucle = false, t0 = 0 } = {}) {
@@ -825,7 +828,27 @@ function sonRarete(rang) {
   MOTIFS[rang].forEach(([f, t, d, type, v]) => note(f, t, d, type || "triangle", v || 0.15, REVERB[rang]));
 }
 
+// Sons de l'Arène (draft, coffres de récompense). Le fichier sons/arene/<nom>.mp3 est joué s'il figure dans
+// sons/arene/liste.json ; sinon, un son généré le remplace. Noms et consignes : sons/arene/LISEZMOI.md.
+const SONS_ARENE = {
+  "coffre-pose": () => { coup(140, 50, 0, 0.16, 0.45); souffle(900, 200, 0.12, 0.12, "lowpass"); },
+  "coffre-secousse": () => { for (let i = 0; i < 6; i++) souffle(2600, 1300, 0.05, 0.16, "bandpass", i * 0.06); },
+  "coffre-ouverture": () => { relache(); souffle(400, 6000, 0.45, 0.3); },
+  "recompense-medailles": () => { for (let i = 0; i < 7; i++) setTimeout(tinte, i * 70); },
+  "recompense-lootbox": () => sonRarete(2),
+  "recompense-legendaire": () => sonRarete(4),
+  "recompense-ticket": () => scintille(),
+  "bilan": () => accordMax(),
+  "carte": () => retournement(),
+  "draft-fini": () => sonRarete(3),
+};
+function sonArene(nom, options) {
+  if (!audible() || fichierLb(["arene/" + nom], options)) return;
+  const genere = SONS_ARENE[nom]; if (genere) genere();
+}
+
 App.sons = {
+  arene: sonArene,
   demarrer: demarrerAudio, rarete: sonRarete, grondement: () => tension(2), tension, tic, battement, explosion,
   envol, relache, faisceau, impact, musique, carte, retournement, combo, scintille, cloche, accordMax, tinte,
   get actif() { return sonActif; },

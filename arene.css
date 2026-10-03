@@ -68,35 +68,52 @@
 .ar-carte-stat span { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--encre-2); }
 .ar-fiche { font-size: 12.5px; min-height: 28px; background: none; border: 0; cursor: pointer; }
 
-/* Coffres de récompense : un dessin à eux (ce ne sont pas des lootbox). Couleur du coffre : --cf. */
+/* Coffres de récompense : un dessin à eux (ce ne sont pas des lootbox). Couleur du coffre : --cf.
+   Avec GSAP (.ar-coffrets.gsap), les mouvements sont pilotés par arene.js ; sans GSAP ou avec les effets réduits,
+   les règles « :not(.gsap) » donnent une version simple en CSS. */
 .ar-coffrets { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 22px; margin: 26px 0 6px; }
-.ar-coffret { --cf: #7b68e6; --cf-clair: #c3b6ff; --cf-sombre: #251f44; position: relative; width: 128px; padding: 0 0 56px; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; animation: ar-flotte 3.2s ease-in-out infinite; animation-delay: calc(var(--i) * -.6s); }
+.ar-coffret { --cf: #7b68e6; --cf-clair: #c3b6ff; --cf-sombre: #251f44; position: relative; width: 128px; padding: 0 0 56px; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
 .ar-coffret.legendaire { --cf: #ffc53d; --cf-clair: #ffe9a8; --cf-sombre: #4a3407; }
 .ar-coffret.ticket { --cf: #4fd6c6; --cf-clair: #c2fff6; --cf-sombre: #0c3a35; }
-.ar-coffret svg { display: block; width: 100%; overflow: visible; filter: drop-shadow(0 10px 14px rgba(0,0,0,.5)); transition: transform .25s var(--ease), filter .25s; }
+.ar-coffret > svg { position: relative; display: block; width: 100%; overflow: visible; filter: drop-shadow(0 10px 14px rgba(0,0,0,.5)); }
+.ar-coffret:not(.ouvert):hover > svg, .ar-coffret:not(.ouvert):focus-visible > svg { filter: drop-shadow(0 0 16px color-mix(in oklab, var(--cf) 75%, transparent)) drop-shadow(0 10px 14px rgba(0,0,0,.5)); }
+.ar-coffret.ouvert { cursor: default; }
 .cf-ombre { fill: rgba(0,0,0,.4); }
 .cf-corps > rect:first-child { fill: var(--cf-sombre); stroke: var(--cf); stroke-width: 2; }
 .cf-couvercle > path:first-child { fill: color-mix(in oklab, var(--cf) 48%, var(--cf-sombre)); stroke: var(--cf); stroke-width: 2; }
 .cf-metal { fill: var(--cf-clair); opacity: .8; }
-.cf-gemme { fill: var(--cf-clair); stroke: #fff; stroke-width: 1.2; transition: opacity .2s; }
-.cf-couvercle { transform-box: fill-box; transform-origin: 50% 100%; transition: transform .45s var(--ease); }
+.cf-gemme { fill: var(--cf-clair); stroke: #fff; stroke-width: 1.2; }
+/* Lumière qui sort du coffre, rayons du coffre légendaire, éclats, éclair de la scène (pilotés par GSAP) */
+.ar-halo, .ar-rayons { position: absolute; left: 50%; top: 50px; border-radius: 50%; opacity: 0; visibility: hidden; pointer-events: none; }
+.ar-halo { width: 150px; height: 150px; margin: -75px 0 0 -75px; background: radial-gradient(circle, #fff 0, var(--cf-clair) 28%, transparent 68%); }
+.ar-rayons { width: 300px; height: 300px; margin: -150px 0 0 -150px; background: repeating-conic-gradient(from 0deg, color-mix(in oklab, var(--cf-clair) 60%, transparent) 0 8deg, transparent 8deg 30deg); -webkit-mask: radial-gradient(circle, #000 18%, transparent 66%); mask: radial-gradient(circle, #000 18%, transparent 66%); }
+.ar-fx { position: absolute; left: 50%; top: 46px; width: 0; height: 0; pointer-events: none; }
+.ar-eclat { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--cf-clair); box-shadow: 0 0 8px var(--cf-clair); }
+.ar-eclat.medailles { background: radial-gradient(circle at 35% 30%, #fff3c4, #ffc53d 60%, #b9801a); box-shadow: 0 0 6px rgba(255,197,61,.8); }
+.ar-eclat.lootbox_legendaire { border-radius: 1px; transform: rotate(45deg); }
+.ar-flash { position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(circle at 50% 45%, rgba(255,236,180,.95), rgba(255,197,61,.25) 45%, transparent 72%); opacity: 0; visibility: hidden; pointer-events: none; }
+/* Version sans GSAP */
+.ar-coffrets:not(.gsap) .ar-coffret { animation: ar-flotte 3.2s ease-in-out infinite; animation-delay: calc(var(--i) * -.6s); }
+.ar-coffrets:not(.gsap) .ar-coffret > svg { transition: transform .25s var(--ease), filter .25s; }
+.ar-coffrets:not(.gsap) .cf-couvercle { transform-box: fill-box; transform-origin: 50% 100%; transition: transform .45s var(--ease); }
+.ar-coffrets:not(.gsap) .cf-gemme { transition: opacity .2s; }
 @keyframes ar-flotte { 50% { transform: translateY(-5px); } }
-.ar-coffret:not(.ouvert):hover svg, .ar-coffret:not(.ouvert):focus-visible svg { transform: scale(1.07) rotate(-2deg); filter: drop-shadow(0 0 16px color-mix(in oklab, var(--cf) 75%, transparent)) drop-shadow(0 10px 14px rgba(0,0,0,.5)); }
-.ar-coffret:not(.ouvert):hover .cf-couvercle, .ar-coffret:not(.ouvert):focus-visible .cf-couvercle { transform: translateY(-5px) rotate(-3deg); }
-.ar-coffret:not(.ouvert):active svg { transform: scale(.97); }
-.ar-coffret::before { content: ""; position: absolute; left: 50%; top: 50px; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle, #fff, var(--cf-clair) 35%, transparent 70%); opacity: 0; transform: translate(-50%, -50%); pointer-events: none; }
-.ar-coffret.ouvert { cursor: default; animation: none; }
-.ar-coffret.ouvert .cf-couvercle { transform: translateY(-22px) rotate(-9deg); }
-.ar-coffret.ouvert .cf-gemme { opacity: 0; }
-.ar-coffret.ouvert::before { animation: ar-eclat .9s var(--ease) forwards; }
+.ar-coffrets:not(.gsap) .ar-coffret:not(.ouvert):hover > svg, .ar-coffrets:not(.gsap) .ar-coffret:not(.ouvert):focus-visible > svg { transform: scale(1.07) rotate(-2deg); }
+.ar-coffrets:not(.gsap) .ar-coffret:not(.ouvert):hover .cf-couvercle, .ar-coffrets:not(.gsap) .ar-coffret:not(.ouvert):focus-visible .cf-couvercle { transform: translateY(-5px) rotate(-3deg); }
+.ar-coffrets:not(.gsap) .ar-coffret::before { content: ""; position: absolute; left: 50%; top: 50px; width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle, #fff, var(--cf-clair) 35%, transparent 70%); opacity: 0; transform: translate(-50%, -50%); pointer-events: none; }
+.ar-coffrets:not(.gsap) .ar-coffret.ouvert { animation: none; }
+.ar-coffrets:not(.gsap) .ar-coffret.ouvert .cf-couvercle { transform: translateY(-28px) rotate(-10deg); }
+.ar-coffrets:not(.gsap) .ar-coffret.ouvert .cf-gemme { opacity: 0; }
+.ar-coffrets:not(.gsap) .ar-coffret.ouvert::before { animation: ar-eclat .9s var(--ease) forwards; }
 @keyframes ar-eclat { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 35% { opacity: .95; transform: translate(-50%, -50%) scale(9); } 100% { opacity: .55; transform: translate(-50%, -50%) scale(5); } }
-.ar-butin { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 100%; display: grid; justify-items: center; align-content: start; gap: 1px; min-height: 48px; text-align: center; font-size: 14.5px; line-height: 1.15; }
+.ar-coffrets:not(.gsap) .ar-coffret.ouvert .ar-butin { animation: ar-butin .5s .2s var(--ease) both; }
+@keyframes ar-butin { from { opacity: 0; transform: translateY(-26px) scale(.6); } }
+.ar-butin { position: absolute; left: 0; bottom: 0; width: 100%; display: grid; justify-items: center; align-content: start; gap: 1px; min-height: 48px; text-align: center; font-size: 14.5px; line-height: 1.15; }
 .ar-butin:empty::before { content: "Ouvrir"; align-self: center; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--trait-fort); font-size: 12.5px; font-weight: 700; color: var(--encre-2); }
-.ar-butin svg { position: absolute; left: 50%; top: -74px; width: 30px; height: 30px; margin-left: -15px; color: #fff; filter: drop-shadow(0 0 8px var(--cf-clair)); }
+.ar-butin svg { position: absolute; left: 50%; top: -98px; width: 40px; height: 40px; margin-left: -20px; color: #fff; filter: drop-shadow(0 0 10px var(--cf-clair)) drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
 .ar-butin b { font-family: var(--titre); font-size: 20px; color: var(--cf-clair); }
 .ar-butin small { font-size: 12.5px; color: var(--encre-2); }
-.ar-coffret.ouvert .ar-butin { animation: ar-butin .5s .2s var(--ease) both; }
-@keyframes ar-butin { from { opacity: 0; transform: translate(-50%, -26px) scale(.6); } }
+.ar-recompenses { position: relative; overflow: hidden; }   /* les rayons et l'éclair restent dans le cadre */
 .ar-recompenses { text-align: center; }
 .ar-recompenses .sous { margin-inline: auto; }
 .ar-tout[hidden] { display: none; }
@@ -116,11 +133,11 @@
   .ar-offre-case { flex-basis: calc(50% - 5px); }
   .ar-offre { padding: 10px 8px 12px; }
   .ar-coffret { width: 100px; }
-  .ar-butin svg { top: -60px; width: 24px; height: 24px; margin-left: -12px; }
+  .ar-butin svg { top: -84px; width: 32px; height: 32px; margin-left: -16px; }
   .ar-coffrets { gap: 10px 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ar-coffret, .ar-offre-case, .ar-bilan, .ar-coffret.ouvert .ar-butin { animation: none; }
-  .ar-coffret.ouvert::before { animation: none; opacity: .55; transform: translate(-50%, -50%) scale(5); }
-  .ar-coffret svg, .cf-couvercle, .ar-offre { transition: none; }
+  .ar-coffrets:not(.gsap) .ar-coffret, .ar-offre-case, .ar-bilan, .ar-coffrets:not(.gsap) .ar-coffret.ouvert .ar-butin { animation: none; }
+  .ar-coffrets:not(.gsap) .ar-coffret.ouvert::before { animation: none; opacity: .55; transform: translate(-50%, -50%) scale(5); }
+  .ar-coffrets:not(.gsap) .ar-coffret > svg, .ar-coffrets:not(.gsap) .cf-couvercle, .ar-offre { transition: none; }
 }
