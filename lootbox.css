@@ -8,6 +8,7 @@
 .lb-types { margin-top: 0; }
 .type-lootbox { min-height: 76px; }
 .lb-type-texte { flex: 1; min-width: 0; }
+.lb-type-texte { min-width: 0; }
 .lb-compte { margin-left: auto; text-align: right; flex: none; }
 .lb-compte b { display: block; font-family: var(--titre); font-size: 26px; line-height: 1.05; color: var(--encre); }
 .type-lootbox[data-type="legendaire"] .lb-compte b { color: var(--legendaire); }

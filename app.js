@@ -933,34 +933,28 @@ App.prochainPassif = (j, quoi) => {
   return pas[c];
 };
 function ressources(j) {
-  // Gains passifs : heure du prochain +1 (lootbox, ticket). Rien à afficher quand la réserve est pleine.
-  const r = (href, ic, val, lib, aFaire, prochain) => el("a", { class: "ressource" + (aFaire ? " a-faire" : ""), href, title: lib, "aria-label": fmt(val) + " " + lib }, icone(ic),
-    el("div", { "aria-hidden": "true" }, el("b", { texte: fmt(val) }), el("span", { texte: lib }), prochain ? el("small", { class: "prochain", "data-prochain": prochain }) : null));
+  // Réserves qui se rechargent (quoi = « lootbox » ou « tickets ») : « 3/10 » et le chrono du prochain +1.
+  // Au-delà du plafond, la réserve ne se recharge plus : le nombre seul. Le nom n'est affiché que dans la légende du menu « Plus ».
+  const r = (href, ic, val, lib, aFaire, quoi) => {
+    const plafond = quoi && j.passif ? j.passif.plafond : 0, surPlafond = plafond && (val || 0) <= plafond, prochain = quoi ? App.prochainPassif(j, quoi) : null;
+    return el("a", { class: "ressource" + (aFaire ? " a-faire" : ""), href, title: lib + (surPlafond ? ` : ${fmt(val)} sur ${fmt(plafond)}` : ""), "aria-label": fmt(val) + " " + lib + (surPlafond ? " sur " + fmt(plafond) : "") }, icone(ic),
+      el("div", { "aria-hidden": "true" }, el("b", { texte: fmt(val) + (surPlafond ? "/" + fmt(plafond) : "") }), el("span", { texte: lib }),
+        prochain ? el("small", { class: "prochain", "data-chrono": prochain, texte: App.chrono(new Date(prochain) - Date.now()) }) : null));
+  };
   return [
-    r("lootbox.html", "i-coffre-ligne", j.lootbox, "Lootbox", j.lootbox > 0, App.prochainPassif(j, "lootbox")),
-    r("lootbox.html?type=legendaire", "i-etoile", j.lootbox_legendaire || 0, "Légendaires", (j.lootbox_legendaire || 0) > 0),
+    r("lootbox.html", "i-coffre-ligne", j.lootbox, "Lootbox", j.lootbox > 0, "lootbox"),
+    r("lootbox.html?type=legendaire", "i-etoile", j.lootbox_legendaire || 0, "Lootbox légendaires", (j.lootbox_legendaire || 0) > 0),
     r("boutique.html", "i-medaille", j.medailles, "Médailles"),
-    r("duels.html", "i-ticket", j.tickets, "Tickets de duel", false, App.prochainPassif(j, "tickets")),
+    r("duels.html", "i-ticket", j.tickets, "Tickets de duel", false, "tickets"),
   ];
 }
-// Comptes à rebours (« +1 dans 2 h 10 ») : tout élément [data-prochain] porte l'heure du prochain gain.
-// À l'échéance, on recharge le joueur (le serveur crédite à la lecture) puis la page est prévenue.
+// À l'échéance d'un chrono de recharge, on recharge le joueur (le serveur crédite à la lecture) puis la page est prévenue.
 let rechargePassif = 0;
 function relevePassif() {
   if (Date.now() - rechargePassif < 20000 || !App.ctx || !App.ctx.joueur || App.DEMO) return;
   rechargePassif = Date.now();
   App.rafraichirJoueur().then(() => document.dispatchEvent(new CustomEvent("rpg:passif"))).catch(() => {});
 }
-App.majProchains = () => {
-  let echu = false;
-  $$("[data-prochain]").forEach((z) => {
-    const reste = new Date(z.dataset.prochain).getTime() - Date.now();
-    if (!(reste > 0)) echu = true;
-    z.textContent = reste > 0 ? "+1 dans " + App.dureeCourte(reste) : "+1 disponible";
-  });
-  if (echu) relevePassif();
-};
-setInterval(() => App.majProchains(), 30000);
 // Chrono qui défile, à la seconde : tout élément [data-chrono] porte l'heure visée et affiche « 4:12:33 » (ou « 12:33 » sous une heure).
 App.chrono = (ms) => {
   const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), p = (n) => String(n).padStart(2, "0");
@@ -982,7 +976,7 @@ App.majRessources = () => {
   const b = $("[data-pastille-lootbox]");
   if (b) { const n = (j.lootbox || 0) + (j.lootbox_legendaire || 0); b.textContent = n; b.hidden = n === 0; }
   $$("[data-reserve]").forEach(remplirReserve);
-  App.majProchains(); App.majChronos();
+  App.majChronos();
 };
 // Encart « réserve » des pages Lootbox et Duels : ce qu'il reste, et le chrono du prochain gain passif.
 const RESERVES = { lootbox: ["i-coffre-ligne", "lootbox à ouvrir", "lootbox à ouvrir", "Prochaine lootbox dans"], tickets: ["i-ticket", "ticket de duel", "tickets de duel", "Prochain ticket dans"] };

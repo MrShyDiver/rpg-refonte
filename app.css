@@ -103,7 +103,7 @@ h1, h2, h3 { font-family: var(--titre); font-weight: 700; letter-spacing: -.02em
 .cf-bs { fill: var(--bois-sombre, #4b2c19); } .cf-m { fill: var(--metal, #9a9cae); } .cf-ms { fill: var(--metal-sombre, #5d5f70); } .cf-s { fill: var(--serrure, #ffc53d); }
 .version-legendaire { --bois: #3b2566; --bois-clair: #553692; --bois-sombre: #231543; --metal: #ffc53d; --metal-sombre: #b8841f; --serrure: #fff1c2; }
 
-.types-lootbox { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 30px; }
+.types-lootbox { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 30px; }
 .type-lootbox {
   display: flex; gap: 14px; align-items: center; text-align: left; padding: 14px 16px; border-radius: 16px;
   background: var(--sol-2); border: 1px solid var(--trait); transition: border-color .2s, background .2s, transform .2s var(--ease);
@@ -316,6 +316,8 @@ body { overflow-x: clip; }
 .ressource { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--sol); border: 1px solid var(--trait); text-decoration: none; min-width: 0; }
 .ressource svg { width: 18px; height: 18px; flex: none; }
 .ressource b { font-family: var(--titre); font-size: 14px; font-variant-numeric: tabular-nums; }
+.ressource b { display: block; line-height: 1.2; white-space: nowrap; }
+.ressources .ressource span, .ressources-mobile .ressource span { display: none; }   /* le nom : seulement dans la légende du menu « Plus » (et en infobulle) */
 .ressource span { display: block; font-size: 11px; color: var(--encre-3); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ressource.a-faire { border-color: color-mix(in oklab, var(--legendaire) 45%, transparent); }
 
@@ -468,9 +470,11 @@ body { overflow-x: clip; }
   .barre-haute .fil { display: none; }
   .barre-haute .marque-mobile { display: inline-flex; }
   .barre-haute .marque-mobile b { display: none; }
-  .barre-haute .ressources-mobile { display: flex; gap: 6px; overflow-x: auto; min-width: 0; }
-  .barre-haute .ressources-mobile .ressource { padding: 5px 8px; }
-  .barre-haute .ressources-mobile .ressource span { display: none; }
+  @media (max-width: 400px) { .barre-haute .marque-mobile { display: none; } }
+  .barre-haute .ressources-mobile { display: flex; gap: 4px; overflow-x: auto; min-width: 0; }
+  .barre-haute .ressources-mobile .ressource { padding: 4px 6px; gap: 5px; flex: none; }
+  .barre-haute .ressources-mobile .ressource svg { width: 15px; height: 15px; }
+  .barre-haute .ressources-mobile .ressource b { font-size: 12.5px; }
   .contenu { padding: 22px 16px 110px; }
   .barre-onglets {
     display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
@@ -480,7 +484,7 @@ body { overflow-x: clip; }
   .barre-onglets a, .barre-onglets button { display: grid; justify-items: center; gap: 3px; padding: 6px 2px; border-radius: 10px; font-size: 11px; font-weight: 600; color: var(--encre-3); text-decoration: none; }
   .barre-onglets svg { width: 21px; height: 21px; }
   .barre-onglets [aria-current="page"] { color: var(--legendaire); }
-  .feuille-plus.ouverte { display: block; position: fixed; left: 8px; right: 8px; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); z-index: 45; padding: 8px; border-radius: 18px; background: #1b1c24; border: 1px solid var(--trait-fort); box-shadow: 0 24px 50px -16px rgba(0,0,0,.95); }
+  .feuille-plus.ouverte { display: block; position: fixed; left: 8px; right: 8px; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); max-height: calc(100vh - 150px); max-height: calc(100dvh - 86px - env(safe-area-inset-bottom, 0px)); overflow-y: auto; overscroll-behavior: contain; z-index: 45; padding: 8px; border-radius: 18px; background: #1b1c24; border: 1px solid var(--trait-fort); box-shadow: 0 24px 50px -16px rgba(0,0,0,.95); }
   .feuille-plus a, .feuille-plus button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--encre); text-decoration: none; }
   .feuille-plus svg { width: 20px; height: 20px; color: var(--encre-2); }
   .feuille-plus a[aria-current="page"] { background: var(--sol-3); }
@@ -511,9 +515,8 @@ html.effets-reduits *, html.effets-reduits *::before, html.effets-reduits *::aft
 .barre-publique .marque svg { width: 32px; height: 32px; }
 .barre-publique .marque b { font-family: var(--titre); }
 
-/* Gains passifs : compte à rebours du prochain +1 sous la ressource. */
-.ressource .prochain { display: block; font-size: 10.5px; line-height: 1.25; color: var(--normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ressources-mobile .ressource .prochain { display: none; }
+/* Réserves qui se rechargent : chrono du prochain +1 sous le nombre, toujours visible. */
+.ressource .prochain { display: block; font-size: 10.5px; line-height: 1.25; color: var(--normal); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* Emblème de rang de ligue (pages Ligue et Profil). Couleur de palier : --p. */
 .lg-embleme { --p: #8e8d9a; position: relative; display: inline-grid; place-items: center; flex: none; color: var(--p); vertical-align: middle; }
@@ -541,6 +544,7 @@ html.effets-reduits *, html.effets-reduits *::before, html.effets-reduits *::aft
 .ap-liste { list-style: none; display: grid; gap: 10px; }
 .ap-ligne { display: grid; grid-template-columns: 156px minmax(0, 380px) minmax(0, 1fr); align-items: center; gap: 12px 24px; padding: 12px 18px; border-radius: 16px; background: var(--sol-2); border: 1px solid var(--trait); }
 .ap-ligne.parfait { border-color: color-mix(in oklab, var(--legendaire) 45%, transparent); background: color-mix(in oklab, var(--legendaire) 5%, var(--sol-2)); }
+.ap-ligne > * { min-width: 0; }
 .ap-score { display: grid; gap: 3px; justify-items: start; }
 .ap-score b { font-family: var(--titre); font-size: 26px; line-height: 1.1; font-weight: 800; white-space: nowrap; }
 .ap-score .v { color: var(--normal); } .ap-score .d { color: #ff9b9b; }
