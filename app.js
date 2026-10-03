@@ -1276,28 +1276,33 @@ function textePatch(texte) {
   vider();
   return racine;
 }
-// Objets modifiés, regroupés par verdict. objets : [{ numero, nom, slot, rarete, avant, apres }].
+// Objets modifiés, rangés par type d'équipement (armes, mains gauches, armures, stratagèmes). Chaque objet porte son image et une
+// bulle « Buff », « Nerf » ou « Équilibrage ». objets : [{ numero, nom, slot, rarete, avant, apres }].
 // action(objet) (facultatif) renvoie un bouton à afficher sur la ligne de l'objet (atelier).
 function objetsPatch(objets, action = null) {
   const calcules = (objets || []).map((o) => ({ ...o, ...diffObjet(o.avant, o.apres) })).filter((o) => o.lignes.length);
   const racine = el("div", { class: "patch-objets" });
   if (!calcules.length) return racine;
-  const compte = (v) => calcules.filter((o) => o.verdict === v).length;
-  racine.append(el("p", { class: "patch-resume" }, el("b", { texte: calcules.length + (calcules.length > 1 ? " objets retouchés" : " objet retouché") }), " : ",
-    ["buff", "nerf", "equilibrage"].filter(compte).map((v) => compte(v) + " " + VERDICTS[v][compte(v) > 1 ? 1 : 0].toLowerCase()).join(", "), "."));
-  const ordreSlots = Object.keys(SLOTS);
+  const bulles = (l) => ["buff", "nerf", "equilibrage"].map((v) => [v, l.filter((o) => o.verdict === v).length]).filter(([, n]) => n)
+    .map(([v, n]) => el("span", { class: "patch-bulle " + v, texte: n + " " + VERDICTS[v][n > 1 ? 1 : 0].toLowerCase() }));
+  racine.append(el("p", { class: "patch-resume" }, el("b", { texte: calcules.length + (calcules.length > 1 ? " objets retouchés" : " objet retouché") }), bulles(calcules)));
   const ligne = (l) => el("li", {}, el("span", { texte: l.libelle }), el("span", { class: "num avant", texte: l.avant }),
     el("span", { class: "fleche", "aria-hidden": "true", texte: "→" }),
     el("b", { class: "num " + (l.sens > 0 ? "hausse" : l.sens < 0 ? "baisse" : ""), texte: l.apres + (l.sens > 0 ? " ▲" : l.sens < 0 ? " ▼" : "") }));
-  const carteObjet = (o) => el("article", { class: "patch-objet", style: { "--c": `var(--${o.rarete})` } },
-    el("header", {}, el("b", { class: "nom-objet", texte: o.nom }), el("span", { class: "pilule " + o.rarete, texte: RARETES[o.rarete].nom }),
-      el("span", { class: "mention", texte: SLOTS[o.slot] ? SLOTS[o.slot].nom : o.slot }), action ? action(o) : null),
-    el("ul", { class: "patch-lignes" }, o.lignes.map(ligne)));
-  for (const v of ["buff", "nerf", "equilibrage"]) {
-    const groupe = calcules.filter((o) => o.verdict === v).sort((a, b) => ordreSlots.indexOf(a.slot) - ordreSlots.indexOf(b.slot) || rangRarete(b.rarete) - rangRarete(a.rarete) || a.nom.localeCompare(b.nom, "fr"));
+  const carteObjet = (o) => {
+    const d = o.apres || o.avant || {}, src = App.image(d.image || (App.objet(o.numero) || {}).image);
+    return el("article", { class: "patch-objet", style: { "--c": `var(--${o.rarete})` } },
+      el("header", {}, el("span", { class: "patch-vignette" }, src ? el("img", { src, alt: "", loading: "lazy", decoding: "async" }) : null),
+        el("div", { class: "patch-nom" }, el("b", { class: "nom-objet", texte: o.nom }),
+          el("span", { class: "mention", texte: RARETES[o.rarete].nom + (o.slot === "weapon" ? (d.hand === "two_handed" ? " · deux mains" : " · une main") : "") })),
+        el("span", { class: "patch-bulle " + o.verdict, texte: VERDICTS[o.verdict][0] }), action ? action(o) : null),
+      el("ul", { class: "patch-lignes" }, o.lignes.map(ligne)));
+  };
+  for (const s of [...Object.keys(SLOTS), null]) {   // null : un emplacement inconnu, rangé à la fin
+    const groupe = calcules.filter((o) => (s ? o.slot === s : !SLOTS[o.slot])).sort((x, y) => rangRarete(y.rarete) - rangRarete(x.rarete) || x.nom.localeCompare(y.nom, "fr"));
     if (!groupe.length) continue;
-    racine.append(el("details", { class: "patch-groupe " + v, open: "" },
-      el("summary", {}, el("span", { class: "patch-verdict " + v, texte: VERDICTS[v][1] }), el("span", { class: "mention num", texte: String(groupe.length) })),
+    racine.append(el("details", { class: "patch-groupe", open: "" },
+      el("summary", {}, el("span", { class: "patch-type", texte: s ? SLOTS[s].pluriel : "Autres" }), el("span", { class: "mention num", texte: String(groupe.length) }), bulles(groupe)),
       el("div", { class: "patch-liste" }, groupe.map(carteObjet))));
   }
   return racine;

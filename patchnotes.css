@@ -15,13 +15,19 @@
 .patch-groupe > summary::-webkit-details-marker { display: none; }
 .patch-groupe > summary::after { content: "+"; margin-left: auto; color: var(--encre-3); font-weight: 700; }
 .patch-groupe[open] > summary::after { content: "–"; }
-.patch-verdict { font-family: var(--titre); font-weight: 700; font-size: 15px; }
-.patch-verdict.buff { color: var(--normal); }
-.patch-verdict.nerf { color: #ff8a8a; }
-.patch-verdict.equilibrage { color: var(--legendaire); }
+.patch-groupe > summary { flex-wrap: wrap; }
+.patch-type { font-family: var(--titre); font-weight: 700; font-size: 15px; margin-right: 4px; }
+/* Bulle de verdict : sur chaque objet, et en compte dans le résumé et les titres de type. */
+.patch-bulle { --v: var(--encre-2); display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.5; white-space: nowrap; color: var(--v); background: color-mix(in oklab, var(--v) 15%, transparent); border: 1px solid color-mix(in oklab, var(--v) 38%, transparent); }
+.patch-bulle.buff { --v: var(--normal); } .patch-bulle.nerf { --v: #ff8a8a; } .patch-bulle.equilibrage { --v: var(--legendaire); }
+.patch-resume { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .patch-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 10px; padding: 0 12px 12px; }
 .patch-objet { display: grid; gap: 10px; align-content: start; padding: 14px; border-radius: 12px; background: var(--sol-2); border: 1px solid var(--trait); border-left: 3px solid var(--c, var(--trait-fort)); min-width: 0; }
-.patch-objet > header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.patch-objet > header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.patch-vignette { flex: none; width: 54px; height: 54px; border-radius: 10px; display: grid; place-items: center; border: 1px solid color-mix(in oklab, var(--c, var(--trait-fort)) 40%, var(--trait)); background: radial-gradient(80% 80% at 50% 40%, color-mix(in oklab, var(--c, transparent) 24%, transparent), transparent 75%), var(--sol); }
+.patch-vignette img { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+.patch-nom { flex: 1 1 120px; min-width: 0; display: grid; gap: 1px; }
+.patch-nom .nom-objet { overflow-wrap: anywhere; }
 .patch-objet > header .btn-second { margin-left: auto; padding: 6px 10px; font-size: 13px; }
 .patch-lignes { display: grid; gap: 5px; font-size: 13.5px; color: var(--encre-2); }
 .patch-lignes li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; align-items: baseline; }
