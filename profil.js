@@ -69,6 +69,7 @@
         sectionPoints(),
         sectionStats(),
         sectionCarriere(),
+        sectionArene(),
         el("p", { class: "sr", "aria-live": "polite", "data-annonce": "" })].filter(Boolean));
       if (focus) { const c = main.querySelector(`[data-f="${focus}"]`); if (c) c.focus(); }
     }
@@ -128,6 +129,7 @@
     async function chargerModes() {
       const id = s.joueur.id;
       try {
+        App.api.areneHistorique(id).then((h) => { s.arene = h; }, (e) => { console.warn(e); s.arene = []; }).then(() => remplacer("arene", sectionArene));
         const [rl, tr, pm, cat, sj, js] = await Promise.all([App.api.rangsLigue(), App.api.tours(), App.api.profilModes(id), App.api.succes(), App.api.succesJoueurs(id), App.api.joueurs()]);
         // Places : parmi les joueurs classés, comme sur les pages Ligue et Tour. Un compte hors classement n'a pas de place.
         const classes = new Set(js.filter((x) => !App.horsClassement(x)).map((x) => x.id));
@@ -437,6 +439,15 @@
         t.sous ? el("p", { class: "pf-tuile-sous", texte: t.sous }) : null);
     }
     function chiffre(val, lib, petit) { return el("div", { class: "chiffre" }, el("b", { class: "num", texte: val }), el("span", { texte: lib }), petit ? el("small", { texte: petit }) : null); }
+
+    // ---------- Arène : les 10 derniers parcours (s.arene : undefined tant que ça charge) ----------
+    function sectionArene() {
+      const h = s.arene, qui = proprio ? "tu as" : s.joueur.display_name + " a";
+      return el("section", { class: "section-page", id: "arene", "aria-labelledby": "t-arene" },
+        el("h2", { id: "t-arene", texte: "Arène : derniers parcours" }),
+        el("p", { class: "sous", texte: !h ? "Chargement…" : h.length ? "Les builds que " + qui + " draftés, et jusqu'où ils sont allés." : (proprio ? "Tu n'as" : s.joueur.display_name + " n'a") + " pas encore fait de parcours d'Arène." }),
+        h && h.length ? App.vueParcoursArene(h) : null);
+    }
 
     // ---------- Carrière ----------
     function sectionCarriere() {

@@ -166,6 +166,7 @@ App.api = {
   profilModes: (pid) => App.rpc("profil_modes", { p_id: pid }),
   // Arène (mode solo, draft) : mon parcours (cartes proposées, build drafté, score, coffres).
   arene: () => App.rpc("mon_arene"),
+  areneHistorique: (pid) => App.rpc("arene_historique", { p_id: pid }),
   // Tour (mode solo) : mon étage, mes tentatives et la liste des étages ; étages atteints par tous (classement).
   tour: () => App.rpc("ma_tour"),
   tours: () => q(client().from("tour").select("player_id,etage,franchi_le").limit(5000)),
@@ -557,6 +558,31 @@ App.carte = (o, { niveau = null, verrouille = false, equipe } = {}) => {
   if (eq) c.append(el("span", { class: "equipe-tag", texte: "Équipé" }));
   return c;
 };
+
+// ---------------------------------------------------------------------
+// Arène : les derniers parcours d'un joueur (page Arène et profils). Une ligne par parcours :
+// le score, le build drafté (un clic ouvre la fiche de l'objet) et les points de stats.
+// ---------------------------------------------------------------------
+App.ARENE_COLS = [["arme", "Arme"], ["armure", "Armure"], ["offhand", "Main gauche"], ["strategeme", "Stratagème"]];
+// [clé, abrégé, nom, valeur de base, valeur d'un point]
+App.ARENE_STATS = [["atk", "Atq", "Attaque", 10, 1], ["def", "Déf", "Défense", 10, 1], ["pv", "PV", "PV", 100, 10], ["spd", "Vit", "Vitesse", 10, 1], ["luck", "Chc", "Chance", 0, 1]];
+App.vueParcoursArene = (liste, maxVictoires = 10) => el("ol", { class: "ap-liste" }, liste.map((p) => {
+  const eq = (p.kit || {}).equipement || {}, st = (p.kit || {}).stacks || {};
+  return el("li", { class: "ap-ligne" + (p.victoires >= maxVictoires ? " parfait" : "") },
+    el("div", { class: "ap-score" },
+      el("b", { class: "num", "aria-hidden": "true" }, el("span", { class: "v", texte: fmt(p.victoires) }), " – ", el("span", { class: "d", texte: fmt(p.defaites) })),
+      el("small", { "aria-hidden": "true", texte: "victoires – défaites" }),
+      el("span", { class: "sr", texte: `${p.victoires} victoire${p.victoires > 1 ? "s" : ""}, ${p.defaites} défaite${p.defaites > 1 ? "s" : ""}` }),
+      p.termine ? el("time", { datetime: p.le, title: date(p.le, true), texte: ilYa(p.le) }) : el("span", { class: "pilule normal", texte: "En cours" })),
+    el("div", { class: "ap-build" }, App.ARENE_COLS.map(([c, lib]) => {
+      const x = eq[c], o = x ? App.objet(x.numero) : null, niveau = o ? Math.min(x.niveau, App.niveauMax(o.rarete)) : 0;
+      return o ? el("button", { type: "button", class: "ap-objet", title: o.nom, "aria-label": `${lib} : ${o.nom}. Voir la fiche`,
+          onclick: () => App.tiroir({ titre: o.nom, contenu: App.fiche(o, { niveau, possede: null }) }) }, App.carte(o, { niveau, equipe: false }))
+        : el("div", { class: "ap-vide" }, el("span", { texte: lib }), el("small", { texte: c === "offhand" && App.deuxMains((eq.arme || {}).numero) ? "Deux mains" : "Vide" }));
+    })),
+    el("ul", { class: "ap-stats", "aria-label": "Points de stats du build" }, App.ARENE_STATS.map(([k, lib, nom, , pas]) =>
+      el("li", { title: nom }, el("b", { class: "num", texte: "+" + fmt((st[k] || 0) * pas) }), el("span", { texte: lib })))));
+}));
 
 // ---------------------------------------------------------------------
 // Tiroir, toasts

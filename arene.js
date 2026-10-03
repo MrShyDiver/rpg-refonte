@@ -4,10 +4,8 @@
 "use strict";
 (function () {
 const { el, icone, fmt, RARETES } = App;
-const COLS = [["arme", "Arme"], ["armure", "Armure"], ["offhand", "Main gauche"], ["strategeme", "Stratagème"]];
+const COLS = App.ARENE_COLS, STATS = App.ARENE_STATS;   // [clé, abrégé, nom, valeur de base, valeur d'un point]
 const LIB = Object.fromEntries(COLS);
-// [clé, abrégé, nom, valeur de base, valeur d'un point]
-const STATS = [["atk", "Atq", "Attaque", 10, 1], ["def", "Déf", "Défense", 10, 1], ["pv", "PV", "PV", 100, 10], ["spd", "Vit", "Vitesse", 10, 1], ["luck", "Chc", "Chance", 0, 1]];
 const pluriel = (n, mot, mots) => fmt(n) + " " + (n > 1 ? mots || mot + "s" : mot);
 const niveauDe = (o, n) => Math.min(n, App.niveauMax(o.rarete));
 
@@ -59,7 +57,8 @@ App.demarrer("arene", async (main, ctx) => {
       el("h1", { texte: "Arène" }),
       el("p", { texte: "Ici, tes objets et tes stats ne comptent pas. Tout le monde part de zéro et drafte son build, carte après carte : à toi de faire les bons choix." }))),
     zone, annonce);
-  let etat = await App.api.arene(), occupe = false;
+  const lireHisto = () => App.api.areneHistorique(ctx.joueur.id).catch((e) => { console.warn(e); return []; });
+  let [etat, histo] = await Promise.all([App.api.arene(), lireHisto()]), occupe = false;
 
   const viser = () => { const t = zone.querySelector("h2"); if (t) t.focus(); };
   const palierAtteint = () => [...etat.paliers].reverse().find((p) => etat.victoires >= p.victoires) || null;
@@ -125,6 +124,7 @@ App.demarrer("arene", async (main, ctx) => {
     App.sons.demarrer(); App.sons.arene("carte");
     try {
       etat = await App.rpc("arene_drafter", { p_index: i });
+      if (etat.etat === "en_cours") histo = await lireHisto();   // le build tout juste drafté entre dans l'historique
       rendre(); viser();
       if (etat.etat === "en_cours") { annonce.textContent = "Draft terminé : ton build est prêt."; App.sons.arene("draft-fini"); }
     } catch (e) { App.erreur(e); }
@@ -329,6 +329,10 @@ App.demarrer("arene", async (main, ctx) => {
         el("p", { class: "sous", texte: "Seul le plus haut palier atteint compte. Les coffres s'ouvrent à la fin du parcours." }),
         blocPaliers(enCours || fini)),
       (enCours || fini) && etat.kit ? blocBuild(fini ? "Le build de ce parcours" : "Ton build") : null,
+      histo.length ? el("section", { class: "section-page", "aria-labelledby": "t-histo" },
+        el("h2", { id: "t-histo", texte: "Tes derniers parcours" }),
+        el("p", { class: "sous", texte: "Tes 10 derniers builds et leur résultat. Les autres joueurs les voient aussi sur ton profil." }),
+        App.vueParcoursArene(histo, etat.max_victoires)) : null,
       note()].filter(Boolean));
   }
   rendre();
