@@ -1,5 +1,5 @@
 /* Stream RPG — page Arène : draft façon Hearthstone. Animations des coffres : GSAP (gsap.min.js, chargé par arene.html). Tout le monde part d'une coquille sans objet ni point de stat et
-   drafte son build en 30 tours (le serveur tire les cartes), puis enchaîne les combats : 10 victoires avant 3 défaites.
+   drafte son build en 30 tours (le serveur tire 5 cartes à chaque tour), puis enchaîne les combats : 10 victoires avant 3 défaites.
    En fin de parcours, des coffres de récompense à ouvrir un par un. Tes objets et tes stats ne comptent pas. */
 "use strict";
 (function () {
@@ -96,48 +96,74 @@ App.demarrer("arene", async (main, ctx) => {
 
   // ------------------------------------------------------------------ Draft
   const valeurStat = (k, pts) => { const s = STATS.find((x) => x[0] === k); return s[3] + pts * s[4]; };
+  // Rareté d'une carte : celle de l'objet, ou celle tirée pour la carte de stat (elle fixe ses points). Elle donne la couleur et le son.
+  const rareteDe = (x) => (x.type === "stat" ? x.rarete : (App.objet(x.numero) || {}).rarete) || "commun";
   function carteOffre(x, i) {
-    const o = x.numero ? App.objet(x.numero) : null;
+    const o = x.numero ? App.objet(x.numero) : null, rar = rareteDe(x);
+    const avant = x.emplacement ? ((etat.kit.equipement || {})[x.emplacement] || {}).niveau || 0 : 0;   // niveau de l'objet en place
     let genre, visuel, titre, detail;
     if (x.type === "stat") {
-      const s = STATS.find((y) => y[0] === x.stat), avant = (etat.kit.stacks || {})[x.stat] || 0;
-      genre = "Stat"; titre = "+" + fmt(x.points * s[4]) + " " + s[2];
-      visuel = el("div", { class: "ar-carte-stat" }, el("b", { class: "num", texte: "+" + fmt(x.points * s[4]) }), el("span", { texte: s[2] }));
-      detail = `${s[2]} de base : ${fmt(valeurStat(x.stat, avant))} → ${fmt(valeurStat(x.stat, avant + x.points))}`;
+      const s = STATS.find((y) => y[0] === x.stat), pts = (etat.kit.stacks || {})[x.stat] || 0;
+      genre = "Stat"; titre = "+" + fmt(x.points * s[4]) + " " + s[2] + " (" + RARETES[rar].nom + ")";
+      visuel = el("div", { class: "ar-carte-stat" }, el("i", { class: "ar-stat-rarete", texte: RARETES[rar].nom }), el("b", { class: "num", texte: "+" + fmt(x.points * s[4]) }), el("span", { texte: s[2] }));
+      detail = `${s[2]} de base : ${fmt(valeurStat(x.stat, pts))} → ${fmt(valeurStat(x.stat, pts + x.points))}`;
     } else {
       if (!o) return null;
       visuel = App.carte(o, { niveau: niveauDe(o, x.niveau), equipe: false });
       titre = o.nom;
       if (x.type === "objet") { genre = LIB[x.emplacement]; detail = RARETES[o.rarete].nom + (App.deuxMains(o.numero) ? " · à deux mains" : ""); }
-      else if (x.type === "amelioration") { genre = "Amélioration"; detail = `${LIB[x.emplacement]} : +${fmt(x.niveau - 1)} → +${fmt(x.niveau)}`; }
-      else { const a = App.objet(x.remplace); genre = "Remplacement"; detail = `À la place de ${a ? a.nom : "ton objet"}` + (x.niveau ? `, garde +${fmt(x.niveau)}` : ""); }
+      else if (x.type === "amelioration") { genre = "Amélioration +" + fmt(x.niveau - avant); detail = `${LIB[x.emplacement]} : +${fmt(avant)} → +${fmt(x.niveau)}`; }
+      else { const a = App.objet(x.remplace); genre = "Remplacement"; detail = `À la place de ${a ? a.nom : "ton objet"}` + (!avant ? "" : x.niveau === avant ? `, garde son +${fmt(avant)}` : ` : son +${fmt(avant)} devient +${fmt(x.niveau)}`); }
     }
     return el("li", { class: "ar-offre-case", style: { "--i": i } },
-      el("button", { type: "button", class: "ar-offre " + x.type + (o ? " " + o.rarete : ""), "aria-label": `${genre} : ${titre}. ${detail}` + (x.perd_offhand ? ". Arme à deux mains : ta main gauche est retirée." : ""), onclick: () => prendre(i) },
+      el("button", { type: "button", class: "ar-offre " + x.type + " " + rar, "aria-label": `${genre} : ${titre}. ${detail}` + (x.perd_offhand ? ". Arme à deux mains : ta main gauche est retirée." : ""), onclick: (e) => prendre(i, e.currentTarget) },
         el("span", { class: "ar-offre-genre", texte: genre }), visuel, el("small", { texte: detail }),
         x.perd_offhand ? el("small", { class: "ar-alerte" }, icone("i-alerte"), "Deux mains : ta main gauche est retirée") : null),
       o ? el("button", { type: "button", class: "lien ar-fiche", onclick: () => App.tiroir({ titre: o.nom, contenu: App.fiche(o, { niveau: niveauDe(o, x.niveau), possede: null }) }) }, "Voir la fiche") : null);
   }
-  async function prendre(i) {
+  // Où va une carte dans « Ton build » : la case de son emplacement, ou celle de sa stat.
+  const cibleBuild = (x) => zone.querySelector(x.type === "stat" ? `.ar-monkit .ar-stats > :nth-child(${STATS.findIndex((s) => s[0] === x.stat) + 1})`
+    : `.ar-monkit .lg-build > :nth-child(${COLS.findIndex((c) => c[0] === x.emplacement) + 1})`);
+  // La carte choisie se soulève puis s'envole vers sa place dans le build, pendant que le serveur enregistre le choix (GSAP ; rien si les effets sont réduits).
+  function envol(x, bouton) {
+    const G = window.gsap, visuel = bouton && bouton.querySelector(".carte, .ar-carte-stat"), cible = cibleBuild(x);
+    if (!G || App.reduit || !visuel || !cible) return Promise.resolve();
+    const a = visuel.getBoundingClientRect(), b = cible.getBoundingClientRect(), vol = visuel.cloneNode(true);
+    vol.classList.add("ar-vol");
+    Object.assign(vol.style, { left: a.left + "px", top: a.top + "px", width: a.width + "px", height: a.height + "px" });
+    vol.style.setProperty("--c", getComputedStyle(visuel).getPropertyValue("--c"));
+    document.body.append(vol); visuel.style.visibility = "hidden";
+    return new Promise((fin) => G.timeline({ onComplete: () => { vol.remove(); fin(); } })
+      .to(vol, { scale: 1.1, y: -16, duration: 0.14, ease: "power2.out" })
+      .to(vol, { x: b.left + b.width / 2 - a.left - a.width / 2, y: b.top + b.height / 2 - a.top - a.height / 2, scale: Math.min(1, b.width / a.width), rotation: x.type === "stat" ? 0 : 4, duration: 0.42, ease: "power3.in" })
+      .to(vol, { autoAlpha: 0, duration: 0.1 }, ">-0.1"));
+  }
+  // À l'arrivée, la case du build encaisse la carte : elle gonfle et brille un instant.
+  function impact(x) {
+    const G = window.gsap, c = cibleBuild(x);
+    if (G && !App.reduit && c) G.fromTo(c, { scale: 1.18, filter: "brightness(1.8)" }, { scale: 1, filter: "brightness(1)", duration: 0.5, ease: "back.out(2.5)", clearProps: "transform,filter" });
+  }
+  async function prendre(i, bouton) {
     if (occupe) return;
     occupe = true; zone.classList.add("ar-attente");
-    App.sons.demarrer(); App.sons.arene("carte");
+    const x = etat.offres[i];
+    App.sons.demarrer(); App.sons.arene("carte-" + rareteDe(x));
     try {
-      etat = await App.rpc("arene_drafter", { p_index: i });
+      [etat] = await Promise.all([App.rpc("arene_drafter", { p_index: i }), envol(x, bouton)]);
       if (etat.etat === "en_cours") histo = await lireHisto();   // le build tout juste drafté entre dans l'historique
-      rendre(); viser();
+      rendre(); viser(); impact(x);
       if (etat.etat === "en_cours") { annonce.textContent = "Draft terminé : ton build est prêt."; App.sons.arene("draft-fini"); }
-    } catch (e) { App.erreur(e); }
+    } catch (e) { App.erreur(e); rendre(); }
     occupe = false; zone.classList.remove("ar-attente");
   }
   function ecranDraft() {
-    const o = etat.offres || [], objets = o.length > 0 && o.every((x) => x.type === "objet"), reste = etat.tours - etat.tour;
+    const o = etat.offres || [], vides = o.some((x) => x.type === "objet"), reste = etat.tours - etat.tour;
     zone.replaceChildren(
       el("section", { class: "section-page ar-draft", "aria-labelledby": "t-ar" },
         el("div", { class: "ar-draft-tete" },
           el("div", {}, el("h2", { id: "t-ar", tabindex: "-1", texte: `Tour ${fmt(etat.tour + 1)} sur ${fmt(etat.tours)}` }),
-            el("p", { class: "sous", texte: objets ? (o.length > 1 ? "Un objet par emplacement vide : choisis-en un. Les autres emplacements se rempliront aux tours suivants." : "Ta main gauche est libre : voici l'objet proposé.")
-              : "Choisis une carte : renforcer une stat, améliorer un objet, ou en remplacer un." })),
+            el("p", { class: "sous", texte: vides ? "Remplis un emplacement vide, ou renforce déjà ce que tu as : une stat, ou une amélioration d'un objet déjà pris."
+              : "Choisis une carte : une stat, une amélioration, ou un remplacement (les améliorations de l'ancien objet sont converties selon la rareté du nouveau)." })),
           el("span", { class: "ar-reste num", texte: reste > 1 ? `${fmt(reste)} cartes à choisir` : "Dernière carte" })),
         el("div", { class: "ar-avance", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(etat.tours), "aria-valuenow": String(etat.tour), "aria-label": "Avancement du draft" },
           el("i", { style: { width: (100 * etat.tour) / etat.tours + "%" } })),
@@ -318,7 +344,7 @@ App.demarrer("arene", async (main, ctx) => {
       el("section", { class: "section-page ar-tete", "aria-labelledby": "t-ar" },
         el("h2", { id: "t-ar", tabindex: "-1", texte: titre }), el("p", { class: "sous", texte }),
         enCours || fini ? score() : el("ol", { class: "ar-etapes" },
-          el("li", {}, el("b", { texte: "Drafte" }), el("span", { texte: `${fmt(etat.tours)} tours. D'abord un objet par emplacement, puis à chaque tour : une stat (+${fmt(etat.stat_points)} points), une amélioration ou un remplacement.` })),
+          el("li", {}, el("b", { texte: "Drafte" }), el("span", { texte: `${fmt(etat.tours)} tours, 5 cartes à chaque tour : des objets pour tes emplacements vides, une stat (+${fmt(etat.stat_points)} à +${fmt(etat.stat_points_max || etat.stat_points)} points selon sa rareté), des améliorations (+1 à +3) et, une fois équipé, deux remplacements.` })),
           el("li", {}, el("b", { texte: "Combats" }), el("span", { texte: "Avec ce build, contre ceux des autres joueurs qui ont autant de victoires que toi." })),
           el("li", {}, el("b", { texte: "Ouvre tes coffres" }), el("span", { texte: "Plus tu vas loin, plus il y en a, et mieux ils sont remplis." }))),
         gagnes,

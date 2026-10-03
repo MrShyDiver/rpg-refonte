@@ -7,7 +7,9 @@ Chaque son est généré par le navigateur tant qu'aucun fichier ne le remplace.
 
 Un nom absent de la liste, ou un fichier illisible, garde le son généré. Tu peux n'en fournir que certains.
 
-## Les dix sons
+## Les quatorze sons
+
+La rareté d'une carte du draft est celle de l'objet, ou celle tirée pour une carte de stat.
 
 | Fichier | Moment | Durée visée |
 |---|---|---|
@@ -19,13 +21,17 @@ Un nom absent de la liste, ou un fichier illisible, garde le son généré. Tu p
 | `recompense-legendaire.mp3` | Coffre légendaire : éclair, rayons, lootbox légendaire | 2,5 s |
 | `recompense-ticket.mp3` | Un ticket d'arène sort du coffre | 1,2 s |
 | `bilan.mp3` | Tous les coffres sont ouverts, le bilan apparaît | 2 s |
-| `carte.mp3` | Une carte est choisie pendant le draft (30 fois par draft : très court, discret) | 0,5 s |
+| `carte-commun.mp3` | Une carte commune est choisie pendant le draft (le cas le plus fréquent : très court, discret) | 0,5 s |
+| `carte-normal.mp3` | Une carte normale est choisie | 0,6 s |
+| `carte-rare.mp3` | Une carte rare est choisie | 0,8 s |
+| `carte-epique.mp3` | Une carte épique est choisie | 1 s |
+| `carte-legendaire.mp3` | Une carte légendaire est choisie (2 % des cartes : peut être spectaculaire) | 1,5 s |
 | `draft-fini.mp3` | La 30e carte est choisie, le build est prêt | 1,5 s |
 
 ## Les générer avec fal.ai
 
 Modèle : `fal-ai/elevenlabs/sound-effects/v2` (ElevenLabs Sound Effects V2 sur fal.ai). Tarif relevé le 3 oct. 2026 :
-0,002 $ par seconde générée, soit quelques centimes pour les dix sons, même en plusieurs essais.
+0,002 $ par seconde générée, soit quelques centimes pour les quatorze sons, même en plusieurs essais.
 
 Réglages : `output_format` = `mp3_44100_128`, `prompt_influence` = 0,6 (0,3 par défaut : plus haut, le son colle davantage à
 la consigne), `duration_seconds` = la durée visée du tableau (0,5 au minimum). Les consignes marchent mieux en anglais.
@@ -40,8 +46,12 @@ la consigne), `duration_seconds` = la durée visée du tableau (0,5 au minimum).
 | `recompense-legendaire` | An epic legendary reward reveal: deep impact, rising choir swell and golden shimmering sparkles, triumphant, game sound effect |
 | `recompense-ticket` | A paper ticket flicking out with a quick whoosh followed by a bright short bell ding, game interface sound effect |
 | `bilan` | A short triumphant victory fanfare stinger, brass and bells, warm and satisfying, ends cleanly, game results screen |
-| `carte` | A single playing card being picked and placed, crisp paper flick with a soft tap, very short, quiet game interface sound |
+| `carte-commun` | A single playing card being picked and placed, crisp paper flick with a soft tap, very short, quiet game interface sound |
+| `carte-normal` | A playing card being picked and placed with a soft pleasant two-note chime, short, light game interface sound |
+| `carte-rare` | A playing card being picked with a bright crystalline three-note rising chime and a light shimmer, short, game reward sound |
+| `carte-epique` | A playing card being picked with a rich magical rising arpeggio and a sparkling swell, powerful but short, game reward sound |
+| `carte-legendaire` | A legendary card being picked: deep impact, golden triumphant chord and shimmering sparkles, epic, short game reward sound |
 | `draft-fini` | A sword being drawn from its sheath followed by a confident heroic chord, ready for battle, short game sound effect |
 
 Conseils : coupe le silence au début de chaque fichier (le son doit partir tout de suite, l'animation est calée dessus),
-et garde un volume voisin d'un fichier à l'autre. `carte` s'entend 30 fois de suite : choisis la version la plus discrète.
+et garde un volume voisin d'un fichier à l'autre. `carte-commun` et `carte-normal` s'entendent une vingtaine de fois par draft : choisis les versions les plus discrètes.

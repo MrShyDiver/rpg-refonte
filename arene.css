@@ -51,21 +51,23 @@
 .ar-avance i { display: block; height: 100%; border-radius: inherit; background: var(--rare); transition: width .4s var(--ease); }
 .ar-offres { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; transition: opacity .15s; }
 .ar-attente .ar-offres { opacity: .45; pointer-events: none; }
-.ar-offre-case { flex: 0 1 190px; min-width: 0; display: grid; gap: 6px; justify-items: center; align-content: start; animation: ar-arrive .35s var(--ease) both; animation-delay: calc(var(--i) * 55ms); }
+.ar-offre-case { flex: 1 1 150px; max-width: 190px; min-width: 0; display: grid; gap: 6px; justify-items: center; align-content: start; animation: ar-arrive .35s var(--ease) both; animation-delay: calc(var(--i) * 55ms); }
 @keyframes ar-arrive { from { opacity: 0; transform: translateY(14px) scale(.96); } }
 .ar-offre { --c: var(--encre-3); width: 100%; display: grid; gap: 6px; justify-items: center; align-content: start; padding: 12px 12px 14px; border-radius: 16px; background: var(--sol); border: 1px solid var(--trait); color: inherit; font: inherit; text-align: center; cursor: pointer; transition: transform .2s var(--ease), border-color .2s, box-shadow .2s; }
 .ar-offre.commun { --c: var(--commun); } .ar-offre.normal { --c: var(--normal); } .ar-offre.rare { --c: var(--rare); } .ar-offre.epique { --c: var(--epique); } .ar-offre.legendaire { --c: var(--legendaire); }
-.ar-offre.stat { --c: var(--epique); }
 .ar-offre:hover, .ar-offre:focus-visible { transform: translateY(-5px); border-color: var(--c); box-shadow: 0 14px 30px -18px var(--c), 0 0 0 1px color-mix(in oklab, var(--c) 40%, transparent); }
 .ar-offre > .carte, .ar-offre > .ar-carte-stat { width: 100%; max-width: 150px; }
 .ar-offre-genre { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: var(--encre-3); }
-.ar-offre.amelioration .ar-offre-genre { color: var(--normal); } .ar-offre.remplacement .ar-offre-genre { color: var(--legendaire); } .ar-offre.stat .ar-offre-genre { color: var(--epique); }
+.ar-offre.amelioration .ar-offre-genre { color: var(--normal); } .ar-offre.remplacement .ar-offre-genre { color: var(--legendaire); } .ar-offre.stat .ar-offre-genre { color: var(--c); }
 .ar-offre small { font-size: 12.5px; color: var(--encre-2); line-height: 1.4; }
 .ar-alerte { display: inline-flex; align-items: center; gap: 5px; color: #ffb38a !important; }
 .ar-alerte svg { width: 14px; height: 14px; flex: none; }
-.ar-carte-stat { aspect-ratio: 5 / 7; display: grid; place-content: center; gap: 4px; border-radius: 12px; border: 1px solid color-mix(in oklab, var(--epique) 45%, var(--trait)); background: radial-gradient(90% 70% at 50% 35%, color-mix(in oklab, var(--epique) 26%, transparent), transparent 70%), var(--sol-2); }
-.ar-carte-stat b { font-family: var(--titre); font-weight: 800; font-size: 38px; line-height: 1; color: var(--epique); }
-.ar-carte-stat span { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--encre-2); }
+.ar-carte-stat { position: relative; aspect-ratio: 5 / 7; display: grid; place-content: center; gap: 4px; border-radius: 12px; border: 1px solid color-mix(in oklab, var(--c) 45%, var(--trait)); background: radial-gradient(90% 70% at 50% 35%, color-mix(in oklab, var(--c) 26%, transparent), transparent 70%), var(--sol-2); }
+.ar-carte-stat b { font-family: var(--titre); font-weight: 800; font-size: 38px; line-height: 1; color: var(--c); }
+.ar-carte-stat > span { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--encre-2); }
+.ar-stat-rarete { position: absolute; top: 8px; left: 8px; padding: 2px 7px; border-radius: 999px; background: var(--c); color: #16120a; font-style: normal; font-size: 10px; font-weight: 800; line-height: 1.4; }
+/* La carte choisie, en vol vers « Ton build » (copie posée sur la page, animée par GSAP). */
+.ar-vol { position: fixed; z-index: 90; margin: 0; max-width: none; pointer-events: none; will-change: transform; }
 .ar-fiche { font-size: 12.5px; min-height: 28px; background: none; border: 0; cursor: pointer; }
 
 /* Coffres de récompense : un dessin à eux (ce ne sont pas des lootbox). Couleur du coffre : --cf.

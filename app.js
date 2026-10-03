@@ -865,9 +865,10 @@ const SONS_ARENE = {
   "recompense-legendaire": () => sonRarete(4),
   "recompense-ticket": () => scintille(),
   "bilan": () => accordMax(),
-  "carte": () => retournement(),
   "draft-fini": () => sonRarete(3),
 };
+// Carte choisie pendant le draft, un son par rareté (« carte-commun » … « carte-legendaire ») : le bruit de la carte, puis le motif de sa rareté.
+ORDRE_RARETE.forEach((r, i) => { SONS_ARENE["carte-" + r] = () => { retournement(); if (i) sonRarete(i); }; });
 function sonArene(nom, options) {
   if (!audible() || fichierLb(["arene/" + nom], options)) return;
   const genere = SONS_ARENE[nom]; if (genere) genere();
