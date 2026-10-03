@@ -2,7 +2,7 @@
 (function () {
 const { $, el, icone, fmt, ilYa, date } = App;
 
-const TYPES = { duel: "Duel ciblé", auto_battle: "Combat automatique", entrainement: "Entraînement", ligue: "Ligue" };
+const TYPES = { duel: "Duel ciblé", auto_battle: "Combat automatique", entrainement: "Entraînement", ligue: "Ligue", tour: "Tour" };
 const TRANCHES = { dans_tranche: "Combat équitable", au_dessus: "Cible plus forte", en_dessous: "Cible plus faible" };
 // Estimation qualitative (décision projet : jamais de % exact). Le niveau vient du serveur, qui simule le duel avec les deux builds.
 const NIVEAUX = { 5: "Largement favori", 4: "Favori", 3: "Serré", 2: "Outsider", 1: "Très risqué" };

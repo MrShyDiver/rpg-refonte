@@ -1,4 +1,4 @@
-// Fonction `duel` — Stream RPG (v7, moteur 1.3 : combat automatique, échos validés, puissances stockées, ligue, défis).
+// Fonction `duel` — Stream RPG (v8, moteur 1.3 : combat automatique, échos validés, puissances stockées, ligue, défis, Tour).
 //
 // POST, Authorization: Bearer <jeton de session> :
 //   { mode: "classe" | "entrainement", adversaire: "<login>" }               duel ciblé
@@ -8,6 +8,7 @@
 //   { action: "echos" }                                                      échos que le serveur sait ramener à ton niveau
 //   { action: "ligue", cible: 0 | 1 | 2 }                                    combat de ligue contre l'un des trois adversaires proposés
 //   { action: "estimer", adversaire: "<login>", devoiler?: true }            catégorie du duel ciblé (et estimation fine, pour un abonné qui la dévoile)
+//   { action: "tour", apercu?: true }                                        la Tour : affronter le gardien du prochain étage (ou seulement le voir)
 //
 // Le combat est calculé ICI, jamais dans le navigateur ; l'écriture (ticket, récompenses,
 // historique, replay) est faite en une transaction par la RPC enregistrer_combat (service_role
@@ -73,8 +74,10 @@ function entetesCors(req: Request): Record<string, string> {
   };
 }
 
-function lireCorps(corps: unknown): { action: "duel" | "puissances" | "echos" | "ligue" | "estimer"; mode: Mode; adversaire: string; echo: boolean; cible: number; devoiler: boolean } {
+function lireCorps(corps: unknown): { action: "duel" | "puissances" | "echos" | "ligue" | "estimer" | "tour"; mode: Mode; adversaire: string; echo: boolean; cible: number; devoiler: boolean } {
   const c = (corps ?? {}) as Record<string, unknown>;
+  // Tour : « devoiler » porte l'option « aperçu » (voir le gardien sans combattre).
+  if (c.action === "tour") return { action: "tour", mode: "classe", adversaire: "", echo: false, cible: -1, devoiler: c.apercu === true };
   if (c.action === "puissances" || c.action === "echos") return { action: c.action, mode: "classe", adversaire: "", echo: false, cible: -1, devoiler: false };
   if (c.action === "ligue") {
     if (c.cible !== 0 && c.cible !== 1 && c.cible !== 2) throw new ErreurJoueur(400, "Choisis l'un des trois adversaires proposés");
@@ -326,6 +329,46 @@ async function combatLigue(admin: Client, moi: Joueur, cible: number): Promise<u
   return data;
 }
 
+// ---------------------------------------------------------------- Tour
+// Le gardien d'un étage est l'écho d'un joueur, ramené à la puissance de l'étage (fixée par la base : tour_preparer).
+// Source : parmi les 3 joueurs armés les plus proches de cette puissance, celui dont l'écho est de force MÉDIANE
+// (mini-tournoi à graines fixes entre les 3 échos) : à puissance égale certains builds sont bien plus durs que d'autres,
+// et un étage ne doit pas être un mur parce qu'il est tombé sur le plus coriace. Choix stable d'un essai à l'autre.
+// ponytail: ~36 combats simulés par appel (~110 ms) ; à mettre en cache par étage si la Tour devient très jouée.
+const SOURCES_TOUR = 12, COMBATS_TOURNOI_TOUR = 12;
+async function combatTour(admin: Client, moi: Joueur, apercu: boolean): Promise<unknown> {
+  const prep = verifier(await admin.rpc("tour_preparer", { p_id: moi.id })) as { etage: number; etages: number; tentatives_restantes: number; cible: number };
+  if (prep.etage >= prep.etages) throw new ErreurJoueur(409, "Tu es au sommet de la Tour : plus aucun gardien à affronter pour l'instant.");
+  const etage = prep.etage + 1;
+  const { candidats } = await voisinage(admin, moi);
+  const loin = (j: Joueur) => Math.abs(Math.log(Math.max(1, j.puissance ?? 1) / Math.max(1, prep.cible)));
+  const proches = candidats.sort((a, b) => loin(a) - loin(b) || (a.id < b.id ? -1 : 1)).slice(0, SOURCES_TOUR);
+  const builds = await chargerBuilds(admin, [moi.id, ...proches.map((j) => j.id)]);
+  const armes = proches.filter((j) => entree(j, builds).equipement.arme).slice(0, 3);
+  if (!armes.length) throw new ErreurJoueur(409, "Aucun gardien disponible pour l'instant : reviens un peu plus tard.");
+  const echos = armes.map((j) => ({ j, e: calibrerEcho(entree(j, builds), prep.cible), score: 0 }));
+  for (let a = 0; a < echos.length; a++) {
+    for (let b = a + 1; b < echos.length; b++) {
+      const t = tauxVictoire(echos[a].e.entree, echos[b].e.entree, COMBATS_TOURNOI_TOUR);
+      echos[a].score += t; echos[b].score += 1 - t;
+    }
+  }
+  echos.sort((x, y) => x.score - y.score || (x.j.id < y.j.id ? -1 : 1));
+  const { j: source, e: garde } = echos[Math.floor((echos.length - 1) / 2)];
+  if (apercu) {
+    return { etage, gardien: { login: source.twitch_login, puissance: Math.round(garde.puissance), stacks: garde.entree.stacks,
+      equipement: Object.fromEntries(EMPLACEMENTS.map((k) => { const x = garde.entree.equipement[k]; return [k, x ? { numero: x.numero, niveau: x.niveau } : null]; })) } };
+  }
+  if (prep.tentatives_restantes < 1) throw new ErreurJoueur(403, "Plus de tentative pour aujourd'hui : la Tour t'attend demain.");
+  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+  const resultat = simulerDuel(entree(moi, builds), garde.entree, { seed, mode: "classe" });
+  const { data, error } = await admin.rpc("enregistrer_tour", {
+    p_attaquant: moi.id, p_etage: etage, p_vainqueur: resultat.vainqueur, p_stats: resultat.stats, p_replay: resultat.replay, p_seed: seed, p_echo_de: source.id,
+  });
+  if (error) throw erreurRpc(error);
+  return data;
+}
+
 // ---------------------------------------------------------------- requête
 export async function traiter(req: Request): Promise<Response> {
   const cors = entetesCors(req);
@@ -351,6 +394,7 @@ export async function traiter(req: Request): Promise<Response> {
 
     if (action === "puissances") return repondre(200, { mises_a_jour: await rafraichirPuissances(admin) });
     if (action === "echos") return repondre(200, { echos: await listerEchos(admin, moi) });
+    if (action === "tour" && devoiler) return repondre(200, await combatTour(admin, moi, true));
     if (action === "estimer") {
       // Catégorie d'un duel ciblé avant de le lancer (pour tous) ; estimation fine pour un abonné qui dépense un dévoilement.
       if (adversaire === moi.twitch_login) throw new ErreurJoueur(400, "Tu ne peux pas te défier toi-même !");
@@ -379,6 +423,7 @@ export async function traiter(req: Request): Promise<Response> {
       throw new ErreurJoueur(429, "Doucement ! Attends quelques secondes avant de relancer un combat");
     }
     if (action === "ligue") return repondre(200, await combatLigue(admin, moi, cibleLigue));
+    if (action === "tour") return repondre(200, await combatTour(admin, moi, false));
 
     // Tickets de duel : les gains passifs sont crédités avant de compter.
     verifier(await admin.rpc("crediter_passif_de", { p_id: moi.id }));

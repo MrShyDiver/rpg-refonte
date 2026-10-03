@@ -73,14 +73,15 @@ function carteOuVide(it, libelle) {
 // ---------------------------------------------------------------------
 // Démarrage
 // ---------------------------------------------------------------------
-// Un combat de ligue garde « Ligue » allumé dans le menu.
-App.demarrer(new URLSearchParams(location.search).get("mode") === "ligue" ? "ligue" : "duels", async (main, ctx) => {
+// Un combat de ligue ou de la Tour garde sa page allumée dans le menu.
+App.demarrer({ ligue: "ligue", tour: "tour" }[new URLSearchParams(location.search).get("mode")] || "duels", async (main, ctx) => {
   main.classList.add("contenu-arene");
   document.title = "Combat · Stream RPG";
   const id = params.get("duel"), adv = params.get("adversaire");
   if (params.get("bac")) return ecranBac(main, ctx);
   if (id) return ecranReplay(main, ctx, id);
   if (params.get("mode") === "ligue") return ecranLigue(main, ctx, Number(params.get("cible")));
+  if (params.get("mode") === "tour") return ecranTour(main, ctx);
   if (params.get("mode") === "auto") return ecranAuto(main, ctx);
   if (adv) return ecranVersus(main, ctx, String(adv).toLowerCase(), params.get("mode") === "entrainement" ? "entrainement" : "classe", params.get("echo") === "1");
   main.append(blocVide("Aucun combat à afficher.", "Choisis un adversaire ou un combat dans l'historique."));
@@ -245,6 +246,55 @@ async function ecranLigue(main, ctx, cible) {
       el("a", { class: "lien-retour", href: "ligue.html" }, picto("retour"), "Retour à la ligue"))));
 }
 
+// La Tour : le gardien du prochain étage, tel que le serveur l'a préparé (écho ramené à la puissance de l'étage).
+async function ecranTour(main, ctx) {
+  const moi = ctx.joueur;
+  const vide = (titre, texte) => el("div", { class: "vide arene-vide" }, el("b", { texte: titre }), el("span", { texte: texte + " " }),
+    el("a", { class: "btn-second", href: "tour.html", style: { marginTop: "14px" } }, picto("retour"), "Retour à la Tour"));
+  main.replaceChildren(el("div", { class: "chargement", texte: "Le gardien se prépare…" }));
+  let etat, g, source;
+  try {
+    etat = await App.api.tour();
+    if (etat.etage >= etat.etages) { main.replaceChildren(vide("Tu es au sommet de la Tour.", "Plus aucun gardien à affronter pour l'instant.")); return; }
+    g = (await App.lancerTour(true)).gardien;
+    source = (await App.api.joueur(g.login)) || { twitch_login: g.login, display_name: g.login };
+  } catch (e) { App.erreur(e); main.replaceChildren(vide("La Tour n'a pas pu se charger.", "Vérifie ta connexion puis recharge la page.")); return; }
+  const p = etat.paliers[etat.etage], reste = etat.tentatives_restantes;
+  const garde = { ...source, ...g.stacks && Object.fromEntries(Object.entries(g.stacks).map(([k, v]) => [k + "_stacks", v])), twitch_login: "echo:" + g.login, display_name: "Gardien de l'étage " + p.etage, victoires: null, defaites: null };
+  const lo = Object.fromEntries(Object.entries(g.equipement).map(([k, x]) => [k, x ? x.numero : null]));
+  const niv = new Map(Object.values(g.equipement).filter(Boolean).map((x) => [x.numero, x.niveau]));
+  const pMoi = (App.puissance(moi, App.niveaux(), ctx.loadout) || {}).powerLevel || 0;
+  const lancer = el("button", { type: "button", class: "btn-principal vs-lancer", disabled: reste < 1 }, icone("i-epees"), el("span", { texte: "Affronter le gardien" }));
+  const droite = carteVersus(garde, lo, niv, g.puissance, false);
+  const vd = droite.querySelector(".vs-chiffres div:last-child");   // un gardien n'a pas de bilan : on montre l'étage
+  if (vd) vd.replaceChildren(el("b", { class: "num", texte: fmt(p.etage) + " / " + fmt(etat.etages) }), el("span", { texte: "étage" }));
+  lancer.addEventListener("click", async () => {
+    demarrerSon(); // geste utilisateur : l'audio peut démarrer
+    lancer.disabled = true; lancer.classList.add("occupe"); lancer.lastChild.textContent = "Combat en cours…";
+    try {
+      const rep = await App.lancerTour(false);
+      if (rep.joueur) { Object.assign(ctx.joueur, rep.joueur); App.majRessources(); }
+      history.replaceState(null, "", "combat.html?duel=" + encodeURIComponent(rep.duel_id));
+      await pSfx; demarrerSon();
+      arene(main, ctx, { R: rep.replay, duel: { id: rep.duel_id, type: "tour", replay: { source: "site" } }, joueurs: [moi, { ...source, twitch_login: rep.replay.defenseur, display_name: garde.display_name }], mode: "tour", resultat: rep.resultat }).jouer();
+    } catch (e) {
+      App.erreur(e);
+      if (e.statut === 409) { main.replaceChildren(vide("La Tour a changé.", "Retourne à la Tour pour voir où tu en es.")); return; }
+      lancer.classList.remove("occupe"); lancer.lastChild.textContent = "Affronter le gardien"; lancer.disabled = false;
+    }
+  });
+  main.replaceChildren(el("section", { class: "versus", "aria-labelledby": "titre-versus" },
+    el("header", { class: "vs-entete" }, el("span", { class: "vs-sur", texte: "La Tour" }), el("h1", { id: "titre-versus", texte: "Étage " + fmt(p.etage) + " : toi contre le gardien" })),
+    el("div", { class: "vs-duo" }, carteVersus(moi, ctx.loadout, App.niveaux(), pMoi, true), el("div", { class: "vs-eclair", "aria-hidden": "true" }, el("span", { texte: "VS" })), droite),
+    el("div", { class: "vs-bas" },
+      el("p", { class: "vs-cout" }, icone("i-coche"), el("span", {}, el("b", { texte: "Gratuit" }), ` · une défaite coûte 1 tentative, il t'en reste ${fmt(reste)} sur ${fmt(etat.tentatives)} aujourd'hui.`)),
+      el("p", { class: "vs-cout" }, icone("i-medaille"), el("span", {}, "Victoire : ", el("b", { texte: "+" + fmt(p.medailles) + " médailles" }), p.lootbox ? [" et ", el("b", { texte: "+" + fmt(p.lootbox) + " lootbox" })] : null, ", et l'étage suivant s'ouvre.")),
+      lancer,
+      el("p", { class: "vs-raison", texte: reste < 1 ? "Plus de tentative pour aujourd'hui : la Tour t'attend demain." : "" }),
+      el("p", { class: "mention vs-note" }, "Le gardien est l'", el("a", { class: "lien", href: "aide.html#echo", texte: "écho" }), " de " + (source.display_name || g.login) + ", ramené à la puissance de l'étage. Lui ne gagne ni ne perd rien."),
+      el("a", { class: "lien-retour", href: "tour.html" }, picto("retour"), "Retour à la Tour"))));
+}
+
 async function ecranVersus(main, ctx, login, modeInitial, echo) {
   const moi = ctx.joueur;
   if (login === moi.twitch_login) { main.replaceChildren(blocVide("Tu ne peux pas te défier toi-même.", "Choisis un autre adversaire dans la liste.")); return; }
@@ -350,7 +400,7 @@ function arene(main, ctx, opts) {
   parLogin.set(moi, ctx.joueur);
   for (const c of ["attaquant", "defenseur"]) { // replay d'un écho : portrait et nom du joueur d'origine
     const source = App.echoDe(R[c]);
-    if (source && !parLogin.has(R[c])) parLogin.set(R[c], { ...(parLogin.get(source) || {}), twitch_login: R[c], display_name: App.nomCombattant(R[c], parLogin) });
+    if (source && !parLogin.has(R[c])) parLogin.set(R[c], { ...(parLogin.get(source) || {}), twitch_login: R[c], display_name: R.etage ? "Gardien de l'étage " + R.etage : App.nomCombattant(R[c], parLogin) });
   }
   const nomDe = (l) => (parLogin.get(l) || {}).display_name || l || "?";
   const index = parNom();
@@ -472,7 +522,7 @@ function arene(main, ctx, opts) {
   const bMusique = el("button", { type: "button", class: "bouton-icone musique", "aria-label": "Musique", "aria-pressed": String(prefMusique.get()), title: "Musique",
     onclick: () => { const v = !prefMusique.get(); prefMusique.set(v); bMusique.setAttribute("aria-pressed", String(v)); if (window.SFX) SFX.musique.coupee = !v; } }, picto("musique"));
   const bPlein = document.fullscreenEnabled ? el("button", { type: "button", class: "bouton-icone", "aria-label": "Plein écran", title: "Plein écran", onclick: () => pleinEcran() }, picto("plein")) : null;
-  const retour = opts.bac ? ["recette.html", "Retour à la recette"] : opts.mode === "ligue" ? ["ligue.html", "Retour à la ligue"] : ["duels.html", "Retour aux duels"];
+  const retour = opts.bac ? ["recette.html", "Retour à la recette"] : opts.mode === "ligue" ? ["ligue.html", "Retour à la ligue"] : opts.mode === "tour" ? ["tour.html", "Retour à la Tour"] : ["duels.html", "Retour aux duels"];
   const commandes = el("div", { class: "commandes-arene" },
     el("div", { class: "cmd-lecture" }, bPause, vitesses, bPasser), log,
     el("div", { class: "cmd-outils" }, bSon, bMusique, bPlein, el("a", { class: "btn-second retour", href: retour[0], "aria-label": retour[1] }, picto("retour"), el("span", { texte: retour[1] }))));
@@ -1254,7 +1304,7 @@ function arene(main, ctx, opts) {
     const bouton = avecPorte ? el("button", { type: "button", class: "btn-principal intro-go" }, picto("lecture"), "Regarder le combat") : null;
     const voile = el("div", { class: "intro" + (avecPorte ? " porte" : ""), role: avecPorte ? "dialog" : null, "aria-label": "Présentation du combat" },
       el("div", { class: "intro-ligne" }, cote(G), el("div", { class: "intro-vs", texte: "VS" }), cote(D)),
-      el("div", { class: "intro-infos" }, [opts.bac ? "Bac à sable" : opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel ciblé", auto_battle: "Combat automatique", ligue: "Combat de ligue" }[(opts.duel || {}).type] || "Duel", R.echo_de ? "Écho" : null, TRANCHES[R.tranche] || null].filter(Boolean).join(" · ")),
+      el("div", { class: "intro-infos" }, [opts.bac ? "Bac à sable" : opts.mode === "entrainement" ? "Entraînement" : { duel: "Duel ciblé", auto_battle: "Combat automatique", ligue: "Combat de ligue", tour: "La Tour" }[(opts.duel || {}).type] || "Duel", R.echo_de ? "Écho" : null, TRANCHES[R.tranche] || null].filter(Boolean).join(" · ")),
       compte, bouton);
     racine.append(voile);
     return { voile, compte, bouton };
@@ -1393,13 +1443,14 @@ function arene(main, ctx, opts) {
     const genre = R.egalite || !V ? "egalite" : participant ? (V.login === moi ? "victoire" : "defaite") : "neutre";
     const titre = R.egalite || !V ? "Égalité" : participant ? (V.login === moi ? "Victoire" : "Défaite") : "Victoire de " + V.nom;
     const res = opts.resultat || {};
-    const estLigue = opts.mode === "ligue";
+    const estLigue = opts.mode === "ligue", estTour = opts.mode === "tour";
     const monCote = R.attaquant === moi ? "attaquant" : R.defenseur === moi ? "defenseur" : null;
     // categorie (enregistrer_duel) : "victoire_equitable", "defaite_valeureuse", "defense_exceptionnelle"…
     const libCat = (c) => { const [a, b] = cle(c).split("_"); const x = { victoire: "Victoire", defaite: "Défaite", egalite: "Égalité", defense: "Défense" }[a], y = { valeureuse: "valeureuse", equitable: "équitable", deshonorable: "déshonorable", exceptionnelle: "exceptionnelle" }[b]; return x && y ? x + " " + y : null; };
     const cat = monCote === "defenseur" ? libCat(res.categorie_defenseur) : libCat(res.categorie);
     const rangApres = estLigue && res.points_apres != null ? App.rangLigue(res.points_apres) : null;
     const sous = rangApres ? rangApres.nom + (rangApres.suivant ? " · " + fmt(rangApres.dansDivision) + " / 100 points" : " · " + fmt(res.points_apres) + " points")
+      : estTour ? (R.vainqueur === R.attaquant ? "Étage " + fmt(R.etage) + " franchi" : "Le gardien de l'étage " + fmt(R.etage) + " tient bon")
       : cat || (monCote && R["statut_" + monCote]) || TRANCHES[R.tranche || res.tranche] || "";
     const recompenses = [];
     if (opts.bac) recompenses.push(el("p", { class: "mention", texte: "Bac à sable : rien n'est enregistré." }));
@@ -1416,6 +1467,9 @@ function arene(main, ctx, opts) {
         if (res.premiere_victoire) recompenses.push(el("p", { class: "mention", texte: "Première victoire de ligue du jour : médailles en plus." }));
         if (monCote === "defenseur") recompenses.push(el("p", { class: "mention", texte: "C'est ta défense qui s'est battue : tes points de ligue ne bougent pas." }));
       }
+      const lb = res.lootbox_gagnees != null ? res.lootbox_gagnees : estTour ? R.lootbox_attaquant : 0;
+      if (lb) recompenses.push(el("span", { class: "gain-medailles" }, icone("i-coffre-ligne"), el("b", { class: "num", texte: "+" + fmt(lb) }), " lootbox"));
+      if (estTour && opts.resultat && !res.franchi) recompenses.push(el("p", { class: "mention", texte: "Une tentative de moins pour aujourd'hui. Renforce ton build et reviens." }));
       if (res.prime) recompenses.push(el("p", { class: "mention", texte: `Dont ${fmt(res.prime)} médailles de prime : ton adversaire était en série de victoires en ligue.` }));
       if (res.revanche) recompenses.push(el("p", { class: "mention", texte: "Duel de revanche : aucun ticket dépensé." }));
       if (opts.mode === "auto" && participant) recompenses.push(el("p", { class: "mention", texte: "Combat automatique : récompenses réduites de 50 %. Choisis ta cible pour les toucher en entier." }));
@@ -1427,30 +1481,32 @@ function arene(main, ctx, opts) {
     // Combat automatique : on relance un tirage. Écho : revanche contre le même écho.
     const auto = opts.mode === "auto" && R.attaquant === moi;
     const suite = estLigue ? (R.attaquant === moi && opts.resultat ? ["ligue.html#adversaires", "Combat suivant"] : null)
+      : estTour ? (R.attaquant === moi && opts.resultat ? ["combat.html?mode=tour", res.franchi ? "Étage suivant" : "Réessayer"] : null)
       : auto ? ["combat.html?mode=auto", "Nouveau combat auto"]
       : adverse ? [`combat.html?adversaire=${encodeURIComponent(App.echoDe(adverse) || adverse)}&mode=classe${App.echoDe(adverse) ? "&echo=1" : ""}`, "Rejouer ce duel"] : null;
     // Battu en duel ciblé par un autre joueur, il y a moins de 24 h : la revanche est gratuite (le serveur le revérifie).
     const revancheGratuite = !estLigue && monCote === "defenseur" && (R.type === "duel" || R.mode === "classe") && !R.revanche && !R.egalite && R.vainqueur === R.attaquant
       && Date.now() - new Date(R.date).getTime() < 24 * 3600e3;
     if (revancheGratuite) suite[1] = "Revanche gratuite";
-    if (suite) actions.push(estLigue || tickets > 0 || revancheGratuite
+    if (suite) actions.push(estLigue || estTour || tickets > 0 || revancheGratuite
       ? el("a", { class: "btn-principal", href: suite[0] }, icone("i-epees"), suite[1])
       : el("button", { type: "button", class: "btn-principal", disabled: true, title: "Plus de ticket de duel — gagne-en en live" }, icone("i-epees"), suite[1]));
     if (opts.bac) actions.push(el("a", { class: "btn-principal", href: "recette.html?relancer=1" }, icone("i-epees"), "Relancer"));
     actions.push(el("button", { type: "button", class: "btn-second", onclick: () => arene(main, ctx, opts).jouer() }, picto("rejouer"), "Revoir"));
     actions.push(opts.bac ? el("a", { class: "btn-second", href: "recette.html" }, picto("retour"), "Retour à la recette")
       : estLigue ? el("a", { class: "btn-second", href: "ligue.html" }, picto("retour"), "Retour à la ligue")
+      : estTour ? el("a", { class: "btn-second", href: "tour.html" }, picto("retour"), "Retour à la Tour")
       : el("a", { class: "btn-second", href: "duels.html" }, picto("retour"), "Retour aux duels"));
     const titreEl = el("h2", { class: "outro-titre", tabindex: "-1", texte: titre });
     const panneau = el("div", { class: "outro " + genre, role: "dialog", "aria-labelledby": "outro-titre" },
       el("div", { class: "outro-carte" },
-        el("span", { class: "outro-sur", texte: opts.bac ? "Combat de test terminé" : opts.mode === "entrainement" ? "Entraînement terminé" : opts.mode === "auto" ? "Combat automatique terminé" : estLigue ? "Combat de ligue terminé" : "Combat terminé" }),
+        el("span", { class: "outro-sur", texte: opts.bac ? "Combat de test terminé" : opts.mode === "entrainement" ? "Entraînement terminé" : opts.mode === "auto" ? "Combat automatique terminé" : estLigue ? "Combat de ligue terminé" : estTour ? "La Tour" : "Combat terminé" }),
         titreEl, sous ? el("p", { class: "outro-sous", texte: sous }) : null,
         recompenses.length ? el("div", { class: "outro-gains" }, recompenses) : null,
         el("table", { class: "outro-stats" }, el("thead", {}, el("tr", {}, el("td"), el("th", { scope: "col", texte: G.nom }), el("th", { scope: "col", texte: D.nom }))),
           el("tbody", {}, ligne("Dégâts infligés", "degats_infliges"), ligne("Plus gros coup", "plus_gros_coup"),
             el("tr", {}, el("th", { scope: "row", texte: "Tours" }), el("td", { class: "num", colspan: "2", texte: String(n) })))),
-        adverse && tickets < 1 && !estLigue ? el("p", { class: "mention", texte: "Plus de ticket de duel : tu en regagnes 5 par jour, et le live t'en donne d'autres." }) : null,
+        adverse && tickets < 1 && !estLigue && !estTour ? el("p", { class: "mention", texte: "Plus de ticket de duel : tu en regagnes 5 par jour, et le live t'en donne d'autres." }) : null,
         el("div", { class: "outro-actions" }, actions)));
     titreEl.id = "outro-titre";
     scene.append(panneau); // dans la scène : la barre de commandes reste dégagée

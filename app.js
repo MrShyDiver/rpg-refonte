@@ -43,6 +43,7 @@ const PAGES = [
   { id: "boutique", titre: "Boutique", href: "boutique.html", icone: "i-boutique" },
   { id: "ligue", titre: "Ligue", href: "ligue.html", icone: "i-ligue", mobile: true },
   { id: "duels", titre: "Duels", href: "duels.html", icone: "i-epees" },
+  { id: "tour", titre: "Tour", href: "tour.html", icone: "i-tour" },
   { id: "quetes", titre: "Quêtes", href: "quetes.html", icone: "i-cible" },
   { id: "succes", titre: "Succès", href: "succes.html", icone: "i-trophee" },
   { id: "classements", titre: "Classements", href: "classements.html", icone: "i-podium" },
@@ -75,6 +76,7 @@ const ICONES = `
 <symbol id="i-son" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.2 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
 <symbol id="i-cadenas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
 <symbol id="i-fleche" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-tour" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 20.5V10L6 8.5V4h2.5v2h2V4h3v2h2V4H18v4.5L16.5 10v10.5zM5 20.5h14M10.5 20.5v-3.5a1.5 1.5 0 0 1 3 0v3.5"/></symbol>
 <symbol id="i-cible" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".9" fill="currentColor"/></symbol>
 <symbol id="i-journal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h8.5L18 7v13.5H6zM14.5 3.5V7H18M9 11.5h6M9 15h6"/></symbol>
 `;
@@ -158,6 +160,9 @@ App.api = {
   loadoutsDefense: () => q(client().from("loadouts_defense").select("*").limit(5000)),
   // Ligue : mon état complet (énergie, trois adversaires proposés, défenses reçues) et les rangs publics de tous.
   ligue: () => App.rpc("ma_ligue"),
+  // Tour (mode solo) : mon étage, mes tentatives et la liste des étages ; étages atteints par tous (classement).
+  tour: () => App.rpc("ma_tour"),
+  tours: () => q(client().from("tour").select("player_id,etage,franchi_le").limit(5000)),
   // Quêtes du jour et de la semaine, avec ma progression et le nombre de récompenses à prendre.
   quetes: () => App.rpc("mes_quetes"),
   rangsLigue: () => q(client().from("ligue").select("player_id,points,combats,victoires,defaites,def_victoires,def_defaites,serie,prime_le").limit(5000)),
@@ -219,6 +224,8 @@ async function fonctionDuel(corps) {
 App.lancerDuel = ({ adversaire, mode = "classe", echo = false }) => fonctionDuel(mode === "auto" ? { mode } : { adversaire, mode, echo: !!echo });
 // Combat de ligue contre l'un des trois adversaires proposés (0, 1 ou 2).
 App.lancerLigue = (cible) => fonctionDuel({ action: "ligue", cible });
+// Tour : affronter le gardien du prochain étage, ou seulement le voir (apercu) : { etage, gardien: { login, puissance, equipement } }.
+App.lancerTour = (apercu) => fonctionDuel({ action: "tour", apercu: !!apercu });
 // Duel ciblé : catégorie décidée par le serveur (chance de victoire estimée) et revanche gratuite éventuelle.
 // Avec devoiler, un abonné dépense un dévoilement et reçoit aussi l'estimation en 5 niveaux.
 App.estimerDuel = (adversaire, devoiler) => fonctionDuel({ action: "estimer", adversaire, devoiler: !!devoiler });
@@ -1012,6 +1019,7 @@ async function chargerNotifs(cloche) {
       const autre = App.nomCombattant(d.attaquant_login === moi ? d.defenseur_login : d.attaquant_login);
       const res = d.egalite ? "Égalité" : d.vainqueur_login === moi ? "Victoire" : "Défaite";
       const ligue = d.type === "ligue";
+      if (d.type === "tour") { notifs.push({ quand: d.joue_le, icone: "i-tour", lien: "combat.html?duel=" + encodeURIComponent(d.id), texte: `${res} à l'étage ${(d.replay && d.replay.etage) || "?"} de la Tour` }); return; }
       notifs.push({ quand: d.joue_le, icone: ligue ? "i-ligue" : "i-epees", lien: "combat.html?duel=" + encodeURIComponent(d.id),
         texte: ligue ? (d.attaquant_login === moi ? `${res} en ligue contre ${autre}` : d.egalite ? `Égalité en défense contre ${autre}` : d.vainqueur_login === moi ? `Ta défense a tenu face à ${autre}` : `${autre} a percé ta défense`)
           : `${res} en duel contre ${autre}` });
