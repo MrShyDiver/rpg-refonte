@@ -1,0 +1,30 @@
+/* Stream RPG — page Arène à armes égales (réutilise ligue.css pour le build et les pastilles) */
+.ar-tete { margin-top: 0; padding: 22px; border-radius: 20px; background: linear-gradient(140deg, color-mix(in oklab, var(--rare) 12%, var(--sol-2)), var(--sol-2) 62%); border: 1px solid color-mix(in oklab, var(--rare) 30%, var(--trait)); }
+.ar-tete h2 { font-family: var(--titre); font-weight: 800; letter-spacing: -.02em; font-size: clamp(24px, 3.4vw, 34px); color: var(--rare); }
+.ar-tete .sous { margin: 8px 0 16px; color: var(--encre-2); font-size: 14.5px; max-width: 70ch; }
+.ar-tete .btn-principal[aria-disabled="true"] { background: var(--sol-3); color: var(--encre-2); box-shadow: none; border: 1px dashed var(--trait-fort); cursor: not-allowed; transform: none; filter: none; }
+.ar-score { display: flex; flex-wrap: wrap; gap: 14px 28px; margin: 4px 0 18px; }
+.ar-score > div { display: grid; gap: 6px; }
+.ar-score span { font-size: 13px; color: var(--encre-2); }
+.ar-score b { font-family: var(--titre); font-size: 22px; }
+.ar-pips { display: flex; gap: 4px; }
+.ar-pips i { width: 16px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.1); }
+.ar-pips.v i.plein { background: var(--normal); } .ar-pips.d i.plein { background: #ff7a59; }
+.ar-pips i.palier { outline: 1px solid color-mix(in oklab, var(--legendaire) 70%, transparent); outline-offset: 1px; }
+.ar-paliers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.ar-paliers .pilule svg { width: 14px; height: 14px; }
+.ar-paliers .pilule.atteint { --c: var(--normal); }
+.ar-kits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.ar-kit { display: grid; gap: 12px; align-content: start; padding: 18px; border-radius: 18px; background: var(--sol-2); border: 1px solid var(--trait); min-width: 0; }
+.ar-kit h3 { font-size: 18px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ar-kit h3 small { font-family: var(--texte, inherit); font-size: 12.5px; font-weight: 600; color: var(--encre-3); }
+.ar-stats { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; text-align: center; }
+.ar-stats li { padding: 6px 2px; border-radius: 10px; background: rgba(255,255,255,.04); display: grid; gap: 1px; }
+.ar-stats b { font-family: var(--titre); font-size: 15px; }
+.ar-stats span { font-size: 10.5px; color: var(--encre-3); text-transform: uppercase; letter-spacing: .04em; }
+.ar-kit > .btn-principal, .ar-kit > .btn-second { width: 100%; justify-content: center; }
+.ar-monkit { max-width: 560px; margin-top: 12px; }
+@media (max-width: 900px) { .ar-kits { grid-template-columns: 1fr; } .ar-kit .lg-build { max-width: 420px; } }
+@media (max-width: 560px) { .ar-tete { padding: 16px; } }
+.ar-monkit { display: grid; gap: 12px; }
+.ar-note { margin-top: 16px; }

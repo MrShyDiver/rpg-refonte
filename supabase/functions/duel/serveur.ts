@@ -1,4 +1,4 @@
-// Fonction `duel` — Stream RPG (v8, moteur 1.3 : combat automatique, échos validés, puissances stockées, ligue, défis, Tour).
+// Fonction `duel` — Stream RPG (v9, moteur 1.3 : combat automatique, échos validés, puissances stockées, ligue, défis, Tour, Arène).
 //
 // POST, Authorization: Bearer <jeton de session> :
 //   { mode: "classe" | "entrainement", adversaire: "<login>" }               duel ciblé
@@ -9,6 +9,7 @@
 //   { action: "ligue", cible: 0 | 1 | 2 }                                    combat de ligue contre l'un des trois adversaires proposés
 //   { action: "estimer", adversaire: "<login>", devoiler?: true }            catégorie du duel ciblé (et estimation fine, pour un abonné qui la dévoile)
 //   { action: "tour", apercu?: true }                                        la Tour : affronter le gardien du prochain étage (ou seulement le voir)
+//   { action: "arene", ouvrir?: true }                                       l'Arène à armes égales : ouvrir un parcours (3 kits tirés) ou jouer le combat suivant
 //
 // Le combat est calculé ICI, jamais dans le navigateur ; l'écriture (ticket, récompenses,
 // historique, replay) est faite en une transaction par la RPC enregistrer_combat (service_role
@@ -20,6 +21,7 @@
 import {
   construireCombattant, simulerDuel, type Equipement, type JoueurEntree,
 } from "./moteur.ts";
+import { niveauMaxPourRarete } from "./formule-combat.gen.ts";
 
 // supabase-js est fourni par l'amorce (import npm), pour que ce fichier reste importable tel quel (tests hors ligne compris).
 // deno-lint-ignore no-explicit-any
@@ -74,10 +76,12 @@ function entetesCors(req: Request): Record<string, string> {
   };
 }
 
-function lireCorps(corps: unknown): { action: "duel" | "puissances" | "echos" | "ligue" | "estimer" | "tour"; mode: Mode; adversaire: string; echo: boolean; cible: number; devoiler: boolean } {
+function lireCorps(corps: unknown): { action: "duel" | "puissances" | "echos" | "ligue" | "estimer" | "tour" | "arene"; mode: Mode; adversaire: string; echo: boolean; cible: number; devoiler: boolean } {
   const c = (corps ?? {}) as Record<string, unknown>;
   // Tour : « devoiler » porte l'option « aperçu » (voir le gardien sans combattre).
   if (c.action === "tour") return { action: "tour", mode: "classe", adversaire: "", echo: false, cible: -1, devoiler: c.apercu === true };
+  // Arène : « devoiler » porte l'option « ouvrir » (commencer un parcours).
+  if (c.action === "arene") return { action: "arene", mode: "classe", adversaire: "", echo: false, cible: -1, devoiler: c.ouvrir === true };
   if (c.action === "puissances" || c.action === "echos") return { action: c.action, mode: "classe", adversaire: "", echo: false, cible: -1, devoiler: false };
   if (c.action === "ligue") {
     if (c.cible !== 0 && c.cible !== 1 && c.cible !== 2) throw new ErreurJoueur(400, "Choisis l'un des trois adversaires proposés");
@@ -369,6 +373,74 @@ async function combatTour(admin: Client, moi: Joueur, apercu: boolean): Promise<
   return data;
 }
 
+// ---------------------------------------------------------------- Arène à armes égales
+// Un kit = un équipement tiré au hasard dans le catalogue (objets à mi-niveau) et des stats réparties selon un profil,
+// le tout ramené à la même puissance pour tout le monde (arene_puissance). Les objets et les stats du joueur ne comptent pas.
+type Kit = { nom: string; puissance: number; stacks: JoueurEntree["stacks"]; equipement: Record<string, { numero: number; niveau: number } | null> };
+const PROFILS_ARENE: [string, number[]][] = [["Équilibré", [1, 1, 1, 1, 1]], ["Offensif", [3, 1, 1, 1, 1]], ["Robuste", [1, 2, 3, 1, 1]], ["Rapide", [1, 1, 1, 3, 1]], ["Chanceux", [1, 1, 1, 1, 3]]];
+const SLOT_ARENE: Record<string, string> = { arme: "weapon", armure: "torso", offhand: "offhand", strategeme: "strategeme" };
+const INFOS_KIT = { victoires: 0, defaites: 0, egalites: 0, points: 0, medailles: 0, serie_actuelle: 0, protection_active: false };
+// Un kit dont l'équipement pèse presque toute la puissance n'a plus de points de stats et perd presque tout
+// (mesuré : 13 % de victoires sans point de stats, 25 % entre 30 et 49, 52 % à partir de 50) : on retire jusqu'à en trouver un jouable.
+const STATS_MIN_ARENE = 50, TIRAGES_ARENE = 10;
+function tirerKit(actifs: Joueur[], cible: number): Kit {
+  let kit = tirerKitBrut(actifs, cible);
+  for (let i = 1; i < TIRAGES_ARENE && STATS.reduce((t, k) => t + kit.stacks[k], 0) < STATS_MIN_ARENE; i++) kit = tirerKitBrut(actifs, cible);
+  return kit;
+}
+function tirerKitBrut(actifs: Joueur[], cible: number): Kit {
+  const tirer = (e: string) => { const l = actifs.filter((i) => i.slot === SLOT_ARENE[e]); return l.length ? l[hasard(l.length)] : null; };
+  const arme = tirer("arme");
+  const pieces: Record<string, Joueur | null> = { arme, armure: tirer("armure"), offhand: arme?.data?.hand === "two_handed" ? null : tirer("offhand"), strategeme: tirer("strategeme") };
+  const [nom, poids] = PROFILS_ARENE[hasard(PROFILS_ARENE.length)];
+  const source: JoueurEntree = {
+    login: "arene", display_name: nom, avatar_url: null,
+    stacks: Object.fromEntries(STATS.map((k, i) => [k, poids[i] - 1])) as JoueurEntree["stacks"],   // calibrerEcho ajoute 1 partout
+    equipement: Object.fromEntries(EMPLACEMENTS.map((e) => {
+      const p = pieces[e];
+      return [e, p ? { data: p.data, niveau: Math.round(niveauMaxPourRarete(p.data.rarete) / 2), numero: p.numero } as Equipement : null];
+    })),
+    infos: INFOS_KIT,
+  };
+  const c = calibrerEcho(source, cible);
+  return { nom, puissance: Math.round(c.puissance), stacks: c.entree.stacks,
+    equipement: Object.fromEntries(EMPLACEMENTS.map((e) => { const x = c.entree.equipement[e]; return [e, x ? { numero: x.numero, niveau: x.niveau } : null]; })) };
+}
+function entreeKit(login: string, nom: string, avatar: string | null, kit: Kit, fiches: Map<number, any>): JoueurEntree {
+  return { login, display_name: nom, avatar_url: avatar, stacks: kit.stacks, infos: INFOS_KIT,
+    equipement: Object.fromEntries(EMPLACEMENTS.map((e) => {
+      const x = kit.equipement?.[e];
+      return [e, x && fiches.has(x.numero) ? { data: fiches.get(x.numero), niveau: x.niveau, numero: x.numero } as Equipement : null];
+    })) };
+}
+async function combatArene(admin: Client, moi: Joueur, ouvrir: boolean): Promise<unknown> {
+  const items = verifier(await admin.from("items").select("numero,slot,actif,data").limit(1000)) as Joueur[];
+  const actifs = items.filter((i) => i.actif);
+  const prep = verifier(await admin.rpc("arene_preparer", { p_id: moi.id })) as { etat: string; kit: Kit | null; puissance: number; fantome: Joueur | null };
+  if (ouvrir) {
+    if (!actifs.some((i) => i.slot === "weapon")) throw new ErreurJoueur(409, "L'Arène est fermée pour l'instant.");
+    const { data, error } = await admin.rpc("arene_ouvrir", { p_id: moi.id, p_choix: [0, 1, 2].map(() => tirerKit(actifs, prep.puissance)) });
+    if (error) throw erreurRpc(error);
+    return data;
+  }
+  if (prep.etat !== "en_cours" || !prep.kit) {
+    throw new ErreurJoueur(409, prep.etat === "choix" ? "Choisis d'abord ton kit dans l'Arène." : "Aucun parcours en cours : retourne à l'Arène.");
+  }
+  const fiches = new Map(items.map((i) => [i.numero, i.data]));
+  // Adversaire : une fois sur deux le kit choisi par un autre joueur (s'il y en a un), sinon un kit tiré au hasard.
+  const fantome = prep.fantome && hasard(2) === 0 ? prep.fantome : null;
+  const adverse = fantome ? entreeKit("echo:" + fantome.login, "Kit de " + fantome.nom, fantome.avatar_url ?? null, fantome.kit, fiches)
+    : entreeKit("arene", "Adversaire de l'Arène", null, tirerKit(actifs, prep.puissance), fiches);
+  if (!adverse.equipement.arme) throw new ErreurJoueur(409, "L'adversaire n'a pas pu être préparé : relance le combat.");
+  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+  const resultat = simulerDuel(entreeKit(moi.twitch_login, moi.display_name, moi.avatar_url ?? null, prep.kit, fiches), adverse, { seed, mode: "classe" });
+  const { data, error } = await admin.rpc("enregistrer_arene", {
+    p_attaquant: moi.id, p_vainqueur: resultat.vainqueur, p_stats: resultat.stats, p_replay: resultat.replay, p_seed: seed, p_fantome: fantome ? fantome.id : null,
+  });
+  if (error) throw erreurRpc(error);
+  return data;
+}
+
 // ---------------------------------------------------------------- requête
 export async function traiter(req: Request): Promise<Response> {
   const cors = entetesCors(req);
@@ -395,6 +467,7 @@ export async function traiter(req: Request): Promise<Response> {
     if (action === "puissances") return repondre(200, { mises_a_jour: await rafraichirPuissances(admin) });
     if (action === "echos") return repondre(200, { echos: await listerEchos(admin, moi) });
     if (action === "tour" && devoiler) return repondre(200, await combatTour(admin, moi, true));
+    if (action === "arene" && devoiler) return repondre(200, await combatArene(admin, moi, true));
     if (action === "estimer") {
       // Catégorie d'un duel ciblé avant de le lancer (pour tous) ; estimation fine pour un abonné qui dépense un dévoilement.
       if (adversaire === moi.twitch_login) throw new ErreurJoueur(400, "Tu ne peux pas te défier toi-même !");
@@ -424,6 +497,7 @@ export async function traiter(req: Request): Promise<Response> {
     }
     if (action === "ligue") return repondre(200, await combatLigue(admin, moi, cibleLigue));
     if (action === "tour") return repondre(200, await combatTour(admin, moi, false));
+    if (action === "arene") return repondre(200, await combatArene(admin, moi, false));
 
     // Tickets de duel : les gains passifs sont crédités avant de compter.
     verifier(await admin.rpc("crediter_passif_de", { p_id: moi.id }));
