@@ -510,3 +510,7 @@ html.effets-reduits *, html.effets-reduits *::before, html.effets-reduits *::aft
 .barre-publique .marque { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
 .barre-publique .marque svg { width: 32px; height: 32px; }
 .barre-publique .marque b { font-family: var(--titre); }
+
+/* Gains passifs : compte à rebours du prochain +1 sous la ressource. */
+.ressource .prochain { display: block; font-size: 10.5px; line-height: 1.25; color: var(--normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ressources-mobile .ressource .prochain { display: none; }

@@ -12,20 +12,20 @@ App.demarrer("aide", async (main) => {
     el("h2", { id: "t-" + id, texte: titre }), sous ? el("p", { class: "sous", texte: sous }) : null, ...contenu);
 
   // ---------- En-tête + sommaire ----------
-  const SOMMAIRE = [["boucle", "La boucle"], ["live", "En live"], ["duels", "Les duels"], ["taux", "Lootbox et taux"], ["lexique", "Lexique"], ["faq", "Questions"]];
+  const SOMMAIRE = [["boucle", "La boucle"], ["live", "En live"], ["ligue", "La ligue"], ["duels", "Les duels"], ["taux", "Lootbox et taux"], ["lexique", "Lexique"], ["faq", "Questions"]];
   main.append(
     el("header", { class: "entete-page" }, el("div", {},
       el("h1", { texte: "Comment jouer" }),
-      el("p", { texte: "Tu gagnes des lootbox en live, tu les ouvres ici, tu t'équipes et tu défies les autres viewers. Tout ce qu'il faut savoir, en court." }))),
+      el("p", { texte: "Tu reçois des lootbox et des tickets chaque jour, et bien plus en live. Tu les ouvres ici, tu t'équipes, tu grimpes en ligue et tu défies les autres viewers. Tout ce qu'il faut savoir, en court." }))),
     el("nav", { class: "aide-sommaire", "aria-label": "Sur cette page" }, SOMMAIRE.map(([id, t]) => el("a", { href: "#" + id, texte: t }))));
 
   // ---------- La boucle ----------
   const ETAPES = [
-    ["i-live", "En live", "Tes points de chaîne se changent en lootbox, en points de stats et en duels.", "#live", "Ce qui se gagne en live"],
+    ["i-live", "En live", "Tes points de chaîne se changent en lootbox, en tickets de duel et en points de stats.", "#live", "Ce qui se gagne en live"],
     ["i-coffre-ligne", "Lootbox", "Une lootbox, un objet. Chaque doublon améliore ton objet de +1.", "lootbox.html", "Ouvrir mes lootbox"],
     ["i-bouclier", "Équipe-toi", "Une arme, une main gauche, une armure, un stratagème : c'est ton build.", "collection.html", "Mon inventaire"],
-    ["i-epees", "Duels", "Défie qui tu veux, même hors ligne : ton build contre le sien.", "duels.html", "Choisir un adversaire"],
-    ["i-medaille", "Médailles", "Chaque duel en rapporte, surtout si tu vises toi-même plus fort que toi.", "#medailles", "Comment en gagner"],
+    ["i-ligue", "Ligue et duels", "Grimpe en ligue face à des adversaires de ton niveau, ou défie qui tu veux en duel.", "ligue.html", "Voir mes adversaires"],
+    ["i-medaille", "Médailles", "Chaque combat en rapporte, surtout si tu vises toi-même plus fort que toi.", "#medailles", "Comment en gagner"],
     ["i-boutique", "Boutique", "Achète l'objet qui te manque, revends tes doublons en trop.", "boutique.html", "Voir l'étal"],
   ];
   main.append(section("boucle", "La boucle", "Six étapes, et on recommence à chaque live.",
@@ -35,7 +35,7 @@ App.demarrer("aide", async (main) => {
 
   // ---------- En live ----------
   const LIVE = [
-    [el("b", { texte: "Récompense de points de chaîne du site" }), "Tu reçois des lootbox ou des points de stats (Attaque, Défense, PV, Vitesse, Chance) directement sur ton compte. Le bot te le confirme dans le chat. Pas encore connecté au site ? Rien n'est perdu : tout t'attend à ta première connexion avec Twitch."],
+    [el("b", { texte: "Récompense de points de chaîne du site" }), "Tu reçois des lootbox, des tickets de duel ou des points de stats (Attaque, Défense, PV, Vitesse, Chance) directement sur ton compte. Ces lootbox et ces tickets s'ajoutent à ta réserve sans plafond. Le bot te le confirme dans le chat. Pas encore connecté au site ? Rien n'est perdu : tout t'attend à ta première connexion avec Twitch."],
     [el("b", { texte: "Récompense « Duel »" }), "Lance un duel en live contre le viewer de ton choix, en points de chaîne (environ 500, le prix exact est affiché sur Twitch). Le combat passe à l'écran."],
     [[code("!ticketduel pseudo")], "Le même duel en live, payé avec un ticket de duel au lieu de tes points de chaîne."],
     [[code("!ticketboss")], "Pendant un événement boss : attaque le boss de la communauté avec un ticket. Chaque attaque rapporte 12 médailles. Quand le boss tombe, chaque participant reçoit 10 lootbox légendaires, plus 3, 2 ou 1 pour les podiums de chaque classement du boss."],
@@ -45,7 +45,25 @@ App.demarrer("aide", async (main) => {
   ];
   main.append(section("live", "Ce qui se gagne en live", "Le site et le stream partagent le même compte : ce que tu gagnes en live arrive ici, ce que tu fais ici compte en live.",
     el("ul", { class: "aide-liste" }, LIVE.map(([quoi, texte]) => el("li", {}, el("span", { class: "aide-quoi" }, quoi), el("span", { texte })))),
-    el("p", { class: "mention" }, "Les tickets de duel sont distribués avec les bits, par une âme charitable, ou lors d'événements du stream. ", lien(App.TWITCH_CHAINE, "Aller sur la chaîne"), ".")));
+    el("p", { class: "mention" }, "Sans rien faire, tu reçois déjà 5 lootbox et 5 tickets de duel par jour (voir la ", lien("#reserve", "réserve quotidienne"), "). Le live en donne bien plus, et plus vite. ", lien(App.TWITCH_CHAINE, "Aller sur la chaîne"), ".")));
+
+  // ---------- Ligue ----------
+  const RANGS = ["Fer", "Bronze", "Argent", "Or", "Platine", "Diamant"];
+  main.append(section("ligue", "La ligue", "Le mode classé : des adversaires de ton niveau, un rang à faire grimper, et une défense qui se bat pour toi quand tu n'es pas là.",
+    el("div", { class: "aide-grille" },
+      el("div", {}, el("h3", { texte: "Trois adversaires" }),
+        el("p", {}, "La ligue te propose ", el("b", { texte: "trois adversaires" }), " : un plus faible, un de ton niveau, un plus fort. Tu vois leur défense, ce que tu gagnes en cas de victoire et ce que tu risques. Après chaque combat, trois nouveaux adversaires arrivent. Les abonnés de la chaîne peuvent les changer une fois par jour.")),
+      el("div", {}, el("h3", { texte: "Rangs et points de ligue" }),
+        el("p", {}, RANGS.join(", ") + " : chaque palier compte trois divisions (III, II, I) de 100 points, puis vient le rang ", el("b", { texte: "Maître" }), " à 1 800 points. Battre plus fort que toi rapporte plus de points. De Fer à Or, tu ne redescends jamais de division ; à partir de Platine, tu peux redescendre, mais jamais sous Platine III.")),
+      el("div", { id: "energie" }, el("h3", { texte: "Énergie de ligue" }),
+        el("p", {}, "Un combat de ligue coûte ", el("b", { texte: "1 énergie" }), ", pas de ticket. Tu en regagnes 1 par heure, jusqu'à 10 en réserve. Elle ne s'achète pas : tout le monde a le même nombre de combats.")),
+      el("div", { id: "defense" }, el("h3", { texte: "Ta défense" }),
+        el("p", {}, "Quand un joueur t'attaque, c'est ta ", el("b", { texte: "défense de ligue" }), " qui se bat. Tu peux lui donner un équipement différent de ton build de combat, depuis ", lien("collection.html?build=defense#equipement", "ton inventaire"), ". Une défense percée te coûte des points de ligue, une défense tenue t'en rapporte : dans les deux cas, moitié moins que pour l'attaquant.")),
+      el("div", {}, el("h3", { texte: "Récompenses" }),
+        el("p", { texte: "2 médailles par victoire, 5 de plus pour ta première victoire du jour, et 1 médaille par défense tenue (5 par jour au plus). Une défaite ne te prend ni objet ni médaille." })),
+      el("div", {}, el("h3", { texte: "Échos" }),
+        el("p", {}, "S'il manque un joueur à ton niveau, sa place est prise par un ", lien("#echo", "écho"), " : le build d'un autre joueur ramené à ton niveau, tiré au moment du combat. Le joueur d'origine ne gagne ni ne perd rien."))),
+    el("p", { class: "mention", texte: "Ton rang s'appuie sur un classement caché, qui sert à te trouver des adversaires à ta mesure : tes dix premiers combats le règlent vite, puis il bouge plus doucement." })));
 
   // ---------- Duels ----------
   const MEDAILLES = [
@@ -56,7 +74,7 @@ App.demarrer("aide", async (main) => {
   main.append(section("duels", "Les duels", "Ton build contre le sien, calculé par le serveur. L'adversaire n'a pas besoin d'être connecté : il voit le résultat dans sa cloche.",
     el("div", { class: "aide-grille" },
       el("div", {}, el("h3", { texte: "Duel ciblé" }),
-        el("p", {}, "Tu choisis ta cible. Coûte ", el("b", { texte: "1 ticket de duel" }), ". Il compte dans ton bilan (victoires, défaites, égalités), tes séries et ta carrière, et rapporte médailles et points, comme en live. Un duel ne te fait jamais perdre d'objet ni de médaille.")),
+        el("p", {}, "Tu choisis ta cible, sans aucun effet sur la ligue. Coûte ", el("b", { texte: "1 ticket de duel" }), ". Il compte dans ton bilan (victoires, défaites, égalités), tes séries et ta carrière, et rapporte médailles et points, comme en live. Un duel ne te fait jamais perdre d'objet ni de médaille.")),
       el("div", {}, el("h3", { texte: "Combat automatique" }),
         el("p", {}, "Le jeu tire au sort un adversaire dans ta tranche de puissance ; si personne n'est disponible, tu affrontes un ", lien("#echo", "écho"), ". Coûte aussi ", el("b", { texte: "1 ticket" }), " et compte dans ton bilan, mais les ", el("b", { texte: "récompenses sont réduites de 50 %" }), " : 6 médailles par victoire, 3 par égalité, 1 par défaite.")),
       el("div", {}, el("h3", { texte: "Entraînement" }),
@@ -78,10 +96,11 @@ App.demarrer("aide", async (main) => {
   // ---------- Lexique ----------
   const plafonds = ORDRE_RARETE.map((r) => `${RARETES[r].nom} +${RARETES[r].max}`).join(" · ");
   const TERMES = [
-    ["lootbox", "Lootbox", "Un coffre qui contient un objet tiré au hasard. Se gagne en live avec tes points de chaîne, ou s'achète en médailles à la boutique.", ["lootbox.html", "Ouvrir mes lootbox"]],
+    ["lootbox", "Lootbox", "Un coffre qui contient un objet tiré au hasard. Tu en reçois 5 par jour, bien plus en live avec tes points de chaîne, et tu peux en acheter en médailles à la boutique.", ["lootbox.html", "Ouvrir mes lootbox"]],
+    ["reserve", "Réserve quotidienne", "Sans rien faire, tu gagnes 5 lootbox et 5 tickets de duel par jour, soit 1 de chaque toutes les 4 h 48 environ, tant que ta réserve est sous 10. À 10, le compteur s'arrête : passe les dépenser. Ce que tu t'envoies depuis le live avec tes points de chaîne s'ajoute par-dessus, sans plafond.", ["lootbox.html", "Ouvrir mes lootbox"]],
     ["lootbox-legendaire", "Lootbox légendaire", "Jamais de Commun, et bien plus de chances d'Épique et de Légendaire. Elles tombent quand la communauté abat le boss.", ["lootbox.html?type=legendaire", "Mes lootbox légendaires"]],
-    ["medailles", "Médailles", "La monnaie de la boutique. Tu en gagnes en duel ciblé (plus en visant plus fort que toi) et, moitié moins, en combat automatique, en attaquant le boss en live, et en revendant tes doublons en trop.", ["boutique.html", "La boutique"]],
-    ["tickets", "Tickets de duel", "Un ticket = un duel ciblé ou un combat automatique sur le site, ou un duel en live avec !ticketduel (ou une attaque du boss avec !ticketboss). Ils sont distribués avec les bits, par une âme charitable, ou lors d'événements.", ["duels.html", "Défier un joueur"]],
+    ["medailles", "Médailles", "La monnaie de la boutique. Tu en gagnes en duel ciblé (plus en visant plus fort que toi) et, moitié moins, en combat automatique, en ligue (victoires et défenses tenues), en attaquant le boss en live, et en revendant tes doublons en trop.", ["boutique.html", "La boutique"]],
+    ["tickets", "Tickets de duel", "Un ticket = un duel ciblé ou un combat automatique sur le site, ou un duel en live avec !ticketduel (ou une attaque du boss avec !ticketboss). Tu en reçois 5 par jour (voir la réserve quotidienne), et tu peux t'en envoyer davantage depuis le live avec tes points de chaîne. Les combats de ligue n'en coûtent pas : ils utilisent l'énergie de ligue.", ["duels.html", "Défier un joueur"]],
     ["points", "Points", "Des points de classement gagnés en duel, selon l'issue et la catégorie du combat (jusqu'à 2 250 pour une victoire valeureuse, moitié moins en combat automatique). Ils servent aux classements.", ["classements.html", "Les classements"]],
     ["credits-reset", "Crédits de reset", "Tes points de stats rendus par un ticket de reset, en attente d'être replacés. Place-les sur ton profil : tant qu'ils attendent, ta puissance est au plus bas.", ["profil.html#points", "Placer mes points"]],
     ["ticket-reset", "Ticket de reset", "S'achète en médailles à la boutique. Il retire tous tes points de stats (Attaque, Défense, PV, Vitesse, Chance) et te les rend en crédits, pour les répartir autrement.", ["boutique.html", "La boutique"]],
@@ -109,7 +128,8 @@ App.demarrer("aide", async (main) => {
     ["Que deviennent mes doublons une fois l'objet au MAX ?", ["L'objet reste MAX, et chaque exemplaire en plus s'affiche « +N en trop ». Revends-les contre des médailles à la boutique, ou ", lien("#troc", "troque-les"), " par 10 contre un objet de rareté supérieure."]],
     ["Est-ce que je peux perdre des objets ?", ["Pas en jouant : un duel ne te prend jamais d'objet ni de médaille, même perdu. Un objet ne quitte ton inventaire que si tu le vends ou le troques toi-même. Vendre ta dernière copie le retire aussi de ton équipement et de ta vitrine."]],
     ["Comment supprimer mon compte ?", ["Dans ", lien("parametres.html#suppression", "Paramètres, Zone dangereuse"), " : tape ton pseudo Twitch pour confirmer. C'est immédiat et définitif. Les duels déjà joués restent dans l'historique public. Tu peux d'abord ", lien("parametres.html#compte", "exporter tes données"), "."]],
-    ["Je n'ai plus de lootbox, je fais comment ?", ["Passe en live : les récompenses de points de chaîne en donnent. Tu peux aussi en acheter en médailles à la ", lien("boutique.html", "boutique"), "."]],
+    ["Je n'ai plus de lootbox ou de ticket, je fais comment ?", ["Tu en regagnes 5 de chaque par jour sans rien faire : le temps restant est affiché à côté de tes compteurs. Pour aller plus vite, passe en live : les récompenses de points de chaîne en donnent tout de suite. Tu peux aussi acheter des lootbox en médailles à la ", lien("boutique.html", "boutique"), "."]],
+    ["On m'a attaqué en ligue pendant mon absence, qu'est-ce que je perds ?", ["Uniquement des points de ligue, et moitié moins que ce que l'attaquant risquait. Jamais d'objet ni de médaille. De Fer à Or, tu ne peux pas redescendre de division. Si ta défense tient, c'est toi qui gagnes des points et une médaille. Tu retrouves chaque attaque, avec son replay, sur la ", lien("ligue.html", "page Ligue"), "."]],
   ];
   main.append(section("faq", "Questions fréquentes", null,
     el("div", { class: "aide-faq" }, FAQ.map(([q, r]) => el("details", {}, el("summary", { texte: q }), el("p", {}, r))))));

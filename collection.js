@@ -36,17 +36,30 @@ App.demarrer("collection", async (main, ctx) => {
   const brute = (lo) => { const r = App.puissance(ctx.joueur, App.niveaux(), lo); return r ? r.powerLevel : 0; };
   const libNiveau = (o) => (eff(o) >= max(o) ? "MAX" : `+${eff(o)} / +${max(o)}`);
   const zoneEquip = el("section", { class: "section-page inv-equip", id: "equipement", "aria-labelledby": "t-equipement" });
+  // Deux builds : celui de combat (duels, attaques de ligue) et celui de défense (ce que les autres affrontent en ligue).
+  // Sans défense réglée, c'est le build de combat qui défend.
+  let modeEquip = p.get("build") === "defense" ? "defense" : "combat";
+  let defense = await App.api.loadoutDefense(ctx.joueur.id).catch(() => null);
+  const build = () => (modeEquip === "defense" ? defense || ctx.loadout : ctx.loadout);
+  const choisirBuild = (m) => { modeEquip = m; rendreEquipement(); const b = zoneEquip.querySelector(`[data-build="${m}"]`); if (b) b.focus(); };
 
   function rendreEquipement() {
-    const pl = puissance(ctx.loadout);
+    const lo = build(), enDefense = modeEquip === "defense";
+    const pl = puissance(lo);
     zoneEquip.replaceChildren(
       el("div", { class: "pf-entete" },
         el("div", {}, el("h2", { id: "t-equipement", texte: "Équipement" }),
-          el("p", { class: "sous", texte: "Touche un emplacement pour changer d'objet : l'effet sur ta puissance s'affiche avant de valider." })),
-        pl !== null ? el("p", { class: "inv-puissance" }, "Puissance ", el("b", { class: "num", texte: fmt(pl) })) : null),
+          el("div", { class: "onglets-b inv-builds", role: "group", "aria-label": "Quel build régler" },
+            [["combat", "Build de combat"], ["defense", "Défense de ligue"]].map(([m, t]) => el("button", { type: "button", "data-build": m, "aria-pressed": String(m === modeEquip), texte: t, onclick: () => choisirBuild(m) }))),
+          el("p", { class: "sous", texte: enDefense
+            ? "C'est ce build qui se bat à ta place quand un joueur t'attaque en ligue. " + (!defense ? "Pour l'instant, c'est ton build de combat : change un emplacement pour régler une défense à part."
+              : defense.arme == null ? "Attention : sans arme, c'est ton build de combat qui défend." : "Tu as réglé une défense à part de ton build de combat.")
+            : "Touche un emplacement pour changer d'objet : l'effet sur ta puissance s'affiche avant de valider." }),
+          enDefense && defense ? el("button", { type: "button", class: "btn-second petit", onclick: reprendreCombat }, "Reprendre mon build de combat") : null),
+        pl !== null ? el("p", { class: "inv-puissance" }, enDefense ? "Puissance en défense " : "Puissance ", el("b", { class: "num", texte: fmt(pl) })) : null),
       el("div", { class: "pf-slots" }, Object.entries(SLOTS).map(([slot, def]) => {
-        const o = ctx.loadout[def.col] != null ? App.objet(ctx.loadout[def.col]) : null;
-        const prise = def.col === "offhand" && !o && App.deuxMains(ctx.loadout.arme);
+        const o = lo[def.col] != null ? App.objet(lo[def.col]) : null;
+        const prise = def.col === "offhand" && !o && App.deuxMains(lo.arme);
         const contenu = o && ligne(o) ? App.carte(o, { niveau: eff(o), equipe: false })
           : el("div", { class: "pf-slot-vide" }, el("span", { class: "pf-plus", "aria-hidden": "true", texte: prise ? "—" : "+" }), el("span", { texte: prise ? "Occupée par l'arme à deux mains" : "Choisir" }));
         return el("div", { class: "pf-slot", style: o ? { "--c": `var(--${o.rarete})` } : null },
@@ -58,9 +71,10 @@ App.demarrer("collection", async (main, ctx) => {
   }
 
   function tiroirEquiper(slot) {
-    const def = SLOTS[slot], col = def.col, actuel = ctx.loadout[col] || null;
-    const base = brute(ctx.loadout);
-    const delta = (n) => Math.round(brute({ ...ctx.loadout, [col]: n }) - base);
+    const lo = build();
+    const def = SLOTS[slot], col = def.col, actuel = lo[col] || null;
+    const base = brute(lo);
+    const delta = (n) => Math.round(brute({ ...lo, [col]: n }) - base);
     const candidats = App.objets.filter((o) => o.slot === slot && ligne(o))
       .map((o) => ({ o, d: o.numero === actuel ? 0 : delta(o.numero) }))
       .sort((a, b) => (b.o.numero === actuel) - (a.o.numero === actuel) || b.d - a.d || rangRarete(b.o.rarete) - rangRarete(a.o.rarete));
@@ -80,22 +94,33 @@ App.demarrer("collection", async (main, ctx) => {
     App.tiroir({
       titre: def.nom,
       contenu: el("div", { class: "pf-tiroir" },
-        el("p", { class: "mention", texte: "Les chiffres indiquent l'effet sur ta puissance (" + fmt(base) + ") si tu équipes l'objet." }), liste),
+        el("p", { class: "mention", texte: "Les chiffres indiquent l'effet sur ta puissance " + (modeEquip === "defense" ? "en défense " : "") + "(" + fmt(base) + ") si tu équipes l'objet." }), liste),
       pied: actuel ? [el("button", { class: "btn-danger", type: "button", onclick: () => equiper(col, null, null) }, "Retirer l'objet (", signe(delta(null)), ")")] : null,
     });
   }
 
   async function equiper(col, numero, nom) {
-    const avant = brute(ctx.loadout);
+    const enDefense = modeEquip === "defense";
+    const avant = brute(build());
     try {
-      await App.rpc("equiper", { p_emplacement: col, p_numero: numero });
+      await App.rpc(enDefense ? "equiper_defense" : "equiper", { p_emplacement: col, p_numero: numero });
+      if (enDefense) defense = await App.api.loadoutDefense(ctx.joueur.id);
       await Promise.all([App.rafraichirCollection(), App.rafraichirJoueur()]);
       App.fermerTiroir();
       rendreEquipement(); rendre();
       const b = zoneEquip.querySelector(`[data-f="slot-${col}"]`); if (b) b.focus();
-      const apres = brute(ctx.loadout);
-      App.toast(numero ? nom + " équipé." : "Emplacement vidé.", { titre: "Puissance " + fmt(apres) + " (" + signe(Math.round(apres - avant)) + ")" });
+      const apres = brute(build());
+      App.toast(numero ? nom + (enDefense ? " placé en défense." : " équipé.") : "Emplacement vidé.", { titre: (enDefense ? "Puissance en défense " : "Puissance ") + fmt(apres) + " (" + signe(Math.round(apres - avant)) + ")" });
       App.verifierSucces();
+    } catch (e) { App.erreur(e); }
+  }
+
+  async function reprendreCombat() {
+    try {
+      await App.rpc("defense_comme_attaque");
+      defense = null;
+      rendreEquipement();
+      App.toast("Ta défense est de nouveau ton build de combat.", { titre: "Défense remise à zéro" });
     } catch (e) { App.erreur(e); }
   }
 

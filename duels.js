@@ -2,7 +2,7 @@
 (function () {
 const { $, el, icone, fmt, ilYa, date } = App;
 
-const TYPES = { duel: "Duel ciblé", auto_battle: "Combat automatique", entrainement: "Entraînement" };
+const TYPES = { duel: "Duel ciblé", auto_battle: "Combat automatique", entrainement: "Entraînement", ligue: "Ligue" };
 const TRANCHES = { dans_tranche: "Combat équitable", au_dessus: "Cible plus forte", en_dessous: "Cible plus faible" };
 // Estimation qualitative (décision projet : jamais de % exact). Seuils sur le ratio ma puissance / la sienne.
 const ESTIMATIONS = [[1.5, 5, "Largement favori"], [1.15, 4, "Favori"], [0.87, 3, "Serré"], [0.67, 2, "Outsider"], [0, 1, "Très risqué"]];
@@ -80,7 +80,7 @@ App.demarrer("duels", async (main, ctx) => {
       el("h2", { id: "titre-se-battre", texte: "Se battre" }),
       el("p", { class: "ligne-tickets" + (tickets < 1 ? " sans-ticket" : "") }, icone("i-ticket"),
         tickets < 1
-          ? el("span", {}, el("b", { texte: "Plus de ticket de duel." }), " Gagne-en en live avec tes points de chaîne. ", el("a", { class: "lien", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener", texte: "Aller sur le live" }), lienAide("tickets", "les tickets de duel"))
+          ? el("span", {}, el("b", { texte: "Plus de ticket de duel." }), " Tu en regagnes 5 par jour" + (moi.passif && moi.passif.ticket_prochain ? " (prochain dans " + App.dureeCourte(new Date(moi.passif.ticket_prochain) - Date.now()) + ")" : "") + ", et tes points de chaîne t'en donnent d'autres en live. ", el("a", { class: "lien", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener", texte: "Aller sur le live" }), lienAide("tickets", "les tickets de duel"))
           : el("span", {}, "Il te reste ", el("b", { class: "num", texte: pluriel(tickets, "ticket") + " de duel" }), ". Un combat automatique ou un duel ciblé en coûte un.", lienAide("tickets", "les tickets de duel"))),
       el("div", { class: "modes-combat" },
         el("article", { class: "mode-combat auto" },
@@ -94,7 +94,7 @@ App.demarrer("duels", async (main, ctx) => {
           tickets > 0
             ? el("a", { class: "btn-principal", href: "combat.html?mode=auto" }, icone("i-epees"), "Combat automatique")
             : el("button", { type: "button", class: "btn-principal", "aria-disabled": "true",
-              onclick: () => App.toast("Plus de ticket de duel : gagne-en en live avec tes points de chaîne.", { titre: "Pas de ticket" }) }, icone("i-epees"), "Combat automatique")),
+              onclick: () => App.toast("Plus de ticket de duel : tu en regagnes 5 par jour, et le live t'en donne tout de suite avec tes points de chaîne.", { titre: "Pas de ticket" }) }, icone("i-epees"), "Combat automatique")),
         el("article", { class: "mode-combat cible" },
           el("span", { class: "pilule", texte: "Récompenses complètes" }),
           el("h3", { texte: "Duel ciblé" }),
@@ -308,8 +308,8 @@ App.demarrer("duels", async (main, ctx) => {
             : el("a", { class: "btn-second petit b-entr", href: versCombat(j.twitch_login, "entrainement", echo), title: `Gratuit, sans récompense · ${restants} sur ${ENTRAINEMENTS_PAR_JOUR} restant${restants > 1 ? "s" : ""} aujourd'hui` }, "Entraînement"),
         tickets > 0
           ? el("a", { class: "btn-principal btn-defier", href: versCombat(j.twitch_login, "classe", echo), title: "Coûte 1 ticket de duel", "aria-label": "Défier " + (echo ? "l'écho de " : "") + nomJ + " en duel ciblé (1 ticket)" }, icone("i-epees"), "Défier")
-          : el("button", { type: "button", class: "btn-principal btn-defier", "aria-disabled": "true", title: "Plus de ticket de duel : gagne-en en live",
-            onclick: () => App.toast("Plus de ticket de duel : gagne-en en live avec tes points de chaîne.", { titre: "Pas de ticket" }) }, icone("i-epees"), "Défier")));
+          : el("button", { type: "button", class: "btn-principal btn-defier", "aria-disabled": "true", title: "Plus de ticket de duel : 5 par jour, et plus en live",
+            onclick: () => App.toast("Plus de ticket de duel : tu en regagnes 5 par jour, et le live t'en donne tout de suite avec tes points de chaîne.", { titre: "Pas de ticket" }) }, icone("i-epees"), "Défier")));
   }
 
   function voirContre(l) {

@@ -147,3 +147,8 @@
   .rangee-recherche .champ.tri { flex: 1 1 auto; }
 }
 .outils-objets [hidden] { display: none !important; }
+
+/* Inventaire : choix du build réglé (combat ou défense de ligue) */
+.inv-builds { margin: 2px 0 8px; }
+.inv-builds button { min-height: 40px; }
+.inv-equip .pf-entete .btn-second.petit { margin-top: 8px; }

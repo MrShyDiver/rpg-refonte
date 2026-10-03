@@ -80,7 +80,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     b.append(
       el("span", { class: "lb-type-texte" },
         el("span", { class: "titre-type", texte: t === "legendaire" ? "Lootbox légendaire" : "Lootbox" }),
-        el("span", { class: "texte-type", texte: t === "legendaire" ? "Jamais de Commun. Gagnée contre le boss de la communauté." : "Gagnée en live avec tes points de chaîne." })),
+        el("span", { class: "texte-type", texte: t === "legendaire" ? "Jamais de Commun. Gagnée contre le boss de la communauté." : "5 par jour, et bien plus en live avec tes points de chaîne." })),
       el("span", { class: "lb-compte" }, el("b", { class: "num" }), el("small", { texte: "à ouvrir" })));
     return b;
   });
@@ -130,7 +130,7 @@ App.demarrer("lootbox", async (main, ctx) => {
 
   const vide = el("div", { class: "vide lb-vide", hidden: true },
     el("b", { texte: "Plus aucune lootbox à ouvrir" }),
-    el("p", { texte: "Les lootbox se gagnent en live sur la chaîne de MrShyDiver, avec tes points de chaîne. Tu peux aussi en acheter en Médailles à la boutique, et les lootbox légendaires tombent quand la communauté abat le boss." }),
+    el("p", { texte: "Tu en regagnes 5 par jour sans rien faire : le temps restant est affiché à côté de ton compteur. Pour en avoir tout de suite, passe en live sur la chaîne de MrShyDiver et envoie-t'en avec tes points de chaîne. Tu peux aussi en acheter en Médailles à la boutique, et les lootbox légendaires tombent quand la communauté abat le boss." }),
     el("div", { class: "lb-vide-actions" },
       el("a", { class: "btn-twitch", href: App.TWITCH_CHAINE, target: "_blank", rel: "noopener" }, icone("i-twitch"), "Aller sur le live"),
       el("a", { class: "btn-second", href: "boutique.html" }, icone("i-boutique"), "Boutique")));
@@ -184,7 +184,7 @@ App.demarrer("lootbox", async (main, ctx) => {
     btnCoffre.setAttribute("aria-label", "Ouvrir " + pluriel(choix, nom, nom === "lootbox" ? "lootbox" : "lootbox légendaires"));
     if (pret && !charge) consigne.textContent = n < 1 ? "" : (tactile ? "Touche le coffre" : "Clique sur le coffre") + " pour ouvrir " + pluriel(choix, "lootbox", "lootbox");
     let texte;
-    if (n === 0 && autre === 0) texte = "Tu n'as plus de lootbox : gagne-les en live.";
+    if (n === 0 && autre === 0) texte = "Tu n'as plus de lootbox : la prochaine arrive toute seule, le live en donne tout de suite.";
     else if (n === 0) texte = type === "legendaire" ? `Aucune lootbox légendaire, mais ${pluriel(autre, "lootbox standard", "lootbox standard")} t'attend${autre > 1 ? "ent" : ""}.` : `Aucune lootbox standard, mais ${pluriel(autre, "lootbox légendaire", "lootbox légendaires")} t'attend${autre > 1 ? "ent" : ""}.`;
     else if (n > MAX_PAR_OUVERTURE) texte = `Il t'en reste ${fmt(n)} · 10 au maximum par ouverture.`;
     else if (n < 5) texte = `Il t'en reste ${fmt(n)}.`;

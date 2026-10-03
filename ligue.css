@@ -1,0 +1,74 @@
+/* Page Ligue. Couleur de palier : --p, posée sur l'emblème et la carte de rang. */
+.lg-embleme { --p: #8e8d9a; position: relative; display: inline-grid; place-items: center; flex: none; color: var(--p); vertical-align: middle; }
+.lg-embleme svg { width: 100%; height: 100%; fill: color-mix(in oklab, var(--p) 16%, transparent); }
+.lg-embleme.fer, .lg-rang.fer { --p: #9a9aa6; } .lg-embleme.bronze, .lg-rang.bronze { --p: #d08a55; }
+.lg-embleme.argent, .lg-rang.argent { --p: #cfd6e4; } .lg-embleme.or, .lg-rang.or { --p: #ffc53d; }
+.lg-embleme.platine, .lg-rang.platine { --p: #5fe0d0; } .lg-embleme.diamant, .lg-rang.diamant { --p: #7fb6ff; }
+.lg-embleme.maitre, .lg-rang.maitre { --p: #d79bff; }
+
+.lg-rang { --p: #9a9aa6; margin-top: 0; padding: 22px; border-radius: 20px; background: linear-gradient(140deg, color-mix(in oklab, var(--p) 11%, var(--sol-2)), var(--sol-2) 62%); border: 1px solid color-mix(in oklab, var(--p) 30%, var(--trait)); }
+.lg-rang-tete { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
+.lg-rang-texte { min-width: 0; flex: 1; }
+.lg-rang-texte h2 { font-size: clamp(24px, 3vw, 34px); font-weight: 800; letter-spacing: -.02em; color: var(--p); }
+.lg-rang-texte .sous { margin: 4px 0 12px; max-width: 70ch; color: var(--encre-2); font-size: 14.5px; }
+.lg-barre { height: 10px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; max-width: 520px; }
+.lg-barre i { display: block; height: 100%; border-radius: inherit; background: var(--p); transition: width .6s var(--ease); }
+.lg-energie b { display: flex; align-items: center; gap: 6px; }
+.lg-energie b svg { width: 20px; height: 20px; color: var(--legendaire); }
+.lg-pips { display: flex; gap: 3px; margin-top: 8px; }
+.lg-pips i { flex: 1; max-width: 16px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.1); }
+.lg-pips i.plein { background: var(--legendaire); }
+.chiffre .prochain { color: var(--normal); }
+
+.lg-titre-ligne { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 16px; }
+.lg-titre-ligne h2 { font-size: 22px; margin-bottom: 6px; }
+.lg-titre-ligne .sous { color: var(--encre-2); font-size: 14.5px; max-width: 64ch; }
+.lg-titre-ligne .btn-second[aria-disabled="true"] { opacity: .6; cursor: not-allowed; }
+
+.lg-advs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.lg-adv { --c: var(--encre-2); display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 12px; padding: 18px; border-radius: 18px; background: var(--sol-2); border: 1px solid var(--trait); justify-items: start; min-width: 0; }
+.lg-adv.faible { --c: var(--normal); } .lg-adv.egal { --c: var(--rare); } .lg-adv.fort { --c: #ff7a59; } .lg-adv.echo { --c: var(--epique); }
+.lg-adv { border-top: 3px solid color-mix(in oklab, var(--c) 70%, transparent); }
+.lg-adv-ident { display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; }
+.lg-adv-ident > div { min-width: 0; display: grid; gap: 2px; }
+.lg-adv-nom { font-family: var(--titre); font-size: 17px; font-weight: 700; color: var(--encre); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.lg-adv-nom:hover { text-decoration: underline; }
+.lg-adv-ident .mention { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--encre-3); }
+.lg-inconnu { display: inline-grid; place-items: center; border-radius: 50%; background: var(--sol-3); border: 1px dashed var(--trait-fort); font-family: var(--titre); font-size: 22px; color: var(--epique); flex: none; }
+.lg-build { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-self: start; }
+.lg-build .case-vide { aspect-ratio: 5 / 7; border-radius: 12px; border: 1px dashed var(--trait-fort); display: grid; place-content: center; text-align: center; padding: 4px; font-size: 10.5px; color: var(--encre-3); }
+.lg-build .case-vide small { font-size: 10px; }
+.lg-adv-echo { color: var(--encre-2); font-size: 14px; align-self: start; }
+.lg-enjeu { width: 100%; }
+.lg-enjeu .gain svg { color: var(--normal); transform: rotate(-90deg); } .lg-enjeu .perte svg { color: #ff7a59; transform: rotate(90deg); }
+.lg-enjeu .gain b { color: var(--normal); } .lg-enjeu .perte b { color: #ffab94; }
+.lg-adv > .btn-principal { width: 100%; justify-content: center; }
+.lg-adv > .btn-principal[aria-disabled="true"] { background: var(--sol-3); color: var(--encre-2); box-shadow: none; border: 1px dashed var(--trait-fort); cursor: not-allowed; transform: none; filter: none; }
+
+.lg-def-etat { margin-bottom: 12px; }
+.section-page > .lg-build { max-width: 520px; }
+.lg-sous-titre { margin: 26px 0 10px; font-size: 16px; }
+.lg-journal, .lg-classement { list-style: none; display: grid; gap: 6px; }
+.lg-journal li { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--sol-2); border: 1px solid var(--trait); font-size: 14.5px; }
+.lg-journal .tenue .lg-res { color: var(--normal); font-weight: 700; } .lg-journal .percee .lg-res { color: #ffab94; font-weight: 700; }
+.lg-classement li { display: grid; grid-template-columns: 34px auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px; padding: 9px 14px; border-radius: 12px; background: var(--sol-2); border: 1px solid var(--trait); font-size: 14.5px; }
+.lg-classement li.moi { border-color: color-mix(in oklab, var(--legendaire) 50%, var(--trait)); }
+.lg-classement a { color: var(--encre); font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-classement a:hover { text-decoration: underline; }
+.lg-place { font-family: var(--titre); color: var(--encre-3); text-align: center; }
+.lg-clas-rang { display: flex; align-items: center; gap: 6px; color: var(--encre-2); font-size: 13.5px; white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .lg-advs { grid-template-columns: 1fr; }
+  .lg-adv { grid-template-rows: none; }
+  .lg-build { max-width: 420px; }
+}
+@media (max-width: 560px) {
+  .lg-rang { padding: 16px; }
+  .lg-rang-tete { align-items: flex-start; gap: 12px; }
+  .lg-rang-tete > .lg-embleme { width: 60px !important; height: 60px !important; }
+  .lg-journal li { grid-template-columns: auto 1fr auto; }
+  .lg-journal li .mention { grid-column: 2; grid-row: 2; }
+  .lg-classement li { grid-template-columns: 26px auto minmax(0, 1fr) auto; }
+  .lg-classement .lg-clas-rang, .lg-classement .mention { display: none; }
+}

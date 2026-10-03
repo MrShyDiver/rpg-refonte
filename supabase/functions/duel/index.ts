@@ -1,4 +1,4 @@
-// Edge Function `duel` — Stream RPG (v5, moteur 1.3 : combat automatique, échos validés, puissances stockées).
+// Edge Function `duel` — Stream RPG (v6, moteur 1.3 : combat automatique, échos validés, puissances stockées, ligue).
 //
 // POST, Authorization: Bearer <jeton de session> :
 //   { mode: "classe" | "entrainement", adversaire: "<login>" }               duel ciblé
@@ -6,6 +6,7 @@
 //   { mode: "auto" }                                                         combat automatique
 //   { action: "puissances" }                                                 recalcule les puissances périmées
 //   { action: "echos" }                                                      échos que le serveur sait ramener à ton niveau
+//   { action: "ligue", cible: 0 | 1 | 2 }                                    combat de ligue contre l'un des trois adversaires proposés
 //
 // Le combat est calculé ICI, jamais dans le navigateur ; l'écriture (ticket, récompenses,
 // historique, replay) est faite en une transaction par la RPC enregistrer_combat (service_role
@@ -29,6 +30,7 @@ const DELAI_ENTRE_DUELS_MS = 8000;   // identique à enregistrer_combat
 const TRANCHE = 0.30;                // identique à enregistrer_combat et au moteur
 const MIN_TRANCHE_SANS_ECHO = 5;     // à partir de 5 joueurs dans la tranche, plus d'écho ciblé
 const ESSAIS_ECHO_AUTO = 3;          // échos calibrés en combat automatique avant d'abandonner
+const ESSAIS_ECHO_LIGUE = 6;         // en ligue, l'écho remplace un adversaire manquant : on insiste un peu plus
 const SOURCES_ECHO_AUTO = 30;        // builds chargés pour y trouver ces échos (ceux sans arme sont écartés)
 const ESSAIS_LISTE_ECHOS = 12;       // échos calibrés au plus pour dresser la liste de la page Duels (~75 ms pièce)
 const RETRAIT_ECHO = ["strategeme", "offhand", "armure"] as const; // pièces retirées, dans l'ordre, à un écho trop fort
@@ -59,15 +61,19 @@ function entetesCors(req: Request): Record<string, string> {
   };
 }
 
-function lireCorps(corps: unknown): { action: "duel" | "puissances" | "echos"; mode: Mode; adversaire: string; echo: boolean } {
+function lireCorps(corps: unknown): { action: "duel" | "puissances" | "echos" | "ligue"; mode: Mode; adversaire: string; echo: boolean; cible: number } {
   const c = (corps ?? {}) as Record<string, unknown>;
-  if (c.action === "puissances" || c.action === "echos") return { action: c.action, mode: "classe", adversaire: "", echo: false };
+  if (c.action === "puissances" || c.action === "echos") return { action: c.action, mode: "classe", adversaire: "", echo: false, cible: -1 };
+  if (c.action === "ligue") {
+    if (c.cible !== 0 && c.cible !== 1 && c.cible !== 2) throw new ErreurJoueur(400, "Choisis l'un des trois adversaires proposés");
+    return { action: "ligue", mode: "classe", adversaire: "", echo: false, cible: c.cible };
+  }
   if (c.mode !== "classe" && c.mode !== "entrainement" && c.mode !== "auto") {
     throw new ErreurJoueur(400, "Choisis un mode : classé, entraînement ou combat automatique");
   }
   const adversaire = typeof c.adversaire === "string" ? c.adversaire.trim().replace(/^@/, "").toLowerCase() : "";
   if (c.mode !== "auto" && !/^[a-z0-9_]{1,25}$/.test(adversaire)) throw new ErreurJoueur(400, "Indique le pseudo Twitch de ton adversaire");
-  return { action: "duel", mode: c.mode, adversaire, echo: c.mode !== "auto" && c.echo === true };
+  return { action: "duel", mode: c.mode, adversaire, echo: c.mode !== "auto" && c.echo === true, cible: -1 };
 }
 
 function verifier<T>({ data, error }: { data: T; error: unknown }): T {
@@ -87,12 +93,17 @@ interface Builds { loadoutDe: (id: string) => Joueur | undefined; items: Map<num
 // Loadouts, niveaux et fiches d'objets de quelques joueurs.
 // ponytail: paquets de 15 joueurs pour rester sous la limite de 1 000 lignes par requête
 // (15 joueurs × 50 objets au pire). À revoir si le catalogue dépasse 60 objets.
-async function chargerBuilds(admin: Client, ids: string[]): Promise<Builds> {
+// defenseDe : pour ce joueur, on prend son build de défense s'il en a réglé un (avec une arme).
+async function chargerBuilds(admin: Client, ids: string[], defenseDe?: string): Promise<Builds> {
   const loadouts: Joueur[] = [], inventaire: Joueur[] = [];
   const paquets: string[][] = [];
   for (let i = 0; i < ids.length; i += 15) paquets.push(ids.slice(i, i + 15));
   for (const p of paquets) {
     loadouts.push(...verifier(await admin.from("loadouts").select("player_id,arme,offhand,armure,strategeme").in("player_id", p)) as Joueur[]);
+  }
+  if (defenseDe) {
+    const d = verifier(await admin.from("loadouts_defense").select("player_id,arme,offhand,armure,strategeme").eq("player_id", defenseDe).maybeSingle()) as Joueur | null;
+    if (d && d.arme != null) { const i = loadouts.findIndex((l) => l.player_id === defenseDe); if (i >= 0) loadouts[i] = d; else loadouts.push(d); }
   }
   const numeros = [...new Set(loadouts.flatMap((l) => EMPLACEMENTS.map((e) => l[e]).filter((n) => n != null)))] as number[];
   let items: Joueur[] = [];
@@ -249,6 +260,55 @@ async function listerEchos(admin: Client, moi: Joueur) {
   return echos;
 }
 
+// ---------------------------------------------------------------- ligue
+// Combat de ligue : l'adversaire est l'une des trois propositions gardées en base (jamais un choix libre).
+// Joueur réel : on affronte son build de DÉFENSE, et son classement bouge (cote cachée et points de ligue). Écho : personne n'est touché.
+async function combatLigue(admin: Client, moi: Joueur, cible: number): Promise<unknown> {
+  const prep = verifier(await admin.rpc("ligue_preparer", { p_id: moi.id })) as { energie: number; propositions: Joueur[] };
+  const prop = prep?.propositions?.[cible];
+  if (!prop) throw new ErreurJoueur(409, "Cet adversaire n'est plus proposé : recharge la page de la ligue");
+  if (prep.energie < 1) throw new ErreurJoueur(403, "Plus d'énergie de ligue : elle se recharge toute seule, reviens dans un moment");
+
+  let moiEntree: JoueurEntree, defEntree: JoueurEntree, defenseur: Joueur | null = null, echoDe: Joueur | null = null;
+  if (prop.type === "joueur") {
+    defenseur = verifier(await admin.from("players").select(COLONNES).eq("id", prop.id).maybeSingle()) as Joueur | null;
+    if (!defenseur) throw new ErreurJoueur(409, "Cet adversaire n'est plus disponible : recharge la page de la ligue");
+    const builds = await chargerBuilds(admin, [moi.id, defenseur.id], defenseur.id);
+    moiEntree = entree(moi, builds);
+    defEntree = entree(defenseur, builds);
+    if (!defEntree.equipement.arme) throw new ErreurJoueur(409, "Cet adversaire n'a plus d'arme : recharge la page de la ligue");
+  } else {
+    const { candidats } = await voisinage(admin, moi);
+    const sources = candidats.map((j) => ({ j, r: hasard(1 << 30) })).sort((a, b) => a.r - b.r).map((x) => x.j).slice(0, SOURCES_ECHO_AUTO);
+    const builds = await chargerBuilds(admin, [moi.id, ...sources.map((j) => j.id)]);
+    moiEntree = entree(moi, builds);
+    let trouve: { j: Joueur; entree: JoueurEntree } | null = null, essais = 0;
+    for (const j of sources) {
+      const e = entree(j, builds);
+      if (!e.equipement.arme) continue;
+      if (++essais > ESSAIS_ECHO_LIGUE) break;
+      const c = echoEquitable(e, moiEntree);
+      if (c.valable) { trouve = { j, entree: c.entree }; break; }
+    }
+    if (!trouve) throw new ErreurJoueur(409, "Aucun écho à ta mesure pour l'instant : choisis un autre adversaire.");
+    echoDe = trouve.j;
+    defEntree = trouve.entree;
+  }
+
+  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+  const resultat = simulerDuel(moiEntree, defEntree, { seed, mode: "classe" });
+  const { data, error } = await admin.rpc("enregistrer_ligue", {
+    p_attaquant: moi.id, p_cible: cible, p_defenseur: defenseur ? defenseur.id : null, p_vainqueur: resultat.vainqueur,
+    p_stats: resultat.stats, p_replay: resultat.replay, p_seed: seed, p_echo_de: echoDe ? echoDe.id : null,
+  });
+  if (error) {
+    const statut = STATUT_PAR_CODE[error.code ?? ""];
+    if (statut) throw new ErreurJoueur(statut, error.message);
+    throw error;
+  }
+  return data;
+}
+
 // ---------------------------------------------------------------- requête
 export async function traiter(req: Request): Promise<Response> {
   const cors = entetesCors(req);
@@ -258,7 +318,7 @@ export async function traiter(req: Request): Promise<Response> {
   if (req.method !== "POST") return repondre(405, { erreur: "Méthode non autorisée" });
 
   try {
-    const { action, mode, adversaire, echo } = lireCorps(await req.json().catch(() => null));
+    const { action, mode, adversaire, echo, cible: cibleLigue } = lireCorps(await req.json().catch(() => null));
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const jeton = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -269,26 +329,32 @@ export async function traiter(req: Request): Promise<Response> {
     if (!auth?.user) throw new ErreurJoueur(401, "Connecte-toi avec Twitch pour jouer");
 
     const admin: Client = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-    const moi = verifier(await admin.from("players").select(COLONNES).eq("auth_user_id", auth.user.id).maybeSingle()) as Joueur | null;
+    let moi = verifier(await admin.from("players").select(COLONNES).eq("auth_user_id", auth.user.id).maybeSingle()) as Joueur | null;
     if (!moi) throw new ErreurJoueur(403, "Connecte-toi avec Twitch pour jouer");
 
     if (action === "puissances") return repondre(200, { mises_a_jour: await rafraichirPuissances(admin) });
     if (action === "echos") return repondre(200, { echos: await listerEchos(admin, moi) });
 
+    // Anti-spam commun aux duels et à la ligue (revérifié sous verrou par les RPC).
+    const dernier = verifier(await admin.from("duels").select("joue_le").eq("attaquant_id", moi.id)
+      .order("joue_le", { ascending: false }).limit(1)) as { joue_le: string }[];
+    if (dernier[0] && Date.now() - new Date(dernier[0].joue_le).getTime() < DELAI_ENTRE_DUELS_MS) {
+      throw new ErreurJoueur(429, "Doucement ! Attends quelques secondes avant de relancer un combat");
+    }
+    if (action === "ligue") return repondre(200, await combatLigue(admin, moi, cibleLigue));
+
+    // Tickets de duel : les gains passifs sont crédités avant de compter.
+    verifier(await admin.rpc("crediter_passif_de", { p_id: moi.id }));
+    moi = verifier(await admin.from("players").select(COLONNES).eq("id", moi.id).maybeSingle()) as Joueur;
+
     // Contrôles rapides (messages clairs) ; enregistrer_combat refait tout sous verrou.
     if (mode !== "entrainement" && moi.tickets <= 0) {
-      throw new ErreurJoueur(403, "Tu n'as plus de ticket de duel. Les tickets gratuits sont distribués avec les bits par une âme charitable ou lors d'évènements.");
+      throw new ErreurJoueur(403, "Tu n'as plus de ticket de duel. Tu en regagnes 5 par jour, et tu peux t'en envoyer depuis le stream avec tes points de chaîne.");
     }
     if (mode === "entrainement" && !abonne(moi)) {
       throw new ErreurJoueur(403, "L'entraînement gratuit est réservé aux abonnés de la chaîne Twitch");
     }
     if (adversaire && adversaire === moi.twitch_login) throw new ErreurJoueur(400, "Tu ne peux pas te défier toi-même !");
-    const dernier = verifier(await admin.from("duels").select("joue_le").eq("attaquant_id", moi.id)
-      .order("joue_le", { ascending: false }).limit(1)) as { joue_le: string }[];
-    if (dernier[0] && Date.now() - new Date(dernier[0].joue_le).getTime() < DELAI_ENTRE_DUELS_MS) {
-      throw new ErreurJoueur(429, "Doucement ! Attends quelques secondes avant de relancer un duel");
-    }
-
     // Qui affronte-t-on ? Un joueur réel (cible), ou l'écho d'un joueur (sources à calibrer).
     let cible: Joueur | null = null;
     let sources: Joueur[] = [];

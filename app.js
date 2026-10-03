@@ -41,7 +41,8 @@ const PAGES = [
   { id: "collection", titre: "Inventaire", href: "collection.html", icone: "i-cartes", mobile: true },
   { id: "arsenal", titre: "Codex", href: "arsenal.html", icone: "i-livre" },
   { id: "boutique", titre: "Boutique", href: "boutique.html", icone: "i-boutique" },
-  { id: "duels", titre: "Duels", href: "duels.html", icone: "i-epees", mobile: true },
+  { id: "ligue", titre: "Ligue", href: "ligue.html", icone: "i-ligue", mobile: true },
+  { id: "duels", titre: "Duels", href: "duels.html", icone: "i-epees" },
   { id: "succes", titre: "Succès", href: "succes.html", icone: "i-trophee" },
   { id: "classements", titre: "Classements", href: "classements.html", icone: "i-podium" },
   { id: "patchnotes", titre: "Patchnotes", href: "patchnotes.html", icone: "i-journal" },
@@ -49,6 +50,9 @@ const PAGES = [
 
 const SYMBOLES = "<symbol id=\"i-twitch\" viewBox=\"0 0 24 24\"><path fill=\"currentColor\" d=\"M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z\"/></symbol><symbol id=\"i-live\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"2.2\" fill=\"currentColor\"/><path d=\"M8.2 15.8a5.4 5.4 0 0 1 0-7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.4 18.6a9.3 9.3 0 0 1 0-13.2M18.6 5.4a9.3 9.3 0 0 1 0 13.2\"/></symbol><symbol id=\"i-boite\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3.5\" y=\"9\" width=\"17\" height=\"11\" rx=\"1.5\"/><path d=\"M2.5 9h19V6.5A1.5 1.5 0 0 0 20 5H4a1.5 1.5 0 0 0-1.5 1.5zM12 5v15M12 5c-1.5-2.6-5-3-5-.6 0 1.2 1.6.9 5 .6zM12 5c1.5-2.6 5-3 5-.6 0 1.2-1.6.9-5 .6z\"/></symbol><symbol id=\"i-bouclier\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 2.8 4.5 5.6v6.1c0 4.6 3.1 8 7.5 9.5 4.4-1.5 7.5-4.9 7.5-9.5V5.6z\"/><path d=\"M12 7v10M8.2 11.2h7.6\"/></symbol><symbol id=\"i-epees\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 6.5 13 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2\"/></symbol><symbol id=\"i-retour\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5\"/></symbol><symbol id=\"i-cle\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4.5\" y=\"10.5\" width=\"15\" height=\"10\" rx=\"2\"/><path d=\"M8 10.5V7.5a4 4 0 0 1 8 0v3\"/></symbol><symbol id=\"i-etoile\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M12 2.5l2.3 6.2 6.2 2.3-6.2 2.3L12 19.5l-2.3-6.2L3.5 11l6.2-2.3z\"/></symbol><symbol id=\"i-marque\" viewBox=\"0 0 40 40\"><rect x=\"9\" y=\"4\" width=\"22\" height=\"31\" rx=\"4.5\" fill=\"#2a1d4a\" stroke=\"#b777ff\" stroke-opacity=\".6\" transform=\"rotate(-10 20 20)\"/><rect x=\"10\" y=\"5.5\" width=\"22\" height=\"31\" rx=\"4.5\" fill=\"#15121f\" stroke=\"#ffc53d\" stroke-width=\"1.5\"/><g fill=\"#ffc53d\" shape-rendering=\"crispEdges\"><rect x=\"24\" y=\"10\" width=\"3\" height=\"3\"/><rect x=\"21\" y=\"13\" width=\"3\" height=\"3\"/><rect x=\"18\" y=\"16\" width=\"3\" height=\"3\"/><rect x=\"15\" y=\"19\" width=\"3\" height=\"3\"/><rect x=\"13\" y=\"22\" width=\"3\" height=\"3\" fill=\"#b777ff\"/><rect x=\"16\" y=\"25\" width=\"3\" height=\"3\" fill=\"#b777ff\"/><rect x=\"11\" y=\"20\" width=\"3\" height=\"3\" fill=\"#b777ff\"/><rect x=\"11\" y=\"27\" width=\"3\" height=\"3\" fill=\"#f4f2ec\"/></g></symbol><symbol id=\"i-coffre\" viewBox=\"0 0 32 26\" shape-rendering=\"crispEdges\"><rect class=\"cf-o\" x=\"3\" y=\"10\" width=\"26\" height=\"15\"/><rect class=\"cf-b\" x=\"4\" y=\"11\" width=\"24\" height=\"13\"/><rect class=\"cf-bc\" x=\"4\" y=\"11\" width=\"24\" height=\"1\"/><rect class=\"cf-bs\" x=\"4\" y=\"15\" width=\"24\" height=\"1\"/><rect class=\"cf-bs\" x=\"4\" y=\"19\" width=\"24\" height=\"1\"/><rect class=\"cf-bs\" x=\"4\" y=\"23\" width=\"24\" height=\"1\"/><rect class=\"cf-m\" x=\"7\" y=\"11\" width=\"3\" height=\"13\"/><rect class=\"cf-ms\" x=\"9\" y=\"11\" width=\"1\" height=\"13\"/><rect class=\"cf-m\" x=\"22\" y=\"11\" width=\"3\" height=\"13\"/><rect class=\"cf-ms\" x=\"24\" y=\"11\" width=\"1\" height=\"13\"/><rect class=\"cf-o\" x=\"4\" y=\"2\" width=\"24\" height=\"1\"/><rect class=\"cf-o\" x=\"3\" y=\"3\" width=\"26\" height=\"8\"/><rect class=\"cf-b\" x=\"4\" y=\"3\" width=\"24\" height=\"7\"/><rect class=\"cf-bc\" x=\"4\" y=\"3\" width=\"24\" height=\"2\"/><rect class=\"cf-bs\" x=\"4\" y=\"8\" width=\"24\" height=\"1\"/><rect class=\"cf-m\" x=\"7\" y=\"3\" width=\"3\" height=\"7\"/><rect class=\"cf-ms\" x=\"9\" y=\"3\" width=\"1\" height=\"7\"/><rect class=\"cf-m\" x=\"22\" y=\"3\" width=\"3\" height=\"7\"/><rect class=\"cf-ms\" x=\"24\" y=\"3\" width=\"1\" height=\"7\"/><rect class=\"cf-ms\" x=\"3\" y=\"10\" width=\"26\" height=\"1\"/><rect class=\"cf-o\" x=\"13\" y=\"8\" width=\"6\" height=\"9\"/><rect class=\"cf-s\" x=\"14\" y=\"9\" width=\"4\" height=\"1\"/><rect class=\"cf-s\" x=\"14\" y=\"12\" width=\"4\" height=\"4\"/><rect class=\"cf-o\" x=\"15.5\" y=\"13\" width=\"1\" height=\"2\"/></symbol>";
 const ICONES = `
+<symbol id="i-ligue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.4 3 7.9 7.5 9.5 4.5-1.6 7.5-5.1 7.5-9.5V6z"/><path d="m8.5 12.5 3.5-3 3.5 3M8.5 16l3.5-3 3.5 3"/></symbol>
+<symbol id="i-eclair" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/></symbol>
+<symbol id="i-bouclier" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 4.5 6v5.5c0 4.4 3 7.9 7.5 9.5 4.5-1.6 7.5-5.1 7.5-9.5V6z"/></symbol>
 <symbol id="i-coffre-ligne" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.5 10h17v9.5H3.5zM3.5 10V8a4 4 0 0 1 4-4h9a4 4 0 0 1 4 4v2"/><path d="M10 10v3.5h4V10"/></symbol>
 <symbol id="i-cartes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="7.5" y="3.5" width="12" height="16" rx="2.2"/><path d="M4.5 7.2v11.3a2 2 0 0 0 2 2h9"/></symbol>
 <symbol id="i-livre" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5M9 7.5h7M9 11h5"/></symbol>
@@ -144,8 +148,15 @@ App.api = {
   objets: () => q(client().from("items").select("numero,nom,slot,rarete,set_nom,actif,data").order("numero")),
   inventaire: (pid) => q(client().from("inventory").select("item_numero,niveau,obtenu_le").eq("player_id", pid)),
   inventaires: () => q(client().from("inventory").select("player_id,item_numero,niveau").limit(20000)),
+  inventairesDe: (ids) => q(client().from("inventory").select("player_id,item_numero,niveau").in("player_id", ids).limit(5000)),
   loadout: (pid) => q(client().from("loadouts").select("*").eq("player_id", pid).maybeSingle()),
   loadouts: () => q(client().from("loadouts").select("*").limit(5000)),
+  // Build de défense (ligue) : sans ligne, ou sans arme, c'est le build de combat qui défend.
+  loadoutDefense: (pid) => q(client().from("loadouts_defense").select("*").eq("player_id", pid).maybeSingle()),
+  loadoutsDefense: () => q(client().from("loadouts_defense").select("*").limit(5000)),
+  // Ligue : mon état complet (énergie, trois adversaires proposés, défenses reçues) et les rangs publics de tous.
+  ligue: () => App.rpc("ma_ligue"),
+  rangsLigue: () => q(client().from("ligue").select("player_id,points,combats,victoires,defaites,def_victoires,def_defaites,serie").limit(5000)),
   preferences: (pid) => q(client().from("preferences").select("*").eq("player_id", pid).maybeSingle()),
   grants: (pid) => q(client().from("grants").select("id,type,stat,quantite,source,cree_le").eq("player_id", pid).order("cree_le", { ascending: false }).limit(40)),
   duels: () => q(client().from("duels").select("id,joue_le,type,attaquant_login,defenseur_login,vainqueur_login,egalite,tranche,power_attaquant,power_defenseur,nb_rounds,replay,echo_de").order("joue_le", { ascending: false }).limit(1000)),
@@ -202,6 +213,19 @@ async function fonctionDuel(corps) {
   return json;
 }
 App.lancerDuel = ({ adversaire, mode = "classe", echo = false }) => fonctionDuel(mode === "auto" ? { mode } : { adversaire, mode, echo: !!echo });
+// Combat de ligue contre l'un des trois adversaires proposés (0, 1 ou 2).
+App.lancerLigue = (cible) => fonctionDuel({ action: "ligue", cible });
+// Rang de ligue : 6 paliers de 3 divisions (100 points chacune), puis Maître à 1 800 points.
+const PALIERS_LIGUE = [["fer", "Fer"], ["bronze", "Bronze"], ["argent", "Argent"], ["or", "Or"], ["platine", "Platine"], ["diamant", "Diamant"]], DIVISIONS_LIGUE = ["III", "II", "I"];
+App.rangLigue = (points) => {
+  const p = Math.max(0, Math.floor(Number(points) || 0));
+  if (p >= 1800) return { cle: "maitre", palier: "Maître", division: "", nom: "Maître", dansDivision: p - 1800, progression: 100, suivant: null, protege: false };
+  const d = Math.floor(p / 100), nomDe = (x) => PALIERS_LIGUE[Math.floor(x / 3)][1] + " " + DIVISIONS_LIGUE[x % 3];
+  return { cle: PALIERS_LIGUE[Math.floor(d / 3)][0], palier: PALIERS_LIGUE[Math.floor(d / 3)][1], division: DIVISIONS_LIGUE[d % 3], nom: nomDe(d),
+    dansDivision: p % 100, progression: p % 100, suivant: d === 17 ? "Maître" : nomDe(d + 1), protege: p < 1200 };
+};
+// Durée courte et lisible : « 2 h 10 », « 12 min », « moins d'une minute ».
+App.dureeCourte = (ms) => { const m = Math.ceil(ms / 60000); return m < 1 ? "moins d'une minute" : m < 60 ? m + " min" : Math.floor(m / 60) + " h" + (m % 60 ? " " + String(m % 60).padStart(2, "0") : ""); };
 // Les puissances sont stockées en base ; le serveur recalcule celles dont le build a changé.
 App.rafraichirPuissances = () => fonctionDuel({ action: "puissances" });
 // Échos que le serveur sait ramener à ton niveau : [{ login, equipement: { arme: { numero, niveau } | null, … } }].
@@ -803,19 +827,42 @@ function avatar(j, taille = 40) {
 App.avatar = avatar;
 
 function ressources(j) {
-  const r = (href, ic, val, lib, aFaire) => el("a", { class: "ressource" + (aFaire ? " a-faire" : ""), href, title: lib, "aria-label": fmt(val) + " " + lib }, icone(ic), el("div", { "aria-hidden": "true" }, el("b", { texte: fmt(val) }), el("span", { texte: lib })));
+  // Gains passifs : heure du prochain +1 (lootbox, ticket). Rien à afficher quand la réserve est pleine.
+  const pas = j.passif || {};
+  // Réserve entamée depuis la dernière lecture (lootbox ouverte, ticket dépensé) : le compte à rebours repart d'ici, comme sur le serveur.
+  for (const [k, c] of [["lootbox", "lootbox_prochaine"], ["tickets", "ticket_prochain"]])
+    if (pas.plafond && j[k] < pas.plafond && !pas[c]) pas[c] = new Date(Date.now() + pas.intervalle_s * 1000).toISOString();
+  const r = (href, ic, val, lib, aFaire, prochain) => el("a", { class: "ressource" + (aFaire ? " a-faire" : ""), href, title: lib, "aria-label": fmt(val) + " " + lib }, icone(ic),
+    el("div", { "aria-hidden": "true" }, el("b", { texte: fmt(val) }), el("span", { texte: lib }), prochain ? el("small", { class: "prochain", "data-prochain": prochain }) : null));
   return [
-    r("lootbox.html", "i-coffre-ligne", j.lootbox, "Lootbox", j.lootbox > 0),
+    r("lootbox.html", "i-coffre-ligne", j.lootbox, "Lootbox", j.lootbox > 0, pas.lootbox_prochaine),
     r("lootbox.html?type=legendaire", "i-etoile", j.lootbox_legendaire || 0, "Légendaires", (j.lootbox_legendaire || 0) > 0),
     r("boutique.html", "i-medaille", j.medailles, "Médailles"),
-    r("duels.html", "i-ticket", j.tickets, "Tickets de duel"),
+    r("duels.html", "i-ticket", j.tickets, "Tickets de duel", false, pas.ticket_prochain),
   ];
 }
+// Comptes à rebours (« +1 dans 2 h 10 ») : tout élément [data-prochain] porte l'heure du prochain gain.
+// À l'échéance, on recharge le joueur (le serveur crédite à la lecture) puis la page est prévenue.
+let rechargePassif = 0;
+App.majProchains = () => {
+  let echu = false;
+  $$("[data-prochain]").forEach((z) => {
+    const reste = new Date(z.dataset.prochain).getTime() - Date.now();
+    if (!(reste > 0)) echu = true;
+    z.textContent = reste > 0 ? "+1 dans " + App.dureeCourte(reste) : "+1 disponible";
+  });
+  if (echu && Date.now() - rechargePassif > 20000 && App.ctx && App.ctx.joueur && !App.DEMO) {
+    rechargePassif = Date.now();
+    App.rafraichirJoueur().then(() => document.dispatchEvent(new CustomEvent("rpg:passif"))).catch(() => {});
+  }
+};
+setInterval(() => App.majProchains(), 30000);
 App.majRessources = () => {
   const j = App.ctx.joueur;
   $$("[data-ressources]").forEach((z) => z.replaceChildren(...ressources(j)));
   const b = $("[data-pastille-lootbox]");
   if (b) { const n = (j.lootbox || 0) + (j.lootbox_legendaire || 0); b.textContent = n; b.hidden = n === 0; }
+  App.majProchains();
 };
 App.rafraichirJoueur = async () => {
   const j = await App.api.moi();
@@ -915,14 +962,22 @@ async function chargerNotifs(cloche) {
       p.notif_annonces !== false && App.api.patchnotesRecents ? App.api.patchnotesRecents().catch(() => []) : []]);
     const titres = new Map(catalogue.map((s) => [s.code, s]));
     notifs = [];
-    if (p.notif_lootbox !== false) dons.forEach((d) => notifs.push({ quand: d.cree_le, icone: d.type === "stat" ? "i-profil" : d.type === "lootbox_legendaire" ? "i-etoile" : "i-coffre-ligne",
-      texte: d.type === "stat" ? `+${d.quantite} en ${STATS[d.stat] || d.stat}, gagné en live` : `${d.quantite} lootbox${d.type === "lootbox_legendaire" ? " légendaire" : ""}${d.quantite > 1 ? "s" : ""} reçue${d.quantite > 1 ? "s" : ""} depuis le live`, lien: d.type === "stat" ? "profil.html" : "lootbox.html" + (d.type === "lootbox_legendaire" ? "?type=legendaire" : "") }));
+    if (p.notif_lootbox !== false) dons.forEach((d) => {
+      const n = d.quantite, pl = n > 1 ? "s" : "";
+      if (d.type === "stat") notifs.push({ quand: d.cree_le, icone: "i-profil", texte: `+${n} en ${STATS[d.stat] || d.stat}, gagné en live`, lien: "profil.html" });
+      else if (d.type === "ticket") notifs.push({ quand: d.cree_le, icone: "i-ticket", texte: `${n} ticket${pl} de duel reçu${pl} depuis le live`, lien: "duels.html" });
+      else notifs.push({ quand: d.cree_le, icone: d.type === "lootbox_legendaire" ? "i-etoile" : "i-coffre-ligne",
+        texte: `${n} lootbox${d.type === "lootbox_legendaire" ? " légendaire" : ""}${pl} reçue${pl} depuis le live`, lien: "lootbox.html" + (d.type === "lootbox_legendaire" ? "?type=legendaire" : "") });
+    });
     if (p.notif_succes !== false) succes.forEach((s) => { const t = titres.get(s.code); if (t) notifs.push({ quand: s.debloque_le, icone: "i-trophee", texte: "Succès débloqué : " + t.titre, lien: "succes.html" }); });
     const moi = App.ctx.joueur.twitch_login;
     duels.filter((d) => d.attaquant_login === moi || d.defenseur_login === moi).slice(0, 10).forEach((d) => {
       const autre = App.nomCombattant(d.attaquant_login === moi ? d.defenseur_login : d.attaquant_login);
       const res = d.egalite ? "Égalité" : d.vainqueur_login === moi ? "Victoire" : "Défaite";
-      notifs.push({ quand: d.joue_le, icone: "i-epees", texte: `${res} en duel contre ${autre}`, lien: "combat.html?duel=" + encodeURIComponent(d.id) });
+      const ligue = d.type === "ligue";
+      notifs.push({ quand: d.joue_le, icone: ligue ? "i-ligue" : "i-epees", lien: "combat.html?duel=" + encodeURIComponent(d.id),
+        texte: ligue ? (d.attaquant_login === moi ? `${res} en ligue contre ${autre}` : d.egalite ? `Égalité en défense contre ${autre}` : d.vainqueur_login === moi ? `Ta défense a tenu face à ${autre}` : `${autre} a percé ta défense`)
+          : `${res} en duel contre ${autre}` });
     });
     patchs.forEach((x) => notifs.push({ quand: x.publie_le, icone: "i-journal", texte: `Patchnote ${x.version} : ${x.titre}`, lien: "patchnotes.html#patch-" + x.id }));
     notifs.sort((a, b) => new Date(b.quand) - new Date(a.quand));
