@@ -245,3 +245,9 @@ code { font-family: var(--texte); font-weight: 700; font-size: .95em; padding: 1
 .hors-classement .pilule { --c: var(--epique); }
 
 @media (max-width: 400px) { .adversaire .actions > * { font-size: 12.5px; } }
+
+/* Défis : prime et revanche dans la liste des adversaires */
+.adversaire .ident .pilule { justify-self: start; margin-top: 4px; font-size: 12px; }
+.adversaire .ident .pilule.prime { --c: var(--legendaire); }
+.adversaire .ident .pilule.prime svg { width: 13px; height: 13px; }
+.adversaire .ident .pilule.revanche { --c: var(--normal); }

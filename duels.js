@@ -4,8 +4,8 @@ const { $, el, icone, fmt, ilYa, date } = App;
 
 const TYPES = { duel: "Duel ciblé", auto_battle: "Combat automatique", entrainement: "Entraînement", ligue: "Ligue" };
 const TRANCHES = { dans_tranche: "Combat équitable", au_dessus: "Cible plus forte", en_dessous: "Cible plus faible" };
-// Estimation qualitative (décision projet : jamais de % exact). Seuils sur le ratio ma puissance / la sienne.
-const ESTIMATIONS = [[1.5, 5, "Largement favori"], [1.15, 4, "Favori"], [0.87, 3, "Serré"], [0.67, 2, "Outsider"], [0, 1, "Très risqué"]];
+// Estimation qualitative (décision projet : jamais de % exact). Le niveau vient du serveur, qui simule le duel avec les deux builds.
+const NIVEAUX = { 5: "Largement favori", 4: "Favori", 3: "Serré", 2: "Outsider", 1: "Très risqué" };
 const SEUIL_SAIGNEMENT = 20;
 const PAR_PAGE = 20;
 const MIN_TRANCHE_SANS_ECHO = 5;      // comme la fonction duel : en dessous, des échos sont proposés
@@ -22,7 +22,6 @@ function picto(nom) {
   return s;
 }
 const sansAccent = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-const estimation = (moi, lui) => (moi > 0 && lui > 0 ? ESTIMATIONS.find(([s]) => moi / lui >= s) : null);
 const bilan = (v, d, e) => `${fmt(v)} V · ${fmt(d)} D` + (e ? ` · ${fmt(e)} É` : "");
 const params = new URLSearchParams(location.search);
 
@@ -54,7 +53,7 @@ App.demarrer("duels", async (main, ctx) => {
     return g;
   };
   const fait = (ic, contenu, cls) => el("li", { class: cls || null }, icone(ic), el("span", {}, contenu));
-  const tuilePuissance = chiffre("…", ["Ta puissance", lienAide("puissance", "la puissance")], "Définit ta tranche de combat");
+  const tuilePuissance = chiffre("…", ["Ta puissance", lienAide("puissance", "la puissance")], "Sert à trier tes adversaires");
   const ligneEntrainement = el("span");
   function majEntrainement() {
     const n = statut.entrainements_restants;
@@ -98,10 +97,10 @@ App.demarrer("duels", async (main, ctx) => {
         el("article", { class: "mode-combat cible" },
           el("span", { class: "pilule", texte: "Récompenses complètes" }),
           el("h3", { texte: "Duel ciblé" }),
-          el("p", { texte: "Tu choisis ta cible dans la liste. Plus elle est forte, plus la victoire rapporte." }),
+          el("p", { texte: "Tu choisis ta cible dans la liste. Moins tu as de chances de gagner, plus la victoire rapporte." }),
           el("ul", { class: "faits" },
             fait("i-ticket", "1 ticket de duel"),
-            fait("i-medaille", ["Par victoire : 12 médailles dans ta tranche, 20 contre plus fort, 3 contre plus ", el("span", { class: "insecable" }, "faible.", lienAide("duels", "les récompenses des duels"))])),
+            fait("i-medaille", ["Par victoire : 12 médailles en combat équitable, 20 si tu es l'outsider, 3 si tu es nettement ", el("span", { class: "insecable" }, "favori.", lienAide("duels", "les récompenses des duels"))])),
           el("a", { class: "btn-second vers-bas", href: "#adversaires" }, "Choisir un adversaire", icone("i-fleche")))),
       el("p", { class: "mention ligne-entrainement" }, ligneEntrainement, lienAide("entrainement", "l'entraînement"))));
 
@@ -115,7 +114,7 @@ App.demarrer("duels", async (main, ctx) => {
   const zoneDevoiler = el("div", { class: "devoiler", tabindex: "-1" });
   main.append(el("section", { class: "section-page", id: "adversaires", tabindex: "-1" },
     el("h2", { texte: "Adversaires" }),
-    el("p", { class: "sous" }, "Ta tranche regroupe les joueurs à 30 % de ta puissance, en plus ou en moins : contre eux, le combat est dit équitable.", lienAide("tranches", "les tranches de puissance")),
+    el("p", { class: "sous" }, "Ta tranche regroupe les joueurs à 30 % de ta puissance : c'est un tri. La catégorie du duel (valeureux, équitable, déshonorable) est fixée par le serveur d'après tes chances de gagner, et s'affiche avant de lancer le combat.", lienAide("categories", "les catégories de combat")),
     el("div", { class: "barre-filtres" }, ongletsAdv,
       el("label", { class: "champ recherche" }, icone("i-recherche"), el("input", { type: "search", placeholder: "Chercher un joueur", "aria-label": "Chercher un joueur",
         oninput: (e) => { adv.q = sansAccent(e.target.value); adv.vus = PAR_PAGE; rendreAdversaires(); } })),
@@ -128,8 +127,8 @@ App.demarrer("duels", async (main, ctx) => {
   // Estimations : verrouillées. Un abonné en dévoile une à la fois (un adversaire), 3 par jour ;
   // celles déjà dévoilées restent visibles sur cet appareil jusqu'à la fin de la journée.
   const CLE_DEVOILE = "duels-estimations", aujourdhui = new Date().toDateString();
-  const devoiles = new Set();
-  try { const c = JSON.parse(localStorage.getItem(CLE_DEVOILE) || "null"); if (c && c.jour === aujourdhui) c.logins.forEach((l) => devoiles.add(l)); } catch (e) { /* navigation privée */ }
+  const devoiles = new Map();   // login -> niveau d'estimation (1 à 5), calculé par le serveur
+  try { const c = JSON.parse(localStorage.getItem(CLE_DEVOILE) || "null"); if (c && c.jour === aujourdhui && c.niveaux) Object.entries(c.niveaux).forEach(([l, n]) => devoiles.set(l, n)); } catch (e) { /* navigation privée */ }
   const blocage = () => (!abonne ? "Dévoiler une estimation est réservé aux abonnés de la chaîne."
     : statut.devoilements_restants < 1 ? "Tu as déjà dévoilé 3 estimations aujourd'hui : reviens demain." : null);
   function rendreDevoiler() {
@@ -145,10 +144,10 @@ App.demarrer("duels", async (main, ctx) => {
     if (bloque) { App.toast(bloque, { titre: abonne ? "Limite du jour atteinte" : "Réservé aux abonnés", icone: "i-cadenas" }); return; }
     b.disabled = true;
     try {
-      const r = await App.rpc("devoiler_estimations");
+      const r = await App.estimerDuel(login, true);   // le serveur simule le duel et compte le dévoilement
       if (r && r.devoilements_restants != null) statut.devoilements_restants = r.devoilements_restants;
-      devoiles.add(login);
-      try { localStorage.setItem(CLE_DEVOILE, JSON.stringify({ jour: aujourdhui, logins: [...devoiles] })); } catch (e) { /* navigation privée */ }
+      devoiles.set(login, r.niveau);
+      try { localStorage.setItem(CLE_DEVOILE, JSON.stringify({ jour: aujourdhui, niveaux: Object.fromEntries(devoiles) })); } catch (e) { /* navigation privée */ }
       rendreDevoiler(); rendreAdversaires();
       const ligne = zoneAdv.querySelector(`[data-login="${login}"] .estimation`);
       if (ligne) ligne.focus({ preventScroll: true });
@@ -180,10 +179,11 @@ App.demarrer("duels", async (main, ctx) => {
 
   // ------------------------------------------------------------------ Données
   // Les puissances sont lues en base (players.puissance) : plus aucun build recalculé ici.
-  let joueurs;
+  let joueurs, rangs = new Map(), revanches = new Map();   // primes (série de ligue) et revanches gratuites
   try {
-    const [js, lignes, st] = await Promise.all([App.api.joueurs(), App.api.duels(), App.rpc("mon_statut_duel").catch((e) => { console.warn(e); return null; })]);
+    const [js, lignes, st, rl] = await Promise.all([App.api.joueurs(), App.api.duels(), App.rpc("mon_statut_duel").catch((e) => { console.warn(e); return null; }), App.api.rangsLigue().catch(() => [])]);
     joueurs = js; duels = lignes;
+    rangs = new Map(rl.map((r) => [r.player_id, r])); revanches = App.revanches(duels, login);
     if (st) { statut = { ...statut, ...st }; majEntrainement(); rendreDevoiler(); }
   } catch (e) {
     App.erreur(e);
@@ -276,7 +276,8 @@ App.demarrer("duels", async (main, ctx) => {
     const cle = echo ? "echo:" + j.twitch_login : j.twitch_login;
     const nomJ = j.display_name || j.twitch_login;
     const s = h2h.get(cle), n = s ? s.n : 0;
-    const est = echo ? null : estimation(maPuissance, puissance);
+    const niv = echo ? null : devoiles.get(j.twitch_login), est = niv ? [0, niv, NIVEAUX[niv]] : null;
+    const prime = echo || horsClassement ? 0 : App.primeDe(rangs.get(j.id)), revanche = !echo && revanches.has(j.twitch_login);
     const pct = !echo && puissance && maPuissance ? Math.round((puissance / maPuissance - 1) * 100) : null;
     const restants = statut.entrainements_restants;
     const lienProfil = el("a", { href: "profil.html?joueur=" + encodeURIComponent(j.twitch_login), texte: nomJ });
@@ -285,7 +286,9 @@ App.demarrer("duels", async (main, ctx) => {
       el("div", { class: "ident" },
         echo ? el("b", {}, "Écho de ", lienProfil) : lienProfil,
         echo ? el("span", { class: "mention", texte: "Ramené à ton niveau" })
-          : App.horsClassement(j) ? el("span", { class: "mention", texte: "Hors classement" }) : el("span", { class: "mention num", texte: bilan(j.victoires || 0, j.defaites || 0, j.egalites || 0) })),
+          : App.horsClassement(j) ? el("span", { class: "mention", texte: "Hors classement" }) : el("span", { class: "mention num", texte: bilan(j.victoires || 0, j.defaites || 0, j.egalites || 0) }),
+        prime ? el("span", { class: "pilule prime", title: "En série de victoires en ligue : le battre en duel rapporte une prime (sauf si tu es nettement favori)" }, icone("i-medaille"), "Prime +" + fmt(prime)) : null,
+        revanche ? el("span", { class: "pilule revanche", title: "Il t'a battu en duel : ta revanche est gratuite pendant 24 h", texte: "Revanche gratuite" }) : null),
       el("div", { class: "puissance" }, echo ? el("span", { class: "ajustee", title: "Sa puissance est ajustée à la tienne", texte: "Ajustée" }) : el("b", { class: "num", texte: puissance ? fmt(puissance) : "—" }),
         echo ? null : el("span", { class: "num", texte: pct == null ? "puissance" : pct === 0 ? "comme toi" : Math.abs(pct) + " % de " + (pct > 0 ? "plus" : "moins") })),
       echo ? el("div", { class: "estimation cale", title: "Pas d'estimation : l'écho est ramené à ton niveau" })
@@ -306,8 +309,9 @@ App.demarrer("duels", async (main, ctx) => {
             ? el("button", { type: "button", class: "btn-second petit b-entr", "aria-disabled": "true", title: "3 entraînements par jour",
               onclick: () => App.toast("Tu as fait tes 3 entraînements du jour : reviens demain.", { titre: "Limite du jour atteinte" }) }, "Entraînement")
             : el("a", { class: "btn-second petit b-entr", href: versCombat(j.twitch_login, "entrainement", echo), title: `Gratuit, sans récompense · ${restants} sur ${ENTRAINEMENTS_PAR_JOUR} restant${restants > 1 ? "s" : ""} aujourd'hui` }, "Entraînement"),
-        tickets > 0
-          ? el("a", { class: "btn-principal btn-defier", href: versCombat(j.twitch_login, "classe", echo), title: "Coûte 1 ticket de duel", "aria-label": "Défier " + (echo ? "l'écho de " : "") + nomJ + " en duel ciblé (1 ticket)" }, icone("i-epees"), "Défier")
+        tickets > 0 || revanche
+          ? el("a", { class: "btn-principal btn-defier", href: versCombat(j.twitch_login, "classe", echo), title: revanche ? "Revanche gratuite" : "Coûte 1 ticket de duel",
+            "aria-label": "Défier " + (echo ? "l'écho de " : "") + nomJ + " en duel ciblé (" + (revanche ? "revanche gratuite" : "1 ticket") + ")" }, icone("i-epees"), revanche ? "Revanche" : "Défier")
           : el("button", { type: "button", class: "btn-principal btn-defier", "aria-disabled": "true", title: "Plus de ticket de duel : 5 par jour, et plus en live",
             onclick: () => App.toast("Plus de ticket de duel : tu en regagnes 5 par jour, et le live t'en donne tout de suite avec tes points de chaîne.", { titre: "Pas de ticket" }) }, icone("i-epees"), "Défier")));
   }

@@ -270,6 +270,16 @@ async function ecranVersus(main, ctx, login, modeInitial, echo) {
   let mode = modeInitial === "entrainement" && abonne ? "entrainement" : "classe";
 
   const cout = el("p", { class: "vs-cout", "aria-live": "polite" });
+  // Catégorie du duel ciblé : le serveur estime ta chance de victoire avec vos deux builds (plus de tranche de puissance).
+  const categorie = el("p", { class: "vs-cout vs-categorie", "aria-live": "polite", hidden: true });
+  let estime = null, revanche = false, prime = 0;
+  if (!echo) {
+    Promise.all([App.estimerDuel(login), App.api.rangsLigue().catch(() => [])]).then(([e, rangs]) => {
+      estime = e; revanche = !!e.revanche;
+      prime = e.tranche === "en_dessous" || App.horsClassement(moi) ? 0 : App.primeDe(rangs.find((r) => r.player_id === adv.id));
+      choisir(mode);
+    }).catch((e) => console.warn(e));
+  }
   const lancer = el("button", { type: "button", class: "btn-principal vs-lancer" }, icone("i-epees"), el("span", { texte: "Lancer le duel" }));
   const raison = el("p", { class: "vs-raison" });
   const modes = el("div", { class: "onglets-b vs-modes", role: "group", "aria-label": "Type de duel" },
@@ -282,11 +292,16 @@ async function ecranVersus(main, ctx, login, modeInitial, echo) {
     modes.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === m)));
     const tickets = ctx.joueur.tickets || 0;
     history.replaceState(null, "", `combat.html?adversaire=${encodeURIComponent(login)}&mode=${m}${echo ? "&echo=1" : ""}`);
+    const c = m === "classe" && estime ? App.CATEGORIES_DUEL[estime.tranche] : null;
+    categorie.hidden = !c;
+    if (c) categorie.replaceChildren(icone("i-medaille"), el("span", {}, el("b", { texte: c[0] }), ` : ${c[1]}. Victoire : `, el("b", { texte: `+${c[2]} médailles` }), `, défaite : +${c[3]}.`,
+      prime ? el("b", { class: "vs-prime", texte: ` Prime : +${fmt(prime)} médailles si tu gagnes.` }) : null));
     if (m === "classe") {
-      cout.replaceChildren(icone("i-ticket"), el("span", {}, "Coûte ", el("b", { texte: "1 ticket de duel" }), ` · il t'en reste ${fmt(tickets)}. Médailles et bilan en jeu, comme en live.`));
-      const bloque = tickets < 1;
+      if (revanche) cout.replaceChildren(icone("i-coche"), el("span", {}, el("b", { texte: "Revanche gratuite" }), " : ce duel ne coûte pas de ticket. Médailles et bilan en jeu."));
+      else cout.replaceChildren(icone("i-ticket"), el("span", {}, "Coûte ", el("b", { texte: "1 ticket de duel" }), ` · il t'en reste ${fmt(tickets)}. Médailles et bilan en jeu, comme en live.`));
+      const bloque = tickets < 1 && !revanche;
       lancer.disabled = bloque;
-      raison.textContent = bloque ? "Plus de ticket de duel — gagne-en en live." : "";
+      raison.textContent = bloque ? "Plus de ticket de duel : tu en regagnes 5 par jour, et le live t'en donne tout de suite." : "";
     } else {
       cout.replaceChildren(icone("i-coche"), el("span", {}, el("b", { texte: "Gratuit" }), " pour les abonnés, 3 par jour · aucune récompense, ton bilan ne bouge pas."));
       lancer.disabled = false; raison.textContent = "";
@@ -317,10 +332,10 @@ async function ecranVersus(main, ctx, login, modeInitial, echo) {
   main.replaceChildren(el("section", { class: "versus", "aria-labelledby": "titre-versus" },
     el("header", { class: "vs-entete" }, el("span", { class: "vs-sur", texte: "Face-à-face" }), el("h1", { id: "titre-versus", texte: "Toi contre " + (echo ? "l'écho de " : "") + (adv.display_name || adv.twitch_login) })),
     el("div", { class: "vs-duo" }, carteVersus(moi, ctx.loadout, App.niveaux(), pMoi, true), el("div", { class: "vs-eclair", "aria-hidden": "true" }, el("span", { texte: "VS" })), carteVersus(adv, lo, nivAdv, pAdv, false, echo)),
-    el("div", { class: "vs-bas" }, modes, cout, lancer, raison,
+    el("div", { class: "vs-bas" }, modes, cout, categorie, lancer, raison,
       el("p", { class: "mention vs-note" }, echo
         ? ["Tu affrontes un ", el("a", { class: "lien", href: "aide.html#echo", texte: "écho" }), " : le build de " + (adv.display_name || login) + ", dont les stats et l'équipement sont ramenés à ton niveau par le serveur pour un combat serré. Lui ne gagne ni ne perd rien, et tu touches les récompenses d'un combat équitable."]
-        : "Le combat est calculé par le serveur avec vos deux builds actuels. " + (adv.display_name || login) + " n'a pas besoin d'être connecté : il verra le résultat dans ses notifications."),
+        : "Le combat est calculé par le serveur avec vos deux builds actuels. " + (adv.display_name || login) + " n'a pas besoin d'être connecté : il verra le résultat dans ses notifications, et pourra prendre sa revanche gratuitement s'il perd."),
       el("a", { class: "lien-retour", href: "duels.html" }, picto("retour"), "Retour aux duels"))));
   choisir(mode);
 }
@@ -1401,6 +1416,8 @@ function arene(main, ctx, opts) {
         if (res.premiere_victoire) recompenses.push(el("p", { class: "mention", texte: "Première victoire de ligue du jour : médailles en plus." }));
         if (monCote === "defenseur") recompenses.push(el("p", { class: "mention", texte: "C'est ta défense qui s'est battue : tes points de ligue ne bougent pas." }));
       }
+      if (res.prime) recompenses.push(el("p", { class: "mention", texte: `Dont ${fmt(res.prime)} médailles de prime : ton adversaire était en série de victoires en ligue.` }));
+      if (res.revanche) recompenses.push(el("p", { class: "mention", texte: "Duel de revanche : aucun ticket dépensé." }));
       if (opts.mode === "auto" && participant) recompenses.push(el("p", { class: "mention", texte: "Combat automatique : récompenses réduites de 50 %. Choisis ta cible pour les toucher en entier." }));
     }
     const ligne = (lib, k) => el("tr", {}, el("th", { scope: "row", texte: lib }), el("td", { class: "num", texte: fmt(R[k + "_" + G.c] || 0) }), el("td", { class: "num", texte: fmt(R[k + "_" + D.c] || 0) }));
@@ -1411,8 +1428,12 @@ function arene(main, ctx, opts) {
     const auto = opts.mode === "auto" && R.attaquant === moi;
     const suite = estLigue ? (R.attaquant === moi && opts.resultat ? ["ligue.html#adversaires", "Combat suivant"] : null)
       : auto ? ["combat.html?mode=auto", "Nouveau combat auto"]
-      : adverse ? [`combat.html?adversaire=${encodeURIComponent(App.echoDe(adverse) || adverse)}&mode=classe${App.echoDe(adverse) ? "&echo=1" : ""}`, "Revanche"] : null;
-    if (suite) actions.push(estLigue || tickets > 0
+      : adverse ? [`combat.html?adversaire=${encodeURIComponent(App.echoDe(adverse) || adverse)}&mode=classe${App.echoDe(adverse) ? "&echo=1" : ""}`, "Rejouer ce duel"] : null;
+    // Battu en duel ciblé par un autre joueur, il y a moins de 24 h : la revanche est gratuite (le serveur le revérifie).
+    const revancheGratuite = !estLigue && monCote === "defenseur" && (R.type === "duel" || R.mode === "classe") && !R.revanche && !R.egalite && R.vainqueur === R.attaquant
+      && Date.now() - new Date(R.date).getTime() < 24 * 3600e3;
+    if (revancheGratuite) suite[1] = "Revanche gratuite";
+    if (suite) actions.push(estLigue || tickets > 0 || revancheGratuite
       ? el("a", { class: "btn-principal", href: suite[0] }, icone("i-epees"), suite[1])
       : el("button", { type: "button", class: "btn-principal", disabled: true, title: "Plus de ticket de duel — gagne-en en live" }, icone("i-epees"), suite[1]));
     if (opts.bac) actions.push(el("a", { class: "btn-principal", href: "recette.html?relancer=1" }, icone("i-epees"), "Relancer"));

@@ -516,3 +516,6 @@
 }
 .effets-reduits .au, .effets-reduits .au i, .effets-reduits .au b, .effets-reduits .au polyline, .effets-reduits .socle .visage { animation: none !important; }
 .effets-reduits .au-elec polyline { opacity: .8; }
+
+/* Défis : prime annoncée avant le duel */
+.vs-cout .vs-prime { color: var(--legendaire); }

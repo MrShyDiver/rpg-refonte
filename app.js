@@ -160,7 +160,7 @@ App.api = {
   ligue: () => App.rpc("ma_ligue"),
   // Quêtes du jour et de la semaine, avec ma progression et le nombre de récompenses à prendre.
   quetes: () => App.rpc("mes_quetes"),
-  rangsLigue: () => q(client().from("ligue").select("player_id,points,combats,victoires,defaites,def_victoires,def_defaites,serie").limit(5000)),
+  rangsLigue: () => q(client().from("ligue").select("player_id,points,combats,victoires,defaites,def_victoires,def_defaites,serie,prime_le").limit(5000)),
   preferences: (pid) => q(client().from("preferences").select("*").eq("player_id", pid).maybeSingle()),
   grants: (pid) => q(client().from("grants").select("id,type,stat,quantite,source,cree_le").eq("player_id", pid).order("cree_le", { ascending: false }).limit(40)),
   duels: () => q(client().from("duels").select("id,joue_le,type,attaquant_login,defenseur_login,vainqueur_login,egalite,tranche,power_attaquant,power_defenseur,nb_rounds,replay,echo_de").order("joue_le", { ascending: false }).limit(1000)),
@@ -219,6 +219,33 @@ async function fonctionDuel(corps) {
 App.lancerDuel = ({ adversaire, mode = "classe", echo = false }) => fonctionDuel(mode === "auto" ? { mode } : { adversaire, mode, echo: !!echo });
 // Combat de ligue contre l'un des trois adversaires proposés (0, 1 ou 2).
 App.lancerLigue = (cible) => fonctionDuel({ action: "ligue", cible });
+// Duel ciblé : catégorie décidée par le serveur (chance de victoire estimée) et revanche gratuite éventuelle.
+// Avec devoiler, un abonné dépense un dévoilement et reçoit aussi l'estimation en 5 niveaux.
+App.estimerDuel = (adversaire, devoiler) => fonctionDuel({ action: "estimer", adversaire, devoiler: !!devoiler });
+// Récompenses de l'attaquant selon la catégorie (miroir de enregistrer_combat) : [titre, explication, victoire, défaite].
+App.CATEGORIES_DUEL = {
+  au_dessus: ["Combat valeureux", "ton adversaire est favori", 20, 2],
+  dans_tranche: ["Combat équitable", "le combat est ouvert", 12, 2],
+  en_dessous: ["Combat déshonorable", "tu es nettement favori", 3, 1],
+};
+// Prime portée par un joueur en série de victoires de ligue (miroir de enregistrer_combat : 3 victoires, 2 médailles par victoire, 20 au plus).
+// Une seule prime par cible et par jour (heure de Paris).
+App.primeDe = (rang) => {
+  if (!rang || (rang.serie || 0) < 3) return 0;
+  const jour = new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris" }).format(new Date());
+  return rang.prime_le === jour ? 0 : Math.min(20, 2 * rang.serie);
+};
+// Revanches gratuites : battu en duel ciblé depuis moins de 24 h, sans avoir encore répliqué. login adverse -> fin (ms).
+App.revanches = (duels, moi) => {
+  const m = new Map(), limite = Date.now() - 24 * 3600e3;
+  for (const d of duels) {
+    if (d.type !== "duel" || d.defenseur_login !== moi || d.egalite || d.vainqueur_login !== d.attaquant_login || (d.replay && d.replay.revanche)) continue;
+    const t = new Date(d.joue_le).getTime();
+    if (t < limite || m.has(d.attaquant_login)) continue;
+    if (!duels.some((r) => r.type === "duel" && r.attaquant_login === moi && r.defenseur_login === d.attaquant_login && new Date(r.joue_le).getTime() > t)) m.set(d.attaquant_login, t + 24 * 3600e3);
+  }
+  return m;
+};
 // Rang de ligue : 6 paliers de 3 divisions (100 points chacune), puis Maître à 1 800 points.
 const PALIERS_LIGUE = [["fer", "Fer"], ["bronze", "Bronze"], ["argent", "Argent"], ["or", "Or"], ["platine", "Platine"], ["diamant", "Diamant"]], DIVISIONS_LIGUE = ["III", "II", "I"];
 App.rangLigue = (points) => {
@@ -979,6 +1006,8 @@ async function chargerNotifs(cloche) {
     });
     if (p.notif_succes !== false) succes.forEach((s) => { const t = titres.get(s.code); if (t) notifs.push({ quand: s.debloque_le, icone: "i-trophee", texte: "Succès débloqué : " + t.titre, lien: "succes.html" }); });
     const moi = App.ctx.joueur.twitch_login;
+    App.revanches(duels, moi).forEach((fin, l) => notifs.push({ quand: new Date(fin - 24 * 3600e3 + 1000).toISOString(), icone: "i-epees", lien: "combat.html?adversaire=" + encodeURIComponent(l) + "&mode=classe",
+      texte: `Revanche gratuite contre ${App.nomCombattant(l)} : encore ${App.dureeCourte(fin - Date.now())}` }));
     duels.filter((d) => d.attaquant_login === moi || d.defenseur_login === moi).slice(0, 10).forEach((d) => {
       const autre = App.nomCombattant(d.attaquant_login === moi ? d.defenseur_login : d.attaquant_login);
       const res = d.egalite ? "Égalité" : d.vainqueur_login === moi ? "Victoire" : "Défaite";
