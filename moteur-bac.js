@@ -459,7 +459,7 @@ const REGLES_ESSAI = {
 const BUDGET = {
     BASE: 200,
     POINT: 10,
-    POINT_PV: 15,
+    POINT_PV: 20,
     DEUX_MAINS: 2,
     RARETE: {
         commun: [

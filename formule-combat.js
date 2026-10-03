@@ -508,11 +508,11 @@ function nivelerEquipement(equipementBrut) {
 // calculerPowerLevelSimule tant que la bascule n'est pas faite (voir moteur/CORRECTIFS.md).
 // =========================================================================
 const REGLES_ESSAI = { BASE_PV: 200.0 }; // PV de base (100 en ligne) ; toujours 10 PV par point
-// Puissance « budget » : additive et prévisible. 200 de base, 10 par point de stat (15 en PV),
+// Puissance « budget » : additive et prévisible. 200 de base, 10 par point de stat (20 en PV),
 // plus le budget de chaque objet : socle de sa rareté à +0, plafond au niveau max, linéaire entre les deux.
 // Tous les emplacements pèsent pareil ; une arme à deux mains compte double (elle prend deux emplacements).
 const BUDGET = {
-    BASE: 200, POINT: 10, POINT_PV: 15, DEUX_MAINS: 2,
+    BASE: 200, POINT: 10, POINT_PV: 20, DEUX_MAINS: 2,
     RARETE: { commun: [150, 600], normal: [200, 700], rare: [280, 800], epique: [380, 900], legendaire: [500, 1000] },
 };
 function budgetObjet(data, niveau) {

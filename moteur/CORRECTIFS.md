@@ -164,7 +164,7 @@ Frappe 500kg 45,8 → 48,5, Frappe Aérienne 39,4 → 41,1, Frappe de précision
 
 ### Règles à l'essai, atelier patchnote et éditeur d'objets (03/10) — moteur inchangé (1.3.0)
 
-Décisions de MrShyDiver : **200 PV de base** (10 PV par point inchangé), **puissance par budget** avec **15 par point de PV** (10 pour les autres stats),
+Décisions de MrShyDiver : **200 PV de base** (10 PV par point inchangé), **puissance par budget** avec **20 par point de PV** (10 pour les autres stats ; 15 jusqu'au 3 oct. après-midi, passé à 20),
 tous les emplacements × 1, arme à deux mains × 2. **Rien de tout cela n'est en ligne** : c'est rangé dans `formule-combat.js` sous `REGLES_ESSAI`, `BUDGET`,
 `budgetObjet` et `puissanceBudget`, et seul le Simulateur s'en sert (mode « à l'essai »). `moteur-bac.js` expose `MoteurDuel.CST` pour que le Simulateur
 applique `BASE_PV = 200` le temps d'une simulation, puis le remette.
