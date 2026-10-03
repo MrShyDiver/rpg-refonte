@@ -19,10 +19,11 @@
 .lg-titre-ligne .sous { color: var(--encre-2); font-size: 14.5px; max-width: 64ch; }
 .lg-titre-ligne .btn-second[aria-disabled="true"] { opacity: .6; cursor: not-allowed; }
 
-.lg-advs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.lg-adv { --c: var(--encre-2); display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 12px; padding: 18px; border-radius: 18px; background: var(--sol-2); border: 1px solid var(--trait); justify-items: start; min-width: 0; }
-.lg-adv.faible { --c: var(--normal); } .lg-adv.egal { --c: var(--rare); } .lg-adv.fort { --c: #ff7a59; } .lg-adv.echo { --c: var(--epique); }
-.lg-adv { border-top: 3px solid color-mix(in oklab, var(--c) 70%, transparent); }
+/* Adversaires proposés : une ligne par adversaire (identité, défense, enjeu, bouton), du plus fort au moins fort. */
+.lg-advs { list-style: none; display: grid; gap: 10px; }
+.lg-adv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px) minmax(170px, auto) auto; align-items: center; gap: 12px 22px; padding: 12px 18px; border-radius: 16px; background: var(--sol-2); border: 1px solid var(--trait); min-width: 0; }
+.lg-adv.echo { border-style: dashed; }
+.lg-adv .lg-adv-nom { font-size: 15.5px; }
 .lg-adv-ident { display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; }
 .lg-adv-ident > div { min-width: 0; display: grid; gap: 2px; }
 .lg-adv-nom { font-family: var(--titre); font-size: 17px; font-weight: 700; color: var(--encre); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -32,11 +33,11 @@ a.lg-adv-nom:hover { text-decoration: underline; }
 .lg-build { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-self: start; }
 .lg-build .case-vide { aspect-ratio: 5 / 7; border-radius: 12px; border: 1px dashed var(--trait-fort); display: grid; place-content: center; text-align: center; padding: 4px; font-size: 10.5px; color: var(--encre-3); }
 .lg-build .case-vide small { font-size: 10px; }
-.lg-adv-echo { color: var(--encre-2); font-size: 14px; align-self: start; }
-.lg-enjeu { width: 100%; }
+.lg-adv-echo { color: var(--encre-2); font-size: 13.5px; line-height: 1.45; }
+.lg-enjeu { min-width: 0; }
 .lg-enjeu .gain svg { color: var(--normal); transform: rotate(-90deg); } .lg-enjeu .perte svg { color: #ff7a59; transform: rotate(90deg); }
 .lg-enjeu .gain b { color: var(--normal); } .lg-enjeu .perte b { color: #ffab94; }
-.lg-adv > .btn-principal { width: 100%; justify-content: center; }
+.lg-adv > .btn-principal { justify-content: center; white-space: nowrap; }
 .lg-adv > .btn-principal[aria-disabled="true"] { background: var(--sol-3); color: var(--encre-2); box-shadow: none; border: 1px dashed var(--trait-fort); cursor: not-allowed; transform: none; filter: none; }
 
 .lg-def-etat { margin-bottom: 12px; }
@@ -53,8 +54,9 @@ a.lg-adv-nom:hover { text-decoration: underline; }
 .lg-clas-rang { display: flex; align-items: center; gap: 6px; color: var(--encre-2); font-size: 13.5px; white-space: nowrap; }
 
 @media (max-width: 900px) {
-  .lg-advs { grid-template-columns: 1fr; }
-  .lg-adv { grid-template-rows: none; }
+  .lg-adv { grid-template-columns: minmax(0, 1fr); padding: 12px; gap: 10px; }
+  .lg-adv .lg-enjeu { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .lg-adv > .lg-build, .lg-adv > .lg-adv-echo { order: 1; } .lg-adv > .btn-principal { order: 2; width: 100%; }
   .lg-build { max-width: 420px; }
 }
 @media (max-width: 560px) {

@@ -202,7 +202,7 @@ async function ecranLigue(main, ctx, cible) {
       }
     }
   } catch (e) { App.erreur(e); main.replaceChildren(vide("Le combat de ligue n'a pas pu se charger.", "Vérifie ta connexion puis recharge la page.")); return; }
-  if (!p || (p.type === "joueur" && !adv)) { main.replaceChildren(vide("Cet adversaire n'est plus proposé.", "Tes trois adversaires t'attendent sur la page de la ligue.")); return; }
+  if (!p || (p.type === "joueur" && !adv)) { main.replaceChildren(vide("Cet adversaire n'est plus proposé.", "Tes adversaires t'attendent sur la page de la ligue.")); return; }
 
   const pMoi = (App.puissance(moi, App.niveaux(), ctx.loadout) || {}).powerLevel || 0;
   const pAdv = adv ? (App.puissance(adv, nivAdv, lo) || {}).powerLevel || 0 : 0;

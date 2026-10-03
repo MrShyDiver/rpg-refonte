@@ -6,7 +6,7 @@
 //   { mode: "auto" }                                                         combat automatique
 //   { action: "puissances" }                                                 recalcule les puissances périmées
 //   { action: "echos" }                                                      échos que le serveur sait ramener à ton niveau
-//   { action: "ligue", cible: 0 | 1 | 2 }                                    combat de ligue contre l'un des trois adversaires proposés
+//   { action: "ligue", cible: 0, 1, 2… }                                     combat de ligue contre l'un des adversaires proposés (son rang dans la liste)
 //   { action: "estimer", adversaire: "<login>", devoiler?: true }            catégorie du duel ciblé (et estimation fine, pour un abonné qui la dévoile)
 //   { action: "tour", apercu?: true }                                        la Tour : affronter le gardien du prochain étage (ou seulement le voir)
 //   { action: "arene" }                                                      l'Arène en draft : jouer le combat suivant avec le build drafté
@@ -82,8 +82,8 @@ function lireCorps(corps: unknown): { action: "duel" | "puissances" | "echos" | 
   if (c.action === "arene") return { action: "arene", mode: "classe", adversaire: "", echo: false, cible: -1, devoiler: false };
   if (c.action === "puissances" || c.action === "echos") return { action: c.action, mode: "classe", adversaire: "", echo: false, cible: -1, devoiler: false };
   if (c.action === "ligue") {
-    if (c.cible !== 0 && c.cible !== 1 && c.cible !== 2) throw new ErreurJoueur(400, "Choisis l'un des trois adversaires proposés");
-    return { action: "ligue", mode: "classe", adversaire: "", echo: false, cible: c.cible, devoiler: false };
+    if (!Number.isInteger(c.cible) || (c.cible as number) < 0 || (c.cible as number) > 19) throw new ErreurJoueur(400, "Choisis l'un des adversaires proposés");
+    return { action: "ligue", mode: "classe", adversaire: "", echo: false, cible: c.cible as number, devoiler: false };
   }
   const estimer = c.action === "estimer";
   if (!estimer && c.mode !== "classe" && c.mode !== "entrainement" && c.mode !== "auto") {
@@ -287,7 +287,7 @@ async function listerEchos(admin: Client, moi: Joueur) {
 }
 
 // ---------------------------------------------------------------- ligue
-// Combat de ligue : l'adversaire est l'une des trois propositions gardées en base (jamais un choix libre).
+// Combat de ligue : l'adversaire est l'une des propositions gardées en base (jamais un choix libre).
 // Joueur réel : on affronte son build de DÉFENSE, et son classement bouge (cote cachée et points de ligue). Écho : personne n'est touché.
 async function combatLigue(admin: Client, moi: Joueur, cible: number): Promise<unknown> {
   const prep = verifier(await admin.rpc("ligue_preparer", { p_id: moi.id })) as { energie: number; propositions: Joueur[] };

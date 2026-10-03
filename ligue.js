@@ -1,10 +1,9 @@
-/* Stream RPG — page Ligue : rang, énergie, trois adversaires proposés, défense, classement.
+/* Stream RPG — page Ligue : rang, énergie, liste d'adversaires proposés (du plus fort au moins fort), défense, classement.
    Le classement caché (cote) n'arrive jamais ici : le serveur ne renvoie que le rang visible et les gains possibles. */
 "use strict";
 (function () {
 const { el, icone, fmt, ilYa } = App;
 
-const ETIQUETTES = { faible: ["Plus faible", "Victoire probable, petit gain"], egal: ["À ton niveau", "Combat ouvert"], fort: ["Plus fort", "Victoire difficile, gros gain"] };
 const COLS = [["arme", "Arme"], ["armure", "Armure"], ["offhand", "Main gauche"], ["strategeme", "Stratagème"]];
 const pluriel = (n, mot) => fmt(n) + " " + mot + (n > 1 ? "s" : "");
 const signe = (n) => (n > 0 ? "+" : n < 0 ? "−" : "") + fmt(Math.abs(n));
@@ -20,7 +19,7 @@ App.demarrer("ligue", async (main, ctx) => {
   main.append(
     el("header", { class: "entete-page" }, el("div", {},
       el("h1", { texte: "Ligue" }),
-      el("p", { texte: "Choisis l'un des trois adversaires proposés et monte de rang. Le jeu te propose des joueurs à ta mesure : pas besoin de chercher une cible." }))),
+      el("p", { texte: "Choisis ton adversaire dans la liste et monte de rang. Le jeu ne te propose que des joueurs à ta portée : pas besoin de chercher une cible." }))),
     ...(App.horsClassement(moi) ? [el("p", { class: "hors-classement" }, el("span", { class: "pilule", texte: "Compte hors classement" }),
       el("span", { texte: "Tu peux jouer en ligue pour tester, mais tes combats ne changent rien pour tes adversaires et tu n'es proposé à personne." }))] : []),
     zone);
@@ -72,22 +71,21 @@ App.demarrer("ligue", async (main, ctx) => {
   }
 
   // ------------------------------------------------------------------ Adversaires proposés
+  // Une ligne par adversaire, sans étiquette de difficulté : ce que tu gagnes et ce que tu risques suffit à juger.
   function carteAdversaire(p, i) {
     const j = p.type === "joueur" ? parLogin.get(p.login) : null;
-    const [titre, sousTitre] = p.type === "echo" ? ["Écho", "Un adversaire ramené à ton niveau"] : ETIQUETTES[p.rang];
     const sansEnergie = etat.energie < 1;
     const bouton = sansEnergie
       ? el("button", { type: "button", class: "btn-principal", "aria-disabled": "true",
         onclick: () => App.toast("Elle se recharge toute seule : " + (etat.energie_prochaine ? "prochaine dans " + App.dureeCourte(new Date(etat.energie_prochaine) - Date.now()) + "." : "reviens dans un moment."), { titre: "Plus d'énergie de ligue" }) }, icone("i-epees"), "Combattre")
       : el("a", { class: "btn-principal", href: "combat.html?mode=ligue&cible=" + i, "aria-label": `Combattre ${j ? j.display_name : "un écho"} (1 énergie de ligue)` }, icone("i-epees"), "Combattre");
     const rang = j ? App.rangLigue(p.points || 0) : null;
-    return el("article", { class: "lg-adv " + (p.type === "echo" ? "echo" : p.rang) },
-      el("span", { class: "pilule", texte: titre }),
+    return el("li", { class: "lg-adv" + (j ? "" : " echo") },
       el("div", { class: "lg-adv-ident" },
-        j ? App.avatar(j, 52) : el("span", { class: "avatar lg-inconnu", style: { width: "52px", height: "52px" }, "aria-hidden": "true", texte: "?" }),
+        j ? App.avatar(j, 48) : el("span", { class: "avatar lg-inconnu", style: { width: "48px", height: "48px" }, "aria-hidden": "true", texte: "?" }),
         el("div", {},
           j ? el("a", { class: "lg-adv-nom", href: "profil.html?joueur=" + encodeURIComponent(j.twitch_login), texte: j.display_name || j.twitch_login }) : el("b", { class: "lg-adv-nom", texte: "Écho mystère" }),
-          el("span", { class: "mention" }, rang ? [embleme(rang, 20), " ", rang.nom] : sousTitre))),
+          el("span", { class: "mention" }, rang ? [embleme(rang, 20), " ", rang.nom, " · ", fmt(p.points || 0), " pts"] : "Un adversaire ramené à ton niveau"))),
       j ? cartesBuild(j.id, buildDefense(j.id), (n) => niveaux.get(j.id + ":" + n))
         : el("p", { class: "lg-adv-echo" }, "Le build d'un autre joueur, ramené à ton niveau au moment du combat. Personne n'y perd rien. ", el("a", { class: "lien", href: "aide.html#echo", target: "_blank", rel: "noopener", texte: "Qu'est-ce qu'un écho ?" })),
       el("ul", { class: "faits lg-enjeu" },
@@ -103,13 +101,13 @@ App.demarrer("ligue", async (main, ctx) => {
         if (!etat.abonne) return App.toast("Changer d'adversaires une fois par jour est réservé aux abonnés Twitch de la chaîne.", { titre: "Réservé aux abonnés", icone: "i-cadenas" });
         if (!peutChanger) return App.toast("Tu as déjà changé d'adversaires aujourd'hui : reviens demain.", { titre: "Limite du jour atteinte" });
         const b = e.currentTarget; b.disabled = true;
-        try { etat = await App.rpc("ligue_rafraichir"); await charger(); rendre(); App.toast("Trois nouveaux adversaires t'attendent.", { titre: "Adversaires changés" }); document.getElementById("adversaires").focus(); }
+        try { etat = await App.rpc("ligue_rafraichir"); await charger(); rendre(); App.toast("De nouveaux adversaires t'attendent.", { titre: "Adversaires changés" }); document.getElementById("adversaires").focus(); }
         catch (err) { App.erreur(err); b.disabled = false; }
       } }, etat.abonne ? null : icone("i-cadenas"), "Changer d'adversaires");
     return el("section", { class: "section-page", id: "adversaires", tabindex: "-1", "aria-labelledby": "t-adv" },
       el("div", { class: "lg-titre-ligne" }, el("div", {}, el("h2", { id: "t-adv", texte: "Adversaires proposés" }),
-        el("p", { class: "sous" }, "Tu affrontes le build de défense de l'adversaire. Chaque combat coûte 1 énergie de ligue ; les adversaires changent après chaque combat.")), changer),
-      el("div", { class: "lg-advs" }, etat.propositions.map(carteAdversaire)));
+        el("p", { class: "sous" }, "Du plus fort au moins fort. Tu affrontes le build de défense de l'adversaire. Chaque combat coûte 1 énergie de ligue ; la liste change après chaque combat.")), changer),
+      el("ol", { class: "lg-advs" }, etat.propositions.map(carteAdversaire)));
   }
 
   // ------------------------------------------------------------------ Ma défense

@@ -51,8 +51,8 @@ App.demarrer("aide", async (main) => {
   const RANGS = ["Fer", "Bronze", "Argent", "Or", "Platine", "Diamant"];
   main.append(section("ligue", "La ligue", "Le mode classé : des adversaires de ton niveau, un rang à faire grimper, et une défense qui se bat pour toi quand tu n'es pas là.",
     el("div", { class: "aide-grille" },
-      el("div", {}, el("h3", { texte: "Trois adversaires" }),
-        el("p", {}, "La ligue te propose ", el("b", { texte: "trois adversaires" }), " : un plus faible, un de ton niveau, un plus fort. Tu vois leur défense, ce que tu gagnes en cas de victoire et ce que tu risques. Après chaque combat, trois nouveaux adversaires arrivent. Les abonnés de la chaîne peuvent les changer une fois par jour.")),
+      el("div", {}, el("h3", { texte: "Une liste d'adversaires" }),
+        el("p", {}, "La ligue te propose ", el("b", { texte: "une liste d'adversaires" }), ", rangés du plus fort au moins fort. Pour chacun, tu vois sa défense, ce que tu gagnes en cas de victoire et ce que tu risques : plus il est fort, plus la victoire rapporte. Le jeu ne te propose jamais une victoire trop facile. Après chaque combat, la liste change. Les abonnés de la chaîne peuvent la changer une fois par jour.")),
       el("div", {}, el("h3", { texte: "Rangs et points de ligue" }),
         el("p", {}, RANGS.join(", ") + " : chaque palier compte trois divisions (III, II, I) de 100 points, puis vient le rang ", el("b", { texte: "Maître" }), " à 1 800 points. Battre plus fort que toi rapporte plus de points. De Fer à Or, tu ne redescends jamais de division ; à partir de Platine, tu peux redescendre, mais jamais sous Platine III.")),
       el("div", { id: "energie" }, el("h3", { texte: "Énergie de ligue" }),
@@ -63,7 +63,7 @@ App.demarrer("aide", async (main) => {
         el("p", { texte: "2 médailles par victoire, 5 de plus pour ta première victoire du jour, et 1 médaille par défense tenue (5 par jour au plus). Une défaite ne te prend ni objet ni médaille." })),
       el("div", {}, el("h3", { texte: "Échos" }),
         el("p", {}, "S'il manque un joueur à ton niveau, sa place est prise par un ", lien("#echo", "écho"), " : le build d'un autre joueur ramené à ton niveau, tiré au moment du combat. Le joueur d'origine ne gagne ni ne perd rien."))),
-    el("p", { class: "mention", texte: "Ton rang s'appuie sur un classement caché, qui sert à te trouver des adversaires à ta mesure : tes dix premiers combats le règlent vite, puis il bouge plus doucement." })));
+    el("p", { class: "mention", texte: "Tout le monde démarre au même point. Ton rang s'appuie sur un classement caché, qui sert à te trouver des adversaires à ta mesure : tes dix premiers combats le règlent vite, puis il bouge plus doucement. Si ton build est plus fort que ceux de ton rang, tu gagnes tes combats et tu montes vite." })));
 
   // ---------- Duels ----------
   const MEDAILLES = [
