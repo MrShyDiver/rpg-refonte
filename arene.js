@@ -162,8 +162,8 @@ App.demarrer("arene", async (main, ctx) => {
       el("section", { class: "section-page ar-draft", "aria-labelledby": "t-ar" },
         el("div", { class: "ar-draft-tete" },
           el("div", {}, el("h2", { id: "t-ar", tabindex: "-1", texte: `Tour ${fmt(etat.tour + 1)} sur ${fmt(etat.tours)}` }),
-            el("p", { class: "sous", texte: vides ? "Remplis un emplacement vide, ou renforce déjà ce que tu as : une stat, ou une amélioration d'un objet déjà pris."
-              : "Choisis une carte : une stat, une amélioration, ou un remplacement (les améliorations de l'ancien objet sont converties selon la rareté du nouveau)." })),
+            el("p", { class: "sous", texte: vides ? "Remplis un emplacement vide, ou joue une autre carte : une stat, ou l'amélioration ou le remplacement d'un objet déjà pris."
+              : "Les cartes sont tirées au sort : stats, améliorations, remplacements. Plus un objet est rare, plus son amélioration est rare." })),
           el("span", { class: "ar-reste num", texte: reste > 1 ? `${fmt(reste)} cartes à choisir` : "Dernière carte" })),
         el("div", { class: "ar-avance", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": String(etat.tours), "aria-valuenow": String(etat.tour), "aria-label": "Avancement du draft" },
           el("i", { style: { width: (100 * etat.tour) / etat.tours + "%" } })),
@@ -344,7 +344,7 @@ App.demarrer("arene", async (main, ctx) => {
       el("section", { class: "section-page ar-tete", "aria-labelledby": "t-ar" },
         el("h2", { id: "t-ar", tabindex: "-1", texte: titre }), el("p", { class: "sous", texte }),
         enCours || fini ? score() : el("ol", { class: "ar-etapes" },
-          el("li", {}, el("b", { texte: "Drafte" }), el("span", { texte: `${fmt(etat.tours)} tours, 5 cartes à chaque tour : des objets pour tes emplacements vides, une stat (+${fmt(etat.stat_points)} à +${fmt(etat.stat_points_max || etat.stat_points)} points selon sa rareté), des améliorations (+1 à +3) et, une fois équipé, deux remplacements.` })),
+          el("li", {}, el("b", { texte: "Drafte" }), el("span", { texte: `${fmt(etat.tours)} tours, 5 cartes à chaque tour : une stat (+${fmt(etat.stat_points)} à +${fmt(etat.stat_points_max || etat.stat_points)} points selon sa rareté), un objet pour chaque emplacement vide, et pour le reste des améliorations (+1 à +3) ou des remplacements tirés au sort. Plus un objet est rare, plus son amélioration est rare.` })),
           el("li", {}, el("b", { texte: "Combats" }), el("span", { texte: "Avec ce build, contre ceux des autres joueurs qui ont autant de victoires que toi." })),
           el("li", {}, el("b", { texte: "Ouvre tes coffres" }), el("span", { texte: "Plus tu vas loin, plus il y en a, et mieux ils sont remplis." }))),
         gagnes,
